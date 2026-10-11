@@ -38,8 +38,24 @@ jobs:
       - name: Check package lifecycles
         run: npm run release:check
 
+  windows-cli:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run build -w @mosaic-apps/core
+      - run: npm run build -w @mosaic-apps/server
+      - run: npm run test -w @mosaic-apps/cli
+      - run: npx playwright install chromium
+      - run: npm run release:consumer:pack
+      - run: npm run release:consumer
+
   publish:
-    needs: build-and-test
+    needs: [build-and-test, windows-cli]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
