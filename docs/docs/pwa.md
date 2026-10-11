@@ -2,40 +2,35 @@
 sidebar_position: 10
 ---
 
-# PWA guide
+# Install your application
 
-Every generated web app is an **installable PWA**: manifest, service worker,
-icons and an offline page ship in the template.
+Generated web applications include a web manifest, service worker, icons, and an
+offline fallback page. Deploy over HTTPS, then use your browser's install action
+to launch the application in its own window.
 
-## What ships
+## What is cached
 
-- `static/manifest.webmanifest` — name, colors, `standalone` display, 192/512
-  + maskable icons
-- `static/sw.js` — shell precache (`/`, offline page, icons, manifest);
-  **network-first** for `/api` + `/files` with stale fallback (offline reads
-  keep working); navigation fallback to `/offline.html`
-- `static/offline.html` — friendly offline page
-- `scripts/make-icons.mjs` — generates real PNG icons (no binary assets in
-  the template); run via `npm run icons`
-- layout registers `/sw.js` on first load
+The service worker caches the application shell and static assets. Business API
+responses and uploaded files use the network and are not stored in the shared
+service-worker cache. Previously cached data is removed when the new cache
+version activates.
 
-## Offline forms
+Cached navigation and assets can help display an offline fallback. Published
+form definitions and business records still need API access; complete offline
+record editing and automatic submission synchronization are not implemented.
 
-Published form trees are JSON: once visited, the page shell + form definition
-are cached, so data entry keeps rendering offline. Queueing submits for
-background sync is app-specific — a typical pattern:
+## If your workflow needs offline editing
 
-1. `try { await client.createRecord(...) } catch (offline) { save to
-   localStorage queue }`
-2. On `online` event or SW `sync`, replay the queue.
+Design an explicit, user-scoped persistence layer with logout cleanup, expiry,
+data minimization, queued write identifiers, retry handling, and conflict
+resolution. Decide which records may be stored on the device. Do not put bearer
+tokens or private records in a shared cache.
 
-## Installability checklist
+## Configure and inspect
 
-- Served over HTTPS (or localhost) ✓
-- 192px + 512px icons ✓ (generated)
-- `start_url`, `display: standalone`, `theme_color` ✓
-- Service worker with `fetch` handler ✓
+- Edit `static/manifest.webmanifest` for the app name, colors, and start URL.
+- Generate icons with `npm run icons` in `apps/web`.
+- Inspect the manifest and service worker in your browser's Application tools.
+- Increment the service worker's cache version when changing cached assets.
 
-Test with Chrome DevTools → Application → Manifest, and Lighthouse PWA
-audits. Bump the `VERSION` constant in `sw.js` when you change caching
-strategy — old caches are purged on activate.
+See [Deployment](./deployment.md) for supported frontend hosting options.

@@ -1,11 +1,12 @@
 /**
  * Mosaic PWA service worker.
  * - App shell: cache-first (precached on install)
- * - /api + /files: network-first with stale fallback (offline reads keep working)
+ * - Business APIs and uploads: network only; no private records in shared caches
  * - Navigations: cached shell, /offline.html fallback when offline
  */
 
-const VERSION = '__PROJECT_SLUG__-v1';
+const CACHE_PREFIX = '__PROJECT_SLUG__-v';
+const VERSION = `${CACHE_PREFIX}2`;
 const SHELL = [
   '/',
   '/offline.html',
@@ -28,7 +29,7 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== VERSION).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => k.startsWith(CACHE_PREFIX) && k !== VERSION).map((k) => caches.delete(k))))
       .then(() => self.clients.claim()),
   );
 });
@@ -38,27 +39,10 @@ self.addEventListener('fetch', (event) => {
   if (req.method !== 'GET') return;
 
   const url = new URL(req.url);
+  if (url.origin !== self.location.origin) return;
 
-  // API + uploads: network-first, fall back to cache (stale) when offline
-  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/files/')) {
-    event.respondWith(
-      fetch(req)
-        .then((res) => {
-          const copy = res.clone();
-          caches.open(VERSION).then((cache) => cache.put(req, copy));
-          return res;
-        })
-        .catch(async () => {
-          const cached = await caches.match(req);
-          if (cached) return cached;
-          return new Response(
-            JSON.stringify({ success: false, error: { message: 'You are offline', code: 'OFFLINE' } }),
-            { status: 503, headers: { 'Content-Type': 'application/json' } },
-          );
-        }),
-    );
-    return;
-  }
+  // Private data must not survive logout in an unpartitioned service-worker cache.
+  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/files/') || req.headers.has('Authorization')) return;
 
   // Navigations: shell from cache, offline page as last resort
   if (req.mode === 'navigate') {
