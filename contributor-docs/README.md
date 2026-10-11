@@ -14,6 +14,10 @@ uses installed Edge; on other platforms run `npx playwright install chromium`
 or set `MOSAIC_BROWSER_EXECUTABLE_PATH` to your browser executable.
 
 Build public docs with `npm run docs:build`; `npm run docs:start` serves them on 3003.
+For a hosted docs build, set `MOSAIC_DOCS_URL` to the real site origin and,
+when hosting under a subpath, `MOSAIC_DOCS_BASE_URL` (with a trailing slash).
+Deploy the generated `docs/build` directory with your static host. The default
+configuration targets local preview and does not assume an owned domain.
 
 The public site in `docs/` teaches application builders how to use Mosaic.
 Repository development and release procedures belong here.

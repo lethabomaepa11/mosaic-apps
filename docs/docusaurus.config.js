@@ -5,8 +5,8 @@ const config = {
   tagline: 'The metadata-driven full-stack platform — model, migrate, design, deploy',
   favicon: 'img/favicon.svg',
 
-  url: 'https://mosaic.dev',
-  baseUrl: '/',
+  url: process.env.MOSAIC_DOCS_URL ?? 'http://localhost:3003',
+  baseUrl: process.env.MOSAIC_DOCS_BASE_URL ?? '/',
   organizationName: 'lethabomaepa11',
   projectName: 'mosaic-apps',
 
