@@ -55,7 +55,7 @@ async function main(): Promise<void> {
 
   if (command === 'help' || command === '--help' || command === '-h' || command === 'version' || command === '--version') {
     if (command === 'version' || command === '--version') {
-      console.log('mosaic 0.2.1');
+      console.log('mosaic 0.2.2');
       return;
     }
     console.log(HELP);

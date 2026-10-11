@@ -13,7 +13,7 @@ export default defineConfig({
   envPrefix: ['VITE_', 'PUBLIC_'],
   preview: { host: '127.0.0.1', port: Number(process.env.MOSAIC_WEB_PORT ?? __WEB_PORT__) },
   plugins: [tailwindcss(), sveltekit({
-    adapter: process.env.MOSAIC_DEPLOY_TARGET === 'netlify' ? netlifyAdapter() : process.env.MOSAIC_DEPLOY_TARGET === 'vercel' ? vercelAdapter() : adapter(),
+    adapter: process.env.MOSAIC_DEPLOY_TARGET === 'netlify' ? netlifyAdapter() : process.env.MOSAIC_DEPLOY_TARGET === 'vercel' ? vercelAdapter({ runtime: 'nodejs22.x' }) : adapter(),
     ...(process.env.MOSAIC_APP_ORIGIN ? { paths: { origin: process.env.MOSAIC_APP_ORIGIN } } : {}),
   })],
   resolve: { alias: { '#lib': fileURLToPath(new URL('./src/lib', import.meta.url)) } },

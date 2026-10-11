@@ -13,7 +13,7 @@ export default defineConfig({
   optimizeDeps: { include: ['monaco-editor/editor/editor.main', '@jitl/quickjs-wasmfile-release-sync', 'quickjs-emscripten-core', 'typescript'] },
   envPrefix: ['VITE_', 'PUBLIC_'],
   plugins: [tailwindcss(), sveltekit({
-    adapter: process.env.MOSAIC_DEPLOY_TARGET === 'netlify' ? netlifyAdapter() : process.env.MOSAIC_DEPLOY_TARGET === 'vercel' ? vercelAdapter() : adapter(),
+    adapter: process.env.MOSAIC_DEPLOY_TARGET === 'netlify' ? netlifyAdapter() : process.env.MOSAIC_DEPLOY_TARGET === 'vercel' ? vercelAdapter({ runtime: 'nodejs22.x' }) : adapter(),
     ...(process.env.MOSAIC_APP_ORIGIN ? { paths: { origin: process.env.MOSAIC_APP_ORIGIN } } : {}),
   })],
   resolve: {
