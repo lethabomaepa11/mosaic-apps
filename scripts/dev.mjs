@@ -1,11 +1,12 @@
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
+import { createConnection } from 'node:net';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const node = process.execPath;
-const apiPort = Number(process.env.MOSAIC_API_PORT ?? '8787');
-const studioPort = Number(process.env.STUDIO_PORT ?? process.env.PORT ?? '4173');
+const apiPort = Number(process.env.MOSAIC_API_PORT ?? '3001');
+const studioPort = Number(process.env.STUDIO_PORT ?? process.env.PORT ?? '3000');
 const apiUrl = (process.env.PUBLIC_API_URL ?? `http://127.0.0.1:${apiPort}`).replace(/\/$/, '');
 const children = [];
 let stopping = false;
@@ -74,6 +75,16 @@ async function studioIsHealthy() {
   }
 }
 
+async function studioPortIsListening() {
+  return new Promise((resolveListening) => {
+    const socket = createConnection({ host: '127.0.0.1', port: studioPort });
+    const finish = (listening) => { socket.destroy(); resolveListening(listening); };
+    socket.once('connect', () => finish(true));
+    socket.once('error', () => finish(false));
+    socket.setTimeout(500, () => finish(false));
+  });
+}
+
 async function main() {
   const studioEnv = { ...process.env, PORT: String(studioPort), PUBLIC_API_URL: apiUrl };
   const existingApi = await apiIsHealthy();
@@ -85,6 +96,18 @@ async function main() {
   if (await studioIsHealthy()) {
     console.log(`[mosaic] Studio and its API proxy are already healthy at http://localhost:${studioPort}`);
     return;
+  }
+  if (await studioPortIsListening()) {
+    console.log(`[mosaic] waiting for the existing Studio on port ${studioPort} to become ready`);
+    const deadline = Date.now() + 60_000;
+    while (Date.now() < deadline) {
+      if (await studioIsHealthy()) {
+        console.log(`[mosaic] Studio and its API proxy are healthy at http://localhost:${studioPort}`);
+        return;
+      }
+      await new Promise((resolveReady) => setTimeout(resolveReady, 500));
+    }
+    throw new Error(`Port ${studioPort} is occupied but Studio or its API proxy is unhealthy. Check the existing process and PUBLIC_API_URL.`);
   }
   console.log(`[mosaic] starting Studio at http://localhost:${studioPort}`);
   start('Studio', [resolve(root, 'node_modules/vite/bin/vite.js'), 'dev', '--host', '127.0.0.1', '--strictPort'], resolve(root, 'apps/studio'), studioEnv);

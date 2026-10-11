@@ -4,7 +4,7 @@ import type { AuditEntry, EntityDef, FormDef, PageDef, QuerySpec, RefList, Setti
 import { buildQueryString } from '@mosaic-apps/core';
 
 export interface ClientOptions {
-  /** API base, e.g. '/api' (proxied) or 'http://localhost:8787/api' */
+  /** API base, e.g. '/api' (proxied) or 'http://localhost:3001/api' */
   baseUrl: string;
   token?: string;
   onUnauthorized?: () => void;

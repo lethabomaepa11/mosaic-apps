@@ -9,7 +9,7 @@ import http from 'node:http';
 import assert from 'node:assert/strict';
 import { createMosaicServer } from '../packages/server/dist/index.js';
 
-const PORT = 8799;
+const PORT = 3101;
 const BASE = `http://localhost:${PORT}/api`;
 
 let passed = 0;

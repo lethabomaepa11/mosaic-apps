@@ -10,7 +10,7 @@ const reset = "\x1b[0m";
 const children = [];
 let shuttingDown = false;
 
-for (const t of targets) {
+function startTarget(t) {
   const child = spawn(`npm ${t.args.join(" ")}`, { stdio: ["ignore", "pipe", "pipe"], shell: true });
   children.push(child);
 
@@ -34,6 +34,25 @@ for (const t of targets) {
   });
 }
 
+async function main() {
+  startTarget(targets[0]);
+  const health = 'http://127.0.0.1:__API_PORT__/api/health';
+  const deadline = Date.now() + 60_000;
+  while (Date.now() < deadline) {
+    try {
+      const response = await fetch(health, { signal: AbortSignal.timeout(1500) });
+      if (response.ok) {
+        console.log(`[mosaic] API ready; starting web (:__WEB_PORT__) and Studio (:3002)`);
+        startTarget(targets[1]);
+        startTarget(targets[2]);
+        return;
+      }
+    } catch { /* API may still be initializing its database. */ }
+    await new Promise((resolveReady) => setTimeout(resolveReady, 300));
+  }
+  throw new Error(`API did not become healthy at ${health}. Check DATABASE_URL and API logs.`);
+}
+
 function shutdown(code) {
   if (shuttingDown) return;
   shuttingDown = true;
@@ -45,3 +64,4 @@ function shutdown(code) {
 
 process.on("SIGINT", () => shutdown(0));
 process.on("SIGTERM", () => shutdown(0));
+main().catch((error) => { console.error('[mosaic]', error.message); shutdown(1); });

@@ -1,5 +1,5 @@
 /**
- * Entity & field decorators — define Mosaic entities as TypeScript classes.
+ * Entity & field decorators â€” define Mosaic entities as TypeScript classes.
  *
  * ```ts
  * import { Entity, Field, Relation } from '@mosaic-apps/core';
@@ -17,8 +17,8 @@
  * }
  * ```
  *
- * Decorators work with both modern (standard) decorators — what tsc and esbuild
- * emit by default — and legacy `experimentalDecorators`. Field metadata is kept
+ * Decorators work with both modern (standard) decorators â€” what tsc and esbuild
+ * emit by default â€” and legacy `experimentalDecorators`. Field metadata is kept
  * on the shared per-class decorator metadata object (modern) or on the prototype
  * chain via reflect-metadata (legacy); `extractEntityDef()` reads either.
  */
@@ -86,7 +86,7 @@ export interface EntityOptions extends Omit<EntityDef, 'name' | 'fields' | 'vers
 }
 
 export type FieldOptions = Omit<FieldDef, 'name' | 'type'> & {
-  /** Defaults to `string` — always set it explicitly for non-strings. */
+  /** Defaults to `string` â€” always set it explicitly for non-strings. */
   type?: FieldType;
 };
 
@@ -278,7 +278,7 @@ export function extractEntityDef(entityClass: EntityClass): EntityDef {
   const stored = Reflect.getMetadata(ENTITY_META, entityClass) as StoredEntity | undefined;
   if (!stored) {
     throw new Error(
-      `${entityClass.name} is missing @Entity() — decorate the class with @Entity({ ... }) before using it.`,
+      `${entityClass.name} is missing @Entity() â€” decorate the class with @Entity({ ... }) before using it.`,
     );
   }
 
@@ -299,7 +299,7 @@ export function extractEntityDef(entityClass: EntityClass): EntityDef {
 
   const errors = validateEntity(def);
   if (errors.length) {
-    throw new Error(`Entity "${def.name}" (${entityClass.name}) is invalid:\n  • ${errors.join('\n  • ')}`);
+    throw new Error(`Entity "${def.name}" (${entityClass.name}) is invalid:\n  â€¢ ${errors.join('\n  â€¢ ')}`);
   }
   return def;
 }
@@ -375,7 +375,7 @@ export async function loadEntityJsonDefs(dir: string): Promise<EntityDef[]> {
     const raw = JSON.parse(await readFile(join(dir, file), 'utf8')) as EntityDef;
     const errors = validateEntity(raw);
     if (errors.length) {
-      throw new Error(`Entity file "${file}" is invalid:\n  • ${errors.join('\n  • ')}`);
+      throw new Error(`Entity file "${file}" is invalid:\n  â€¢ ${errors.join('\n  â€¢ ')}`);
     }
     defs.push(raw);
   }

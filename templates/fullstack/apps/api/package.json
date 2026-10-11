@@ -1,5 +1,5 @@
 {
-  "name": "api",
+  "name": "@__PROJECT_SLUG__/api",
   "version": "0.1.0",
   "private": true,
   "type": "module",

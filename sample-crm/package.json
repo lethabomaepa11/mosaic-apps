@@ -17,7 +17,7 @@
     "start": "npm run start -w @sample-crm/api"
   },
   "devDependencies": {
-    "@mosaic-apps/cli": "file:C:/Users/letha/desktop/projects/experiment/mosaic-apps/packages/cli",
+    "@mosaic-apps/cli": "file:../packages/cli",
     "tsx": "^4.20.0",
     "typescript": "^6.0.3"
   },

@@ -181,7 +181,7 @@ export async function studio(opts: { dir: string; port?: number }): Promise<void
     cwd: repo,
     stdio: 'inherit',
     shell: process.platform === 'win32',
-    env: { ...process.env, PUBLIC_API_URL: `http://localhost:${config.api.port}/api`, PORT: String(opts.port ?? 4173) },
+    env: { ...process.env, PUBLIC_API_URL: `http://localhost:${config.api.port}/api`, PORT: String(opts.port ?? 3002) },
   });
   child.on('exit', (code) => process.exit(code ?? 0));
 }

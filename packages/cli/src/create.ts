@@ -117,11 +117,12 @@ export async function create(opts: CreateOptions): Promise<void> {
 ✅ ${name} is ready!
 
   cd ${slug}
-  ${opts.install ? '' : `${opts.pm} install\n`}docker compose up -d        # start PostgreSQL
-  npm run dev                   # API (:${opts.apiPort}) + web (:${opts.webPort})
+  ${opts.install ? '' : `${opts.pm} install\n  `}${databaseUrl.startsWith('pglite') ? '# Embedded PostgreSQL: no database service needed' : 'docker compose up -d        # start PostgreSQL'}
+  npm run dev                   # API (:${opts.apiPort}) + web (:${opts.webPort}) + Studio (:3002)
 
   API   → http://localhost:${opts.apiPort}
   Web   → http://localhost:${opts.webPort}
+  Studio → http://localhost:3002
   Admin → admin@mosaic.local / admin1234${opts.demo ? '' : '\n\n  (demo seeding disabled)'}
 
 Next:

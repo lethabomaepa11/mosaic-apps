@@ -10,9 +10,11 @@
   ],
   "scripts": {
     "build": "npm run build -w @mosaic-apps/core && npm run build -w @mosaic-apps/server && npm run build -w @mosaic-apps/cli && npm run build -w studio",
-    "typecheck": "npm run typecheck -w @mosaic-apps/core && npm run typecheck -w @mosaic-apps/server && npm run typecheck -w @mosaic-apps/cli && npm run check -w @mosaic-apps/ui && npm run check -w studio",
+    "typecheck": "npm run build -w @mosaic-apps/core && npm run typecheck -w @mosaic-apps/core && npm run typecheck -w @mosaic-apps/server && npm run typecheck -w @mosaic-apps/cli && npm run check -w @mosaic-apps/ui && npm run check -w studio",
     "test": "npm run test -w @mosaic-apps/core && npm run test -w @mosaic-apps/server && npm run test -w @mosaic-apps/ui",
     "release:check": "node scripts/check-packages.mjs",
+    "release:consumer": "node scripts/validate-release-consumer.mjs",
+    "release:publish": "node scripts/publish-packages.mjs",
     "mosaic": "node --import tsx packages/cli/src/index.ts",
     "create": "npm run mosaic -- create",
     "link-cli": "node scripts/link-cli.mjs",
@@ -23,10 +25,12 @@
     "db:down": "docker compose -f infra/docker-compose.yml down -v",
     "docs:start": "npm --prefix docs run start",
     "docs:build": "npm --prefix docs run build",
+    "docs:screenshots": "node scripts/capture-docs.mjs",
     "e2e": "node scripts/integration.mjs"
   },
   "devDependencies": {
     "@types/node": "^26.0.0",
+    "playwright": "^1.64.0",
     "tsx": "^4.20.0",
     "typescript": "^6.0.3"
   },

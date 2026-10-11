@@ -11,7 +11,7 @@ async function main(): Promise<void> {
   // default: embedded Postgres (WASM) — no external DB needed for quickstart.
   // set DATABASE_URL=postgres://... to use a real server instead.
   const databaseUrl = env('DATABASE_URL', 'pglite://memory');
-  const port = Number(env('PORT', '8787'));
+  const port = Number(env('PORT', '3001'));
 
   const server = await createMosaicServer({
     databaseUrl,

@@ -11,8 +11,8 @@
     "check": "svelte-check --tsconfig ./tsconfig.json"
   },
   "dependencies": {
-    "@mosaic-apps/core": "file:C:/Users/letha/desktop/projects/experiment/mosaic-apps/packages/core",
-    "@mosaic-apps/ui": "file:C:/Users/letha/desktop/projects/experiment/mosaic-apps/packages/ui"
+    "@mosaic-apps/core": "file:../../../packages/core",
+    "@mosaic-apps/ui": "file:../../../packages/ui"
   },
   "imports": {
     "#lib": "./src/lib/index.js",

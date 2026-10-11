@@ -29,8 +29,8 @@ create options:
   --auth on|off          Enable authentication (default on)
   --demo | --no-demo     Seed demo entities/forms (default demo)
   --pwa | --no-pwa       PWA-enabled web app (default pwa)
-  --port <n>             API port (default 8787)
-  --web-port <n>         Web port (default 5173)
+  --port <n>             API port (default 3001)
+  --web-port <n>         Web port (default 3000)
   --db-port <n>          Docker Postgres host port (default 5432)
   --pm npm|pnpm|yarn     Package manager (default npm)
   --install | --no-install   Run package install (default install)
@@ -54,7 +54,7 @@ async function main(): Promise<void> {
 
   if (command === 'help' || command === '--help' || command === '-h' || command === 'version' || command === '--version') {
     if (command === 'version' || command === '--version') {
-      console.log('mosaic 0.1.0');
+      console.log('mosaic 0.2.0');
       return;
     }
     console.log(HELP);
@@ -76,8 +76,8 @@ async function main(): Promise<void> {
           'no-demo': { type: 'boolean', default: false },
           pwa: { type: 'boolean', default: true },
           'no-pwa': { type: 'boolean', default: false },
-          port: { type: 'string', default: '8787' },
-          'web-port': { type: 'string', default: '5173' },
+          port: { type: 'string', default: '3001' },
+          'web-port': { type: 'string', default: '3000' },
           'db-port': { type: 'string', default: '5432' },
           pm: { type: 'string', default: 'npm' },
           install: { type: 'boolean', default: true },

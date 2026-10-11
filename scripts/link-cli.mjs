@@ -13,7 +13,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const repo = dirname(dirname(fileURLToPath(import.meta.url)));
-const cliDir = join(repo, 'packages', 'mosaic-cli');
+const cliDir = join(repo, 'packages', 'cli');
 
 function run(cmd, args, cwd) {
   const res = spawnSync(cmd, args, { cwd, stdio: 'inherit', shell: process.platform === 'win32' });

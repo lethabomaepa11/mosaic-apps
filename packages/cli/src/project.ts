@@ -89,8 +89,8 @@ export async function loadProjectConfig(dir: string): Promise<ProjectConfig> {
     auth: raw.auth !== false,
     pwa: raw.pwa !== false,
     demo: raw.demo !== false,
-    api: { port: Number(process.env.PORT ?? api.port ?? 8787) },
-    web: { port: web.port ?? 5173 },
+    api: { port: Number(process.env.PORT ?? api.port ?? 3001) },
+    web: { port: web.port ?? 3000 },
   };
 }
 
@@ -160,7 +160,7 @@ export async function rewriteMosaicDeps(dir: string, linkDir: string): Promise<v
       for (const name of Object.keys(deps)) {
         if (!name.startsWith('@mosaic-apps/')) continue;
         const short = name.replace('@mosaic-apps/', '');
-        const abs = join(packages, `mosaic-${short}`);
+        const abs = join(packages, short);
         if (existsSync(abs)) {
           deps[name] = `file:${abs.split('\\').join('/')}`;
           changed = true;

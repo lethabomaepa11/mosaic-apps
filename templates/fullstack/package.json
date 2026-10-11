@@ -18,7 +18,7 @@
     "seed": "npm run seed -w apps/api"
   },
   "devDependencies": {
-    "@mosaic-apps/cli": "latest"
+    "@mosaic-apps/cli": "^0.2.0"
   },
   "engines": {
     "node": ">=22"
