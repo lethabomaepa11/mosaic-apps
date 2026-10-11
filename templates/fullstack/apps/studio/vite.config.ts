@@ -16,7 +16,7 @@ export default defineConfig({
   envPrefix: ['VITE_', 'PUBLIC_'],
   plugins: [tailwindcss(), sveltekit({
     adapter: process.env.MOSAIC_DEPLOY_TARGET === 'netlify' ? netlifyAdapter() : process.env.MOSAIC_DEPLOY_TARGET === 'vercel' ? vercelAdapter() : adapter(),
-    paths: { origin: process.env.MOSAIC_APP_ORIGIN },
+    ...(process.env.MOSAIC_APP_ORIGIN ? { paths: { origin: process.env.MOSAIC_APP_ORIGIN } } : {}),
   })],
   resolve: {
     alias: {

@@ -72,6 +72,7 @@ async function waitHealthy(url) {
   const deadline = Date.now() + 120_000;
   while (Date.now() < deadline) {
     if (development.exitCode !== null) throw new Error(`Generated dev stack exited before ${url} became healthy.`);
+    if (services.some((service) => service.exitCode !== null)) throw new Error(`A production frontend exited before ${url} became healthy.`);
     try { if ((await fetch(url, { signal: AbortSignal.timeout(15000) })).ok) return; } catch { /* Waiting for startup. */ }
     await new Promise((resolveReady) => setTimeout(resolveReady, 300));
   }
