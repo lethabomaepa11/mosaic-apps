@@ -57,12 +57,15 @@
   The initial push exposed a fresh-CI dependency-order issue: CLI typechecking
   imports the server's generated declarations. Root `typecheck` now builds both
   core and server before checking consumers; do not rely on leftover local dist.
-  npm publication was attempted after validation and rejected with `EOTP`: the
-  account requires two-factor authentication. All four 0.2.0 package versions
-  still return registry 404. A current OTP or an authenticated publishing session
-  is needed; a question is pending. CI uses idempotent `npm run release:publish`
-  with the configured NPM_TOKEN. Do not claim npm publication succeeded without
-  verifying the registry. No application hosting destination was provided.
+  Manual npm publication required EOTP, but CI subsequently published all four
+  packages at 0.2.0 with its configured NPM_TOKEN. The successful delivery run is
+  `https://github.com/lethabomaepa11/mosaic-apps/actions/runs/38167953204` on source
+  commit `9693e3d`; build/test and publish jobs both passed. Public version metadata
+  was verified for core, server, ui, and cli; public tarballs are available. npm
+  packument/CDN propagation may briefly lag version endpoints after first publication.
+  No OTP is now needed. CI uses idempotent `npm run release:publish`, so later
+  unchanged versions are skipped. Bump versions before publishing new package
+  source. No application hosting destination was provided.
 
 Remaining enterprise work must retain explicit status: draft recovery/conflicts,
 metadata/action validation and migration, data-source loading and query lifecycle,

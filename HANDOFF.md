@@ -26,10 +26,13 @@ Final packed consumer also passed generated startup and both API proxies. Eviden
 The first CI push revealed missing server declarations in a clean checkout; root
 typecheck now builds core and server before checking CLI consumers.
 Delivery uses focused commits on main and targets origin/main. npm publishing was
-attempted after validation, but npm returned EOTP (account two-factor authentication).
-All four 0.2.0 registry versions remain unpublished. User authentication is pending;
-CI can publish using its configured NPM_TOKEN. Verify registry state before claiming
-publication. No app hosting destination was provided.
+attempted manually and required EOTP; CI then successfully published all four
+`@mosaic-apps/{core,server,ui,cli}` packages at 0.2.0 using its configured NPM_TOKEN.
+Both jobs passed: https://github.com/lethabomaepa11/mosaic-apps/actions/runs/38167953204
+on source commit 9693e3d. Public version records and tarballs have been verified.
+Initial npm packument/CDN propagation can lag version endpoints. No OTP is now
+required. Published package versions are immutable; bump before source releases.
+No application hosting destination was provided.
 
 Public docs teach usage with ten real screenshots and a v1 roadmap, with no product
 comparisons. Contributor architecture/release guides are in `contributor-docs`.
