@@ -2,71 +2,78 @@
 sidebar_position: 2
 ---
 
-# Quickstart
+# Create your first application
 
-## Prerequisites
+## Requirements
 
-- Node.js 20+
-- npm 10+
-- PostgreSQL 14+ **or nothing** — Mosaic boots on embedded Postgres
-  ([PGlite](https://electric-sql.com/docs/pglite)) when `DATABASE_URL` starts
-  with `pglite://`. No Docker required for your first app.
+- Node.js 22.17 or newer and npm 11 or newer.
+- A terminal and a browser.
 
-## 1. Scaffold
+Use embedded PostgreSQL for local development, or supply a PostgreSQL connection
+string with `--db`. The example below stores local data in a directory so it
+survives API restarts.
+
+## 1. Create the project
 
 ```bash
-npx @mosaic-apps/cli create my-crm
+npx @mosaic-apps/cli create my-crm --db pglite://./data --no-install
 cd my-crm
 npm install
 ```
 
-This creates an API (`apps/api`, Hono + `@mosaic-apps/server`) and a PWA web app
-(`apps/web`, SvelteKit). `@mosaic-apps/*` dependencies are linked to your repo
-checkout automatically when created from the monorepo — from a checkout run
-`npm run create -- my-crm` (source, no publish) or `npm run link-cli` once and
-then `mosaic create my-crm` from anywhere.
+The CLI creates an API, a web application, and Studio. It also creates `.env`
+with your database URL and a generated JWT secret. Keep that file private.
 
-## 2. Run
+## 2. Start the application
 
 ```bash
-cp .env.example .env
-npm run dev          # API on :8787, web on :5173
+npm run dev
 ```
 
-Open http://localhost:5173 and sign in with `admin@mosaic.local` / `admin1234`
-(the API seeds this on first boot when `SEED=true`).
+| Application | Local address |
+| --- | --- |
+| Web application | `http://localhost:3000` |
+| API | `http://localhost:3001/api/health` |
+| Studio | `http://localhost:3002` |
 
-## 3. Model something
+The development command starts all three applications. You can also run
+`npx mosaic studio` to open Studio separately. With demo seeding enabled, sign in
+using `admin@mosaic.local` and `admin1234`. Replace the demo account before deploying.
+
+## 3. Create a form
+
+1. In Studio, open **Forms** and create a form named **Customer intake**.
+2. Drag a **Text field** onto the canvas. Select it and set its label to **Name**
+   and its data binding to `name`.
+3. Add another text field bound to `email` and a **Date picker** bound to `startDate`.
+4. Open **Form settings** to choose the entity, layout, and submit labels.
+5. Click **Save**. Studio saves and publishes the definition.
+6. Click **Preview** to try the fields inside Studio.
+
+![Customer intake form in Studio](/img/screenshots/form-studio.png)
+
+The generated web application renders published forms at `/f/<slug>` and pages
+at `/p/<slug>`. Choose an entity when the form should create or update a record.
+
+## 4. Add a business entity
 
 ```bash
-mosaic entity Product --fields "name:string,sku:string,price:decimal,stock:int,active:boolean"
-mosaic migrate
+npx mosaic entity Product --fields "name:string,sku:string,price:decimal,stock:int,active:boolean"
+npx mosaic migrate --dry-run
+npx mosaic migrate
 ```
 
-`mosaic entity` scaffolds a **class** in `apps/api/src/entities/product.entity.ts`
-— edit it like any other TypeScript file. `migrate` prints every SQL statement
-first (dry-run preview), then applies it. Your CRUD API exists immediately:
+Review the generated entity in `apps/api/src/entities/product.entity.ts` and the
+migration preview before applying changes. Restart the API after adding entity
+source files. Then choose the entity in Studio for field-binding suggestions
+and entity-backed tables.
 
-```bash
-curl -X POST localhost:8787/api/entities/product \
-  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
-  -d '{"name":"Widget","price":19.99}'
-```
+## Continue building
 
-## 4. Design a form
+- [Studio guide](./builder.md): settings, actions, scripts, and reusable forms.
+- [Component gallery](./components/gallery.md): screenshots and configuration examples.
+- [Runtime state](./state-management.md): how inputs and actions share values.
+- [Deployment](./deployment.md): database first, then API, then frontend.
 
-```bash
-mosaic studio
-```
-
-Pick your entity's auto-suggested form (or drag components onto a blank
-canvas), then press **Save** to persist and publish the form. Open the generated
-`/f/<slug>` route in the web app. Install the PWA from your browser menu — the
-form works offline.
-
-## Where to go next
-
-- [Entities](./entities.md) — field types, relations, permissions
-- [Migrations](./migrations.md) — how the diff engine thinks
-- [Builder guide](./builder.md) — Studio power features
-- [PWA guide](./pwa.md) — offline, install prompts, caching
+The PWA can cache its application shell. Online API access is still needed for
+record writes; do not assume offline submissions are synchronized automatically.

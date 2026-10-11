@@ -88,7 +88,7 @@ Generated projects include `Dockerfile.api`. Build it from the project root:
 
 ```bash
 docker build -f Dockerfile.api -t my-mosaic-api .
-docker run --rm -p 8787:8787 \
+docker run --rm -p 3001:3001 \
   -e DATABASE_URL \
   -e MOSAIC_JWT_SECRET \
   -e CORS_ORIGINS=https://app.example.com \
@@ -111,6 +111,9 @@ This is a public build-time value. Do not put database credentials, JWT secrets,
 ### Netlify
 
 The generated web app includes the Netlify adapter. In Netlify:
+
+The template pairs SvelteKit 3 with `@sveltejs/adapter-netlify` 7. Keep adapters
+compatible when upgrading Kit; see [SvelteKit 3 migration](https://svelte.dev/docs/kit/migrating-to-sveltekit-3).
 
 - leave **Base directory** empty so dependencies install at the repository root;
 - set **Package directory** to `apps/web`;

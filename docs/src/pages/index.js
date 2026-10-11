@@ -1,44 +1,33 @@
 import React from 'react';
 import Layout from '@theme/Layout';
 import Link from '@docusaurus/Link';
+import useBaseUrl from '@docusaurus/useBaseUrl';
 
 export default function Home() {
+  const screenshot = useBaseUrl('/img/screenshots/form-studio.png');
   return (
-    <Layout title="Mosaic — metadata-driven full-stack platform" description="Model entities, migrate SQL, design forms with drag & drop, deploy an Hono API + SvelteKit PWA.">
+    <Layout title="Mosaic — build business applications" description="Model business records, design forms and pages, and deploy your own application.">
       <header className="hero hero--primary" style={{ padding: '4rem 0' }}>
         <div className="container">
           <h1 className="hero__title">Mosaic</h1>
-          <p className="hero__subtitle">
-            Define entities. Get PostgreSQL tables, migrations, CRUD APIs, admin UIs, drag&nbsp;&amp;&nbsp;drop forms — and an installable PWA — from one JSON model.
-          </p>
-          <div className="buttons">
-            <Link className="button button--secondary button--lg" to="/docs/intro">
-              Get started in 5 minutes
-            </Link>
-          </div>
-          <pre style={{ marginTop: 24, background: 'rgba(0,0,0,.35)', color: '#fff', padding: '12px 18px', borderRadius: 10, display: 'inline-block' }}>
-            npx @mosaic-apps/cli create my-app
-          </pre>
+          <p className="hero__subtitle">Model your records. Design your workflows. Build your business application.</p>
+          <p>Forms, pages, tables, actions, and custom code in one Studio.</p>
+          <Link className="button button--secondary button--lg" to="/docs/quickstart">Create your first app</Link>
         </div>
       </header>
-      <main>
-        <section className="container" style={{ padding: '3rem 0' }}>
-          <div className="row">
-            {[
-              ['🗃️', 'Entities → tables', 'Declare fields in JSON. The migration engine diffs metadata against Postgres and plans safe, reversible-where-possible SQL.'],
-              ['🔌', 'Auto CRUD + auth', 'Instant REST with filters, sorts, pagination, relation labels, soft delete, audit, RBAC and ref-list pickers.'],
-              ['🧱', '57 drag & drop components', 'Inputs, data grids, layouts, charts, feedback — all stored as JSON, rendered anywhere, versioned and publishable.'],
-              ['📱', 'Installable PWA', 'Every generated web app ships installable: precached shell, offline forms, background-sync-friendly API design.'],
-            ].map(([icon, title, text]) => (
-              <div className="col col--3" key={title}>
-                <div className="card" style={{ height: '100%' }}>
-                  <div className="card__header"><h3>{icon} {title}</h3></div>
-                  <div className="card__body"><p>{text}</p></div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
+      <main className="container" style={{ padding: '3rem 0' }}>
+        <img src={screenshot} alt="Customer intake form in Mosaic Studio with the palette and property inspector" style={{ width: '100%', borderRadius: 12, border: '1px solid var(--ifm-color-emphasis-200)' }} />
+        <div className="row" style={{ marginTop: 32 }}>
+          {[
+            ['Model your data', 'Define entities and relations, review database migrations, and use generated CRUD APIs.'],
+            ['Design the interface', 'Build forms and pages with 59 component types. Preview inline and save to publish.'],
+            ['Extend behavior', 'Configure API calls, navigation, and state updates, or write custom JS/TS in a Monaco modal.'],
+            ['Run your own app', 'Use editable generated source and deploy your database, backend, and frontend to your chosen hosts.'],
+          ].map(([title, text]) => (
+            <div className="col col--3" key={title}><h2 className="h3">{title}</h2><p>{text}</p></div>
+          ))}
+        </div>
+        <p><Link to="/docs/components/gallery">Explore components</Link> · <Link to="/docs/builder">Learn Studio</Link> · <Link to="/docs/deployment">Deploy an application</Link> · <Link to="/docs/roadmap">Road to v1</Link></p>
       </main>
     </Layout>
   );

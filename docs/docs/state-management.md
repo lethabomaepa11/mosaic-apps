@@ -71,7 +71,8 @@ boundary for third-party services.
 
 ## Custom code
 
-Studio includes an offline Monaco editor for script actions. It provides
+Studio opens script actions in an **Execute script** modal with an offline Monaco
+editor, **Apply script**, and **Cancel**. It provides
 autocomplete for the read only `state` snapshot and the `api` action helpers.
 A script returns an array of actions, for example:
 
@@ -87,7 +88,9 @@ Published scripts run in a dedicated browser worker inside QuickJS WebAssembly.
 The sandbox has no DOM, cookies, browser storage, or host network APIs. It has a
 16 MiB memory limit, 512 KiB stack limit, a 500 ms default CPU deadline, a 2
 second maximum deadline, a 50,000 character source limit, and a 50 action output
-limit. TypeScript is transpiled in the worker. Returned values are parsed and
+limit. Worker initialization and TypeScript compilation have a separate 15 second
+startup limit, so they do not consume the script's execution budget.
+TypeScript is transpiled in the worker. Returned values are parsed and
 validated before the regular action runner can call the configured same-origin
 API, navigate, show a message, or update state. Scripts cannot create scripts.
 
@@ -95,3 +98,7 @@ API, navigate, show a message, or update state. Scripts cannot create scripts.
 Their Studio control can optionally switch to JavaScript or TypeScript; those
 conditions use the same worker and must return a boolean. A condition error is
 reported to the user and falls back to visible/enabled behavior.
+
+Form state writes, including actions returned by scripts, immediately update
+bound inputs and notify the form's `onchange` callback. User input updates the
+same form scope. Page/application state changes refresh visibility expressions.

@@ -7,7 +7,7 @@ const config = {
 
   url: 'https://mosaic.dev',
   baseUrl: '/',
-  organizationName: 'mosaic',
+  organizationName: 'lethabomaepa11',
   projectName: 'mosaic-apps',
 
   onBrokenLinks: 'throw',
@@ -28,7 +28,7 @@ const config = {
       ({
         docs: {
           sidebarPath: './sidebars.js',
-          editUrl: 'https://github.com/mosaic/mosaic-apps/tree/main/docs/',
+          editUrl: 'https://github.com/lethabomaepa11/mosaic-apps/tree/main/docs/',
         },
         blog: {
           showReadingTime: true,
@@ -50,10 +50,10 @@ const config = {
         items: [
           { type: 'docSidebar', sidebarId: 'guide', position: 'left', label: 'Docs' },
           { to: '/docs/components/catalog', label: 'Components', position: 'left' },
-          { href: '/api', label: 'API reference', position: 'left' },
+          { to: '/docs/auto-crud', label: 'API reference', position: 'left' },
           { to: '/blog', label: 'Blog', position: 'left' },
           {
-            href: 'https://github.com/mosaic/mosaic-apps',
+            href: 'https://github.com/lethabomaepa11/mosaic-apps',
             label: 'GitHub',
             position: 'right',
           },
@@ -82,7 +82,7 @@ const config = {
             title: 'More',
             items: [
               { label: 'Blog', to: '/blog' },
-              { label: 'GitHub', href: 'https://github.com/mosaic/mosaic-apps' },
+              { label: 'GitHub', href: 'https://github.com/lethabomaepa11/mosaic-apps' },
             ],
           },
         ],

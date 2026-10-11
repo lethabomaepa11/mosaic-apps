@@ -2,51 +2,37 @@
 sidebar_position: 1
 ---
 
-# Introduction
+# Build business applications with Mosaic
 
-**Mosaic** is a metadata-driven full-stack platform. You describe your domain
-as entity classes (or JSON) plus forms and pages — and Mosaic turns them into a
-running system:
+Mosaic helps you create internal applications around your business data: customer
+directories, service requests, inventory, and operational dashboards. Define
+entities, design forms and pages in Studio, and run them in your own web application.
 
-- **PostgreSQL tables** via a diffing migration engine (plan SQL, review, apply)
-- **REST APIs** with filters, sorts, pagination, soft delete, audit and RBAC —
-  auto-generated per entity, no hand-written controllers
-- **Drag & drop forms and pages** (59 component types) stored as JSON, with
-  versioning, publish workflow and live preview
-- **An installable SvelteKit PWA** per project (offline shell + offline data)
-- **A CLI** (`mosaic create|migrate|seed|entity|studio|info`) that drives the loop
+![A customer form in Mosaic Studio](/img/screenshots/form-studio.png)
 
-## Who is it for?
+## What you can do
 
-Teams that keep rebuilding the same internals: admin panels, CRUD apps,
-data-entry forms, approval dashboards. If your spec is "a database with a nice
-UI and permissions", Mosaic is the shortest path from model to production.
+- Model records and relations, review schema changes, and expose entity CRUD APIs.
+- Drag components onto forms and pages, then configure fields, layouts, and actions.
+- Use tables for record lists and drill down into a selected record's detail view.
+- Reuse forms inside other forms or pages and pass initial values through props.
+- Connect buttons to API calls, navigation, messages, or scoped state updates.
+- Write JavaScript or TypeScript in a Monaco modal when you need custom behavior.
+- Configure form and page settings, including SEO metadata, in their settings views.
 
-## The loop
+**Save** persists and publishes a form or page. **Preview** opens inside Studio,
+with desktop, tablet, and mobile widths. Code and JSON open in modal editors;
+Apply updates the designer and Cancel discards the editor draft.
 
-```bash
-mosaic create crm                    # scaffold API + PWA web
-mosaic entity Customer \
-  --fields "name:string,email:string,status:enum:prospect|active"   # model
-mosaic migrate                       # preview SQL → apply
-mosaic studio                        # design forms & pages, Save publishes forms
-```
+## Your first workflow
 
-1. **Model** — `apps/api/src/entities/*.entity.ts` (or `.entity.json`)
-2. **Migrate** — `mosaic migrate` shows every statement; `--dry-run` previews
-3. **Design** — Studio renders the same JSON your PWA renders (shared `@mosaic-apps/ui`)
-4. **Deploy** — adapter-node API + PWA web; docs in [Deployment](./deployment.md)
+1. [Create and start an application](./quickstart.md).
+2. [Define the records it manages](./entities.md).
+3. [Design a form and page](./builder.md).
+4. [Choose components](./components/gallery.md) and connect actions to your data.
+5. [Deploy your database, API, and frontend](./deployment.md).
 
-## Project map
+Generated applications contain editable source for the API, frontend, and Studio.
+You can extend the generated code with your own server endpoints and Svelte components.
 
-| Area | Code | What it is |
-|---|---|---|
-| Core | `packages/core` | Entity/form/page types, validation, expressions, query spec |
-| Server | `packages/server` | Hono API: CRUD, auth, migrations, forms, files, admin |
-| UI kit | `packages/ui` | Svelte 5 components, FormRenderer, DnD engine, client |
-| CLI | `packages/cli` | `mosaic` binary |
-| Studio | `apps/studio` | SvelteKit designer app |
-| Template | `templates/fullstack` | What `mosaic create` copies |
-| Docs | `docs` | This site |
-
-Next: [Quickstart](./quickstart.md).
+See the [v1 roadmap](./roadmap.md) for planned capabilities and current limits.

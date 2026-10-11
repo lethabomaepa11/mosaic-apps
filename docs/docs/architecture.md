@@ -4,6 +4,9 @@ sidebar_position: 3
 
 # Architecture
 
+This guide explains how an application's entities, forms, pages, actions, and
+state work together. Start with the [Studio guide](./builder.md) to build a screen.
+
 ## Metadata is the source of truth
 
 Mosaic stores entity definitions, form component trees, and page component trees
@@ -51,9 +54,11 @@ Each application session can own a `MosaicState` instance with application,
 page, and form stores. PageRenderer creates or accepts that instance;
 FormRenderer forks a form scope, and embedded forms share application/page
 scopes but get isolated form scopes. Updates are revisioned and observable;
-snapshots can be serialized and restored. State is in-memory only. Persistence,
-cross-tab synchronization, action execution, and Monaco scripts are not shipped
-yet; see [State management](./state-management.md).
+snapshots can be serialized and restored. Form state and bound inputs synchronize
+in both directions. Component actions use these scopes; Monaco scripts execute
+in an isolated browser worker and return declarative actions. State is in-memory
+only; persistence adapters and cross-tab coordination remain planned. See
+[State management](./state-management.md).
 
 ## Request lifecycle (CRUD)
 

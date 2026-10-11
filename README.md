@@ -18,7 +18,7 @@ Then compose UIs visually in the Studio and publish them as routes in your web a
 
 | path | what it is |
 |---|---|
-| `packages/` | `mosaic-core`, `mosaic-server`, `mosaic-cli`, `mosaic-ui` |
+| `packages/` | `core`, `server`, `cli`, `ui` |
 | `apps/studio` | the visual designer (forms, pages, entities, migrations) |
 | `templates/fullstack` | the project `mosaic create` scaffolds from |
 | `docs/` | Docusaurus site (`npm run docs:start`) |
@@ -26,6 +26,10 @@ Then compose UIs visually in the Studio and publish them as routes in your web a
 | `scripts/` | e2e runner + `link-cli.mjs` |
 
 ## Requirements
+
+Application usage is documented in the public [guides](docs/docs/intro.md).
+Repository setup, architectural decisions, and release procedures are in
+[contributor documentation](contributor-docs/README.md).
 
 - Node.js 22+ (26 tested)
 - npm 11+
@@ -40,9 +44,9 @@ npm run build        # build all packages (needed before file: linking)
 npm test             # core + server unit tests
 npm run typecheck    # all packages + studio
 npm run e2e          # boot the API on PGlite and exercise it over HTTP
-npm run dev           # API (:8787) + Studio (:4173), with the API proxy available
-npm run dev:api      # API on :8787 (PGlite)
-npm run dev:studio   # designer on :4173
+npm run dev           # API (:3001) + Studio (:3000), with the API proxy available
+npm run dev:api      # API on :3001 (PGlite)
+npm run dev:studio   # designer on :3000
 npm run db:up        # Postgres 16 on :5432
 ```
 
@@ -120,7 +124,7 @@ Rules of the road:
 ## Docs
 
 ```bash
-npm run docs:start   # http://localhost:3000
+npm run docs:start   # http://localhost:3003
 ```
 
 Highlights: `docs/docs/quickstart.md`, `entities.md`, `cli.md`, `migrations.md`,

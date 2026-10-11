@@ -4,16 +4,16 @@ sidebar_position: 9
 
 # Builder guide (Studio)
 
-Start Studio with its API from the repository root:
+Start your generated application from its project root:
 
 ```bash
 npm run dev
 ```
 
-The launcher waits for `http://127.0.0.1:8787/api/health` before it starts
-Studio at `http://localhost:4173`. This avoids proxy 502 responses while the API
-is initializing. The form and page designers are at `/studio/forms/:id` and
-`/studio/pages/:id`.
+Open Studio at `http://localhost:3002` and sign in. The web app uses port 3000
+and the API uses 3001. Open **Forms** or **Pages** to create or edit a definition.
+
+![Customer form in Studio](/img/screenshots/form-studio.png)
 
 ## Forms and pages
 
@@ -38,13 +38,42 @@ is initializing. The form and page designers are at `/studio/forms/:id` and
 Every component has a common **Actions** editor. Actions can show a message,
 call the configured API, navigate to a searchable form/page target, update an
 application/page/form/component state path, or run custom JavaScript/TypeScript.
-The custom-code option opens Monaco inline and autocompletes the runtime state
-and action API.
+Choose **Execute script**, then **Edit script** to open Monaco in a modal with
+JavaScript/TypeScript selection and runtime state/API autocomplete. **Apply script**
+adds the changes to the designer; **Cancel**, Escape, or closing the modal discards
+them. Save the form or page to publish the applied script.
 
 `visibleIf` and `disabledIf` use Mosaic's restricted expression interpreter by
-default. Choose JavaScript/TypeScript and click **Code editor** when a condition
+default. Choose JavaScript/TypeScript to open its modal editor when a condition
 needs custom logic. Script conditions run in the same isolated, limited browser
 sandbox as script actions. See [Runtime state management](./state-management.md).
+
+## Code and JSON editors
+
+Every code or JSON field opens Monaco in a modal. This includes component
+options and props, static form records, API request bodies, state values,
+conditions, code blocks, role permissions, settings, and form/page definitions.
+Use **Apply** to update the field or **Cancel** to discard the editor draft.
+Invalid JSON shows an error and stays open until corrected. API responses and
+migration SQL open in read-only Monaco modals.
+
+![JSON editing in a Monaco modal](/img/screenshots/json-editor.png)
+
+![Execute script in a Monaco modal](/img/screenshots/execute-script.png)
+
+## Form and page settings
+
+Select **Form settings** for the form's identity, entity, layout, data source,
+submission behavior, and search/social metadata. Return to the canvas after
+editing, then **Save** to publish the complete definition.
+
+![Form settings](/img/screenshots/form-settings.png)
+
+**Page settings** follows the same pattern, with route, layout, navigation,
+access, and metadata options. See the [roadmap](./roadmap.md) for current limits
+on data-source loading and page access enforcement.
+
+![Page settings](/img/screenshots/page-settings.png)
 
 ## Embedded forms
 

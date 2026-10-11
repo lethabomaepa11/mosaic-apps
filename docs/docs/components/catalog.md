@@ -7,6 +7,10 @@ sidebar_position: 1
 All 59 registry types (`getComponent(type)`), grouped by palette category.
 Field components bind to form data via `binding`; containers render `children`.
 
+See the [component gallery](./gallery.md) for screenshots and usage examples.
+Code and JSON properties open Monaco modals with Apply/Cancel. The JSON input
+component uses that same modal interaction in published forms.
+
 ## Inputs (19)
 
 | type | renders | key props |
