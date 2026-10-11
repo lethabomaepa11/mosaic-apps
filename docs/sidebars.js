@@ -20,6 +20,8 @@ const sidebars = {
     'theming',
     'security',
     'deployment',
+    'deployment-studio',
+    'deployment-vercel',
     'roadmap',
     'recipes',
     'faq',

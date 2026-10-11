@@ -16,8 +16,8 @@ The check builds typed packages, runs the UI Svelte check, and invokes
 `npm pack --dry-run` for each package. The CLI template is copied only for the
 pack lifecycle and the check cleans that copy afterward. The command does not upload tarballs. Publish the
 packages in dependency order: `@mosaic-apps/core`, `@mosaic-apps/server`, `@mosaic-apps/ui`,
-then `@mosaic-apps/cli`. The packages currently share version `0.2.0`; bump and
-review versions and changelogs together before the first release.
+then `@mosaic-apps/cli`. Core, server and UI are `0.2.0`; the CLI startup patch is `0.2.1`. Bump and
+review versions and changelogs together before each release.
 
 ## Publishing manually
 
@@ -43,8 +43,10 @@ npm publish --workspace @mosaic-apps/cli --access public
 
 A GitHub Actions workflow (`.github/workflows/ci.yml`) runs on every push to `main`:
 
-1. **Build & Test** - Installs deps, typechecks, builds, runs tests
-2. **Publish** - If build passes, publishes to npm using `NPM_TOKEN` secret
+1. **Build & Test** - Installs deps, typechecks, builds and runs tests.
+2. **Windows CLI** - Verifies scaffolding, process cleanup and packed consumer
+   builds/browser behavior on Windows.
+3. **Publish** - After both jobs pass, publishes new versions using `NPM_TOKEN`.
 
 ### Setup
 
@@ -61,7 +63,8 @@ before that run; npm does not permit overwriting a published version.
 
 ### Versioning
 
-All packages share the same version. To release:
+Bump changed packages and update their internal consumers. A CLI/template-only
+patch can keep unchanged runtime packages at their existing versions. To release:
 
 ```bash
 # Update the versions in packages/{core,server,ui,cli}/package.json,
@@ -79,15 +82,18 @@ git push origin main --tags
 
 ## Validate the artifacts as a consumer
 
-Create tarballs in a named output directory, then run:
+Pack current workspace artifacts and verify a generated consumer:
 
 ```bash
-npm run release:consumer -- /absolute/path/to/tarballs
+npm run release:consumer:pack
+npm run release:consumer
 ```
 
 The script installs the four tarballs outside the repository, invokes the packed
 CLI and its bundled template, and builds the generated API, web app, and Studio.
-It also builds the web app for Netlify. It prints the retained temporary
+It also builds web/Studio for Node, Netlify and Vercel, checks the native Hono
+serverless entry, and verifies browser hydration, Monaco and production API wiring.
+Windows CI runs this consumer check before publishing. It prints the retained temporary
 directory for inspection. This verifies package consumption without local source
 links and without publishing.
 

@@ -10,22 +10,26 @@ Use `-C, --dir <path>` to target another directory, or `--help` for help.
 ## Create an application
 
 ```bash
-npx @mosaic-apps/cli create "Acme CRM" --db pglite://./data
+npx @mosaic-apps/cli@latest create "Acme CRM"
 ```
 
 | Option | Purpose |
 | --- | --- |
-| `--db URL` | PostgreSQL connection string or `pglite://./data` for local embedded storage |
+| `--db URL` | PostgreSQL connection string; defaults to persistent embedded storage at `pglite://./data` |
 | `--auth on\|off` | Enable authentication; defaults to on |
 | `--demo` / `--no-demo` | Include or omit seeded example records, forms, and pages |
 | `--pwa` / `--no-pwa` | Include or omit PWA support |
 | `--port 3001` | API port |
 | `--web-port 3000` | Frontend port |
+| `--studio-port 3002` | Studio port |
+| `--db-port 5433` | Docker database host port; used only when you choose external PostgreSQL |
+| `--link PATH` | Explicitly use packages from a Mosaic source checkout for contributor development |
 | `--no-install` | Create files and install dependencies yourself |
 | `--no-git` | Create files without initializing a Git repository |
 
 The CLI writes `.env` with a generated JWT secret. When no `--db` is supplied,
-it expects PostgreSQL at `localhost:5432`. See [Quickstart](./quickstart.md).
+it uses embedded PostgreSQL in the project's `data/` directory. Published packages
+are used by default. No Docker service is needed. See [Quickstart](./quickstart.md).
 
 ## Add an entity
 

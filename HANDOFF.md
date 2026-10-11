@@ -2,6 +2,12 @@
 
 ## Current state — 2026-10-11 (takes precedence over historical notes)
 
+Latest continuation: CLI 0.2.1 patch and three public deployment guides now cover
+web, API and Studio, including Vercel + Neon. See the new first section of
+`.opencode/plan.md` for exact fixes/evidence and pending final deployment checks.
+Core/server/UI stay 0.2.0. Verify CI before calling CLI 0.2.1 published.
+The existing external my-crm project was repaired and its original files preserved.
+
 Read `.opencode/plan.md` and `contributor-docs/enterprise-architecture.md` before starting.
 Packages moved to `packages/{core,server,ui,cli}` with names
 `@mosaic-apps/{core,server,ui,cli}`, all version `0.2.0`. Imports, launcher,

@@ -2,6 +2,37 @@
 
 ## Current continuation state (2026-10-11, read before historical progress)
 
+### Latest: Windows scaffold repair and hosted Studio guides
+
+- CLI patch version is 0.2.1; core/server/UI remain 0.2.0. Publishing is pending
+  verification/CI at this point. Do not claim the patch is on npm until confirmed.
+- Fixed Windows Git argument splitting, packaged gitignore omission, misleading
+  automatic local linking, external-PostgreSQL default, stale API readiness,
+  occupied-port detection on IPv4/IPv6, and orphan npm child processes.
+- Generated apps default to persistent `pglite://./data`, share a project-root data
+  directory with CLI migrations, and support configurable API/web/Studio ports.
+- npm-installed UI must be excluded from Vite prebundling: otherwise its Svelte
+  TypeScript modules and Monaco worker imports fail despite passing HTTP health.
+- Eight CLI regressions and all 68 workspace tests pass; typecheck/docs/package
+  checks pass. Default packed consumer browser/Monaco passed at
+  `C:/Users/letha/AppData/Local/Temp/mosaic-release-consumer-jhMNTm`.
+- Existing `C:/Users/letha/desktop/projects/mosaic-apps/my-crm` repaired with private
+  backups in `.mosaic-backups`; API and both proxies healthy, browser login/Studio
+  and web load verified. Existing PostgreSQL files were preserved.
+- Latest deployment additions still require their final verification: Studio
+  public API URL and production start, Node/Netlify/Vercel frontend adapters,
+  Dockerfile.studio, and native Vercel Hono entry backed by external PostgreSQL.
+  Serverless upload routes are disabled until object storage is implemented.
+- Public guides: `docs/docs/deployment.md`, `deployment-studio.md`, and
+  `deployment-vercel.md`. Database → API → web → Studio, including Vercel + Neon,
+  Render/Railway, Netlify frontends and container hosts. User requested speed due
+  to 1% remaining; finish checks, push and publish without claiming unverified work.
+- Latest user steering: continue autonomously toward v1 while they sleep. Complete
+  this verified release, then prioritize linked entity table/create/edit/detail
+  workflow generation, runtime loading/state and editing recovery. Remaining
+  enterprise acceptance is listed in the public roadmap and contributor architecture;
+  do not declare a production-ready v1 merely by changing package versions.
+
 - The active workspace packages are `packages/core`, `packages/server`,
   `packages/ui`, and `packages/cli`, with release names `@mosaic-apps/core`,
   `@mosaic-apps/server`, `@mosaic-apps/ui`, and `@mosaic-apps/cli` at `0.2.0`.

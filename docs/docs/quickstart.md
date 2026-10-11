@@ -16,13 +16,14 @@ survives API restarts.
 ## 1. Create the project
 
 ```bash
-npx @mosaic-apps/cli create my-crm --db pglite://./data --no-install
+npx @mosaic-apps/cli@latest create my-crm
 cd my-crm
-npm install
 ```
 
 The CLI creates an API, a web application, and Studio. It also creates `.env`
 with your database URL and a generated JWT secret. Keep that file private.
+It installs dependencies automatically. Use `--no-install` if you prefer to run
+`npm install` yourself. Local data persists in the project's `data/` directory.
 
 ## 2. Start the application
 
@@ -39,6 +40,27 @@ npm run dev
 The development command starts all three applications. You can also run
 `npx mosaic studio` to open Studio separately. With demo seeding enabled, sign in
 using `admin@mosaic.local` and `admin1234`. Replace the demo account before deploying.
+
+### Resolve startup conflicts
+
+The launcher checks that all three ports are free before starting. If another
+application is using one, stop that application or choose different ports in `.env`:
+
+```dotenv
+PORT=3101
+MOSAIC_WEB_PORT=3100
+MOSAIC_STUDIO_PORT=3102
+```
+
+Restart `npm run dev` after editing `.env`. Both frontend API proxies follow the
+configured API port. If you change the frontend port, also update `CORS_ORIGINS`
+when calling the API directly from that browser origin.
+
+Embedded PostgreSQL does not use port 5432. If you explicitly chose external
+PostgreSQL and see `database does not exist` or `ECONNREFUSED`, create/start the
+database configured in `DATABASE_URL`. For the generated Docker service, use
+`npm run db:up`. If its database port is occupied, choose another `MOSAIC_DB_PORT`
+and use that port in `DATABASE_URL`; keep other databases running.
 
 ## 3. Create a form
 
