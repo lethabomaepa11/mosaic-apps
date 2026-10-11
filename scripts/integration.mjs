@@ -80,6 +80,15 @@ await check('health endpoint reports ok', async () => {
   assert.equal(json.data.db, true);
 });
 
+await check('public navigation and theme endpoints have safe defaults', async () => {
+  const nav = await api('/nav');
+  const theme = await api('/theme');
+  assert.equal(nav.status, 200);
+  assert.equal(nav.json.data.items[0].href, '/');
+  assert.equal(theme.status, 200);
+  assert.deepEqual(theme.json.data, {});
+});
+
 await check('login as seeded admin', async () => {
   const { status, json } = await api('/auth/login', {
     method: 'POST',
@@ -214,14 +223,86 @@ await check('form publish bumps version and snapshots', async () => {
   const created = await api('/forms', {
     method: 'POST',
     token: globalThis.__token,
-    body: { name: 'E2E Form', entity: 'customer', schema: { type: 'form', children: [] } },
+    body: {
+      name: 'E2E Form', entity: 'customer',
+      settings: { seo: { title: 'E2E SEO title', description: 'A searchable form', robots: 'index,follow' } },
+      schema: { type: 'form', children: [{ id: 'submit_button', type: 'button', props: { label: 'Save customer', variant: 'primary' } }] },
+    },
   });
   const id = created.json.data.id;
   const published = await api(`/forms/${id}/publish`, { method: 'POST', token: globalThis.__token });
   assert.equal(published.json.data.published, true);
   assert.equal(published.json.data.version, 2);
+  const unchanged = await api(`/forms/${id}/publish`, { method: 'POST', token: globalThis.__token });
+  assert.equal(unchanged.status, 200);
+  assert.equal(unchanged.json.data.version, 2, 'unchanged content should not create another published version');
+  const saved = await api(`/forms/${id}`, { token: globalThis.__token });
+  assert.equal(saved.status, 200);
+  assert.equal(saved.json.data.root.children[0].props.label, 'Save customer');
+  assert.equal(saved.json.data.settings.seo.title, 'E2E SEO title');
   const versions = await api(`/forms/${id}/versions`, { token: globalThis.__token });
   assert.ok(versions.json.data.length >= 1);
+});
+
+await check('atomic save publishes tree changes and rejects stale versions', async () => {
+  const created = await api('/forms', {
+    method: 'POST', token: globalThis.__token,
+    body: { name: 'Atomic E2E Form', schema: { type: 'form', children: [] } },
+  });
+  const id = created.json.data.id;
+  const saved = await api(`/forms/${id}/save-and-publish`, {
+    method: 'PUT', token: globalThis.__token,
+    body: {
+      expectedVersion: 1,
+      name: 'Atomic E2E Form',
+      root: { type: 'form', children: [{ id: 'atomic_button', type: 'button', props: { label: 'Atomic save' } }] },
+    },
+  });
+  assert.equal(saved.status, 200);
+  assert.equal(saved.json.data.published, true);
+  assert.equal(saved.json.data.version, 2);
+  assert.equal(saved.json.data.root.children[0].props.label, 'Atomic save');
+
+  const unchanged = await api(`/forms/${id}/save-and-publish`, {
+    method: 'PUT', token: globalThis.__token,
+    body: { expectedVersion: 2, name: 'Atomic E2E Form', root: saved.json.data.root },
+  });
+  assert.equal(unchanged.json.data.version, 2);
+
+  const stale = await api(`/forms/${id}/save-and-publish`, {
+    method: 'PUT', token: globalThis.__token,
+    body: { expectedVersion: 1, name: 'Stale overwrite', root: saved.json.data.root },
+  });
+  assert.equal(stale.status, 409);
+  assert.equal(stale.json.error.code, 'STALE_VERSION');
+});
+
+await check('form folders can be created, renamed, and deleted', async () => {
+  const created = await api('/forms', {
+    method: 'POST',
+    token: globalThis.__token,
+    body: { name: 'Folder E2E Form', schema: { type: 'form', children: [] }, folder: 'sales/quotes' },
+  });
+  assert.equal(created.status, 201);
+  const formId = created.json.data.id;
+  assert.equal(created.json.data.folder, 'sales/quotes');
+
+  const folders = await api('/forms/folders', { token: globalThis.__token });
+  assert.ok(folders.json.data.includes('sales/quotes'));
+
+  const renamed = await api('/forms/folders/rename', {
+    method: 'POST', token: globalThis.__token, body: { from: 'sales', to: 'revenue' },
+  });
+  assert.equal(renamed.status, 200);
+  const moved = await api(`/forms/${formId}`, { token: globalThis.__token });
+  assert.equal(moved.json.data.folder, 'revenue/quotes');
+
+  const deleted = await api('/forms/folders/delete', {
+    method: 'POST', token: globalThis.__token, body: { path: 'revenue' },
+  });
+  assert.equal(deleted.status, 200);
+  const atRoot = await api(`/forms/${formId}`, { token: globalThis.__token });
+  assert.equal(atRoot.json.data.folder, undefined);
 });
 
 await check('entity meta exposes endpoints', async () => {

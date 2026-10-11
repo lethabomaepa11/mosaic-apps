@@ -1,0 +1,10 @@
+{
+  "name": "Sample Crm",
+  "slug": "sample-crm",
+  "databaseUrl": "postgres://mosaic:mosaic@localhost:5433/sample-crm",
+  "auth": true,
+  "pwa": true,
+  "demo": true,
+  "api": { "port": 8911 },
+  "web": { "port": 5621 }
+}
