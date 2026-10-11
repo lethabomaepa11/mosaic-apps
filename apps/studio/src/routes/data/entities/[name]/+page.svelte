@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { page } from '$app/state';
-  import { EntityForm, EntityTable, Modal, toast } from '@mosaic/ui';
+  import { EntityForm, EntityTable, Icon, Modal, toast } from '@mosaic/ui';
   import EntityFields from '../../../../components/EntityFields.svelte';
   import type { EntityDef } from '@mosaic/core';
   import { client as api } from '#lib/client';
@@ -92,7 +92,7 @@
       {#if entity.softDelete}<span class="m-badge m-badge--warning">soft delete</span>{/if}
     </div>
     <div class="m-row">
-      <button class="m-btn m-btn--secondary" onclick={planMigration}>🧬 Plan migration</button>
+      <button class="m-btn m-btn--secondary" onclick={planMigration}><Icon name="gitBranch" size={16} /> Plan migration</button>
       <button class="m-btn m-btn--primary" disabled={saving} onclick={saveEntity}>Save entity</button>
       <button class="m-btn m-btn--danger" onclick={deleteEntity}>Unregister</button>
     </div>

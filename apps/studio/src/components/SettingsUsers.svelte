@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { SelectField, TextField, toast } from '@mosaic/ui';
+  import { Icon, SelectField, TextField, toast } from '@mosaic/ui';
   import type { UserRecord } from '@mosaic/core';
   import { client } from '#lib/client';
 
@@ -75,10 +75,10 @@
           <td><strong>{user.name}</strong><div class="m-small m-muted">{user.email}</div></td>
           <td>{#each user.roles as r (r)}<span class="m-badge" style="margin-right:4px">{r}</span>{/each}</td>
           <td>{#if user.disabled}<span class="m-badge m-badge--danger">disabled</span>{:else}<span class="m-badge m-badge--success">active</span>{/if}</td>
-          <td class="m-small m-muted">{user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleString() : 'â€”'}</td>
+          <td class="m-small m-muted">{user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleString() : '—'}</td>
           <td>
             <button class="m-btn m-btn--ghost m-btn--sm" onclick={() => toggleUser(user)}>{user.disabled ? 'Enable' : 'Disable'}</button>
-            <button class="m-btn m-btn--ghost m-btn--sm" onclick={() => removeUser(user.id)}>âś•</button>
+            <button class="m-btn m-btn--ghost m-btn--icon" aria-label="Remove user" onclick={() => removeUser(user.id)}><Icon name="x" size={14} /></button>
           </td>
         </tr>
       {/each}

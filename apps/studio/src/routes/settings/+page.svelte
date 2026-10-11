@@ -6,6 +6,8 @@
   import SettingsUsers from '../../components/SettingsUsers.svelte';
   import SettingsRoles from '../../components/SettingsRoles.svelte';
   import SettingsAdmin from '../../components/SettingsAdmin.svelte';
+  import ThemeEditor from '../../components/ThemeEditor.svelte';
+  import NavigationEditor from '../../components/NavigationEditor.svelte';
 
   interface Role {
     name: string;
@@ -52,12 +54,18 @@
     { id: 'users', label: 'Users' },
     { id: 'roles', label: 'Roles' },
     { id: 'admin', label: 'Reference lists · Settings · Audit' },
+    { id: 'theme', label: 'Theme' },
+    { id: 'navigation', label: 'Navigation' },
   ]}
   bind:active={tab}
 />
 
 <div style="margin-top:16px">
-  {#if tab === 'users'}
+  {#if tab === 'theme'}
+    <ThemeEditor />
+  {:else if tab === 'navigation'}
+    <NavigationEditor />
+  {:else if tab === 'users'}
     <SettingsUsers {users} {roles} onchange={(next) => (users = next)} />
   {:else if tab === 'roles'}
     <SettingsRoles {roles} onchange={(next) => (roles = next)} />

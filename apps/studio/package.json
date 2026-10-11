@@ -4,14 +4,15 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite dev",
+    "dev": "node ../../scripts/dev.mjs",
     "build": "vite build",
     "preview": "vite preview",
     "check": "svelte-check --tsconfig ./tsconfig.json"
   },
   "dependencies": {
     "@mosaic/core": "0.1.0",
-    "@mosaic/ui": "0.1.0"
+    "@mosaic/ui": "0.1.0",
+    "monaco-editor": "^0.57.0"
   },
   "imports": {
     "#lib": "./src/lib/index.js",
@@ -21,6 +22,7 @@
     "@sveltejs/adapter-node": "^6.0.0",
     "@sveltejs/kit": "^3.0.1",
     "@sveltejs/vite-plugin-svelte": "^7.3.1",
+    "@tailwindcss/vite": "^4.3.3",
     "svelte": "^5.57.2",
     "svelte-check": "^4.7.6",
     "typescript": "^6.0.3",

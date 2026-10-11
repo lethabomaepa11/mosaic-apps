@@ -24,6 +24,16 @@ class DesignerStore {
   selectedId = $state<string | null>(null);
   past = $state<string[]>([]);
   future = $state<string[]>([]);
+  bindingOptions = $state<string[]>([]);
+  entityOptionsByName = $state<Record<string, string[]>>({});
+  formOptions = $state<{ value: string; label: string }[]>([]);
+  artifactOptions = $state<{ value: string; label: string; kind: 'form' | 'page' }[]>([]);
+  private savedSnapshot = '';
+  private externalDirty = $state(false);
+
+  get isDirty(): boolean {
+    return this.current ? this.externalDirty || JSON.stringify(this.current) !== this.savedSnapshot : false;
+  }
 
   get kind(): 'form' | 'page' | null {
     return this.form ? 'form' : this.page ? 'page' : null;
@@ -51,6 +61,8 @@ class DesignerStore {
     this.past = [];
     this.future = [];
     this.selectedId = null;
+    this.savedSnapshot = JSON.stringify(this.form);
+    this.externalDirty = false;
   }
 
   loadPage(page: PageDef): void {
@@ -60,6 +72,8 @@ class DesignerStore {
     this.past = [];
     this.future = [];
     this.selectedId = null;
+    this.savedSnapshot = JSON.stringify(this.page);
+    this.externalDirty = false;
   }
 
   private snapshot(): void {
@@ -86,6 +100,16 @@ class DesignerStore {
 
   select(id: string | null): void {
     this.selectedId = id;
+  }
+
+  deleteSelection(): void {
+    if (!this.root || !this.selectedId || this.selectedId === this.root.id) return;
+    this.remove(this.selectedId);
+  }
+
+  duplicateSelection(): void {
+    if (!this.root || !this.selectedId || this.selectedId === this.root.id) return;
+    this.duplicate(this.selectedId);
   }
 
   addAt(parentId: string, index: number, type: string): void {
@@ -123,6 +147,21 @@ class DesignerStore {
     if (!this.root) return;
     this.snapshot();
     updateNode(this.root, id, { props });
+  }
+
+  updateFormSettings(settings: FormDef['settings']): void {
+    if (!this.form) return;
+    this.snapshot();
+    this.form.settings = { ...this.form.settings, ...settings };
+  }
+
+  markSaved(): void {
+    if (this.current) this.savedSnapshot = JSON.stringify(this.current);
+    this.externalDirty = false;
+  }
+
+  markChanged(): void {
+    this.externalDirty = true;
   }
 
   replaceRoot(root: FormNode): void {

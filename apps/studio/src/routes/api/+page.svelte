@@ -54,7 +54,7 @@
   }
 </script>
 
-<svelte:head><title>API explorer Â· Mosaic Studio</title></svelte:head>
+<svelte:head><title>API explorer · Mosaic Studio</title></svelte:head>
 
 <header class="app-header">
   <h1 class="m-h2" style="margin:0">API explorer</h1>
@@ -69,7 +69,7 @@
       <option>GET</option><option>POST</option><option>PATCH</option><option>DELETE</option>
     </select>
     <input class="m-input" style="flex:1;min-width:280px" bind:value={path} placeholder="/entities/customer" />
-    <button class="m-btn m-btn--primary" disabled={busy} onclick={send}>{busy ? 'Sendingâ€¦' : 'Send'}</button>
+    <button class="m-btn m-btn--primary" disabled={busy} onclick={send}>{busy ? 'Sending…' : 'Send'}</button>
   </div>
   {#if method !== 'GET'}
     <textarea class="m-textarea m-mono" rows="7" bind:value={body} spellcheck="false"></textarea>

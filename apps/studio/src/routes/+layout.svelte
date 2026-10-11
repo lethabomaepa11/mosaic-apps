@@ -1,7 +1,8 @@
 <script lang="ts">
   import '../app.css';
   import { page } from '$app/state';
-  import { Toaster } from '@mosaic/ui';
+  import { applyThemeConfig, Toaster } from '@mosaic/ui';
+  import { client } from '#lib/client';
   import { auth } from '#lib/auth.svelte';
   import Sidebar from '../components/Sidebar.svelte';
 
@@ -9,6 +10,11 @@
 
   $effect(() => {
     if (!auth.ready) auth.refresh();
+  });
+
+  $effect(() => {
+    if (typeof document === 'undefined') return;
+    void client.getTheme().then((theme) => applyThemeConfig(theme)).catch(() => {});
   });
 
   const publicPaths = ['/login'];

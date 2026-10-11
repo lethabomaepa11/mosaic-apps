@@ -40,10 +40,10 @@
     <div class="m-stat"><div class="m-stat__label">Migrations</div><div class="m-stat__value">{meta.counts.migrations}</div></div>
   </div>
   <div class="cards" style="margin-top:20px">
-    <a class="m-card" href="/design/forms"><strong>📝 Design a form</strong><div class="m-small m-muted">Drag & drop, store as JSON, publish</div></a>
-    <a class="m-card" href="/design/pages"><strong>📄 Build a page</strong><div class="m-small m-muted">Dashboards from live data</div></a>
-    <a class="m-card" href="/data/entities"><strong>🗃️ Model entities</strong><div class="m-small m-muted">Fields, relations, auto CRUD</div></a>
-    <a class="m-card" href="/data/migrations"><strong>🧬 Migrations</strong><div class="m-small m-muted">Preview SQL, apply safely</div></a>
+    <a class="m-card" href="/studio"><strong>Design a form</strong><div class="m-small m-muted">Drag &amp; drop, store as JSON, publish</div></a>
+    <a class="m-card" href="/studio?kind=page"><strong>Build a page</strong><div class="m-small m-muted">Dashboards from live data</div></a>
+    <a class="m-card" href="/data/entities"><strong>Model entities</strong><div class="m-small m-muted">Fields, relations, auto CRUD</div></a>
+    <a class="m-card" href="/data/migrations"><strong>Migrations</strong><div class="m-small m-muted">Preview SQL, apply safely</div></a>
   </div>
 {:else}
   <div class="m-card"><span class="m-spinner"></span></div>

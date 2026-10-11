@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { toast } from '@mosaic/ui';
+  import { Icon, toast } from '@mosaic/ui';
   import type { AuditEntry, RefList, SettingRecord } from '@mosaic/core';
   import { client } from '#lib/client';
 
@@ -38,7 +38,7 @@
     <section class="m-card">
       <div class="m-row" style="justify-content:space-between">
         <strong>{list.label ?? list.name}</strong>
-        <button class="m-btn m-btn--ghost m-btn--sm" onclick={() => { removeRefList(list.name); onrefreshreflists(); }}>âś•</button>
+        <button class="m-btn m-btn--ghost m-btn--icon" aria-label="Remove reference list" onclick={() => { removeRefList(list.name); onrefreshreflists(); }}><Icon name="x" size={14} /></button>
       </div>
       <div class="m-small m-muted" style="margin:6px 0"><code>{list.name}</code></div>
       <div class="m-row">
@@ -92,9 +92,9 @@
         <tr>
           <td class="m-small">{new Date(entry.createdAt).toLocaleString()}</td>
           <td><span class="m-badge">{entry.action}</span></td>
-          <td>{entry.entity ?? 'â€”'}</td>
-          <td class="m-mono m-small">{entry.recordId ? entry.recordId.slice(0, 8) + 'â€¦' : 'â€”'}</td>
-          <td class="m-small">{entry.userEmail ?? 'â€”'}</td>
+          <td>{entry.entity ?? '—'}</td>
+          <td class="m-mono m-small">{entry.recordId ? entry.recordId.slice(0, 8) + '…' : '—'}</td>
+          <td class="m-small">{entry.userEmail ?? '—'}</td>
         </tr>
       {/each}
     </tbody>

@@ -44,7 +44,7 @@
         <code class="m-badge">{role.name}</code>
       </div>
       <TextArea
-        label="Permissions (one per line; `*` = admin, `entity:*:read`, `forms:manage`â€¦)"
+        label="Permissions (one per line; `*` = admin, `entity:*:read`, `forms:manage`…)"
         rows={6}
         value={role.permissions.join('\n')}
         oninput={(v) =>

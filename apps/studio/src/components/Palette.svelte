@@ -2,6 +2,7 @@
   import { paletteCategories } from '$ui';
   import { draggable } from '$ui';
   import type { DragPayload } from '$ui';
+  import { Icon } from '$ui';
 
   const groups = paletteCategories(false);
 </script>
@@ -20,7 +21,7 @@
               label: item.label,
             }}
           >
-            <span class="icon">{item.icon}</span>
+            <Icon name={item.icon} size={16} />
             <span>{item.label}</span>
           </div>
         {/each}

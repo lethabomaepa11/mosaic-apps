@@ -1,12 +1,11 @@
 {
   "extends": "$app/tsconfig",
   "compilerOptions": {
-    "baseUrl": ".",
     "paths": {
       "#lib": ["./src/lib/client.ts"],
       "#lib/*": ["./src/lib/*"],
       "$ui": ["../../packages/mosaic-ui/src/index.ts"],
-      "@mosaic/core": ["../../packages/mosaic-core/src/index.ts"]
+      "@mosaic/core": ["../../packages/mosaic-core/src/browser.ts"]
     }
   },
   "include": ["src", "test", "*"],

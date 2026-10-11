@@ -1,5 +1,7 @@
 <script lang="ts">
   import type { EntityDef, FieldDef, FieldType, EnumOption } from '@mosaic/core';
+  import { Icon, SelectField } from '@mosaic/ui';
+  import { client } from '#lib/client';
 
   interface Props {
     entity: EntityDef;
@@ -9,6 +11,18 @@
   let { entity, onchange }: Props = $props();
 
   const FIELD_TYPES: FieldType[] = ['string', 'text', 'int', 'decimal', 'boolean', 'date', 'datetime', 'enum', 'json', 'ref', 'file'];
+  let entities = $state<{ name: string; label: string }[]>([]);
+
+  async function loadEntities() {
+    try {
+      const res = await client.listEntities();
+      entities = res.map((e) => ({ name: e.definition.name, label: e.definition.label ?? e.definition.name }));
+    } catch { /* ignore */ }
+  }
+
+  $effect(() => {
+    loadEntities();
+  });
 
   function emit(next: EntityDef) {
     onchange(next);
@@ -57,10 +71,13 @@
               <input class="m-input" placeholder="a,b,c" value={optionsOf(field).map((o) => o.value).join(',')}
                 onchange={(e) => updateField(i, { options: (e.currentTarget as HTMLInputElement).value.split(',').map((s) => s.trim()).filter(Boolean) })} />
             {:else if field.type === 'ref'}
-              <input class="m-input" placeholder="entity name" value={field.refEntity ?? ''}
-                onchange={(e) => updateField(i, { refEntity: (e.currentTarget as HTMLInputElement).value })} />
+              <SelectField
+                bind:value={field.refEntity}
+                placeholder="entity name"
+                options={[{ value: '', label: '— select entity —' }, ...entities.map(e => ({ value: e.name, label: e.label }))]}
+              />
             {:else}
-              <span class="m-muted m-small">â€”</span>
+              <span class="m-muted m-small">—</span>
             {/if}
           </td>
           <td style="white-space:nowrap">
@@ -68,7 +85,7 @@
             <label class="m-check"><input type="checkbox" checked={field.unique ?? false} onchange={(e) => updateField(i, { unique: (e.currentTarget as HTMLInputElement).checked })} /> uniq</label>
             <label class="m-check"><input type="checkbox" checked={field.indexed ?? false} onchange={(e) => updateField(i, { indexed: (e.currentTarget as HTMLInputElement).checked })} /> idx</label>
           </td>
-          <td><button class="m-btn m-btn--ghost m-btn--sm" onclick={() => removeField(i)}>âś•</button></td>
+          <td><button class="m-btn m-btn--ghost m-btn--icon" aria-label="Remove field" onclick={() => removeField(i)}><Icon name="x" size={14} /></button></td>
         </tr>
       {/each}
     </tbody>
