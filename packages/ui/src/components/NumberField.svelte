@@ -1,6 +1,7 @@
 <script lang="ts">
   import ShadcnInput from '../shadcn/input/Input.svelte';
   interface Props {
+    id?: string;
     label?: string;
     value?: number | string | null;
     oninput?: (value: number | null) => void;
@@ -14,7 +15,10 @@
     helpText?: string;
   }
 
-  let { label, value = $bindable<number | string | null>(null), oninput, placeholder, min, max, step = 1, required, disabled, error, helpText }: Props = $props();
+  let { id, label, value = $bindable<number | string | null>(null), oninput, placeholder, min, max, step = 1, required, disabled, error, helpText }: Props = $props();
+  const generatedId = $props.id();
+  const inputId = $derived(id ?? generatedId);
+  const messageId = $derived(`${inputId}-message`);
 
   function onInput(e: Event & { currentTarget: EventTarget & HTMLInputElement }) {
     const raw = e.currentTarget.value;
@@ -31,10 +35,11 @@
 </script>
 
 <div class="m-field">
-  {#if label}<span class="m-field__label">{label}{#if required}<span class="m-field__req">*</span>{/if}</span>{/if}
+  {#if label}<label for={inputId} class="m-field__label">{label}{#if required}<span class="m-field__req">*</span>{/if}</label>{/if}
   <ShadcnInput class={`m-input${error ? ' m-input--invalid' : ''}`}
+    id={inputId} {required} aria-invalid={!!error} ariaDescribedBy={error || helpText ? messageId : undefined}
     type="number" inputmode="decimal" {placeholder} {min} {max} {step} {disabled}
     value={value === null || value === undefined ? '' : String(value)}
     oninput={onInput} />
-  {#if error}<span class="m-field__error">{error}</span>{:else if helpText}<span class="m-field__help">{helpText}</span>{/if}
+  {#if error}<span id={messageId} class="m-field__error">{error}</span>{:else if helpText}<span id={messageId} class="m-field__help">{helpText}</span>{/if}
 </div>

@@ -17,7 +17,7 @@ function transpile(request: SandboxRequest): string {
     reportDiagnostics: true,
     compilerOptions: {
       target: ts.ScriptTarget.ES2020,
-      module: ts.ModuleKind.None,
+      module: ts.ModuleKind.ESNext,
       strict: true,
     },
   });
@@ -84,13 +84,15 @@ async function execute(request: SandboxRequest): Promise<ComponentAction[] | boo
   if (request.source.length > MAX_SOURCE_LENGTH) throw new Error(`Script exceeds the ${MAX_SOURCE_LENGTH.toLocaleString()} character limit`);
 
   const QuickJS = await quickJSPromise;
+  const source = transpile(request);
+  self.postMessage({ id: request.id, phase: 'executing' } satisfies SandboxResponse);
   const runtime = QuickJS.newRuntime();
   runtime.setMemoryLimit(16 * 1024 * 1024);
   runtime.setMaxStackSize(512 * 1024);
   runtime.setInterruptHandler(shouldInterruptAfterDeadline(Date.now() + request.timeoutMs));
   const vm = runtime.newContext();
   try {
-    const program = `"use strict";\n${apiSource()}\nconst state = __freeze(${JSON.stringify(request.state)});\n${transpile(request)}\nJSON.stringify(__mosaicRun(state, api));`;
+    const program = `"use strict";\n${apiSource()}\nconst state = __freeze(${JSON.stringify(request.state)});\n${source}\nJSON.stringify(__mosaicRun(state, api));`;
     const result = vm.evalCode(program, 'mosaic-custom-script.js');
     if (result.error) {
       const dumped = vm.dump(result.error) as { message?: string; stack?: string } | string;

@@ -18,6 +18,7 @@ export interface SandboxRequest {
 }
 
 export type SandboxResponse =
+  | { id: string; phase: 'executing' }
   | { id: string; ok: true; value: ComponentAction[] | boolean }
   | { id: string; ok: false; error: string };
 

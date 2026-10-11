@@ -56,7 +56,7 @@
 <div class="m-field">
   {#if label}<span class="m-field__label">{label}{#if required}<span class="m-field__req">*</span>{/if}</span>{/if}
   {#if withTime}
-    <ShadcnInput class={`m-input${error ? ' m-input--invalid' : ''}`} type="datetime-local" {min} {max} {disabled} value={value ?? ''} oninput={onInput} />
+    <ShadcnInput class={`m-input${error ? ' m-input--invalid' : ''}`} type="datetime-local" ariaLabel={label ?? 'Choose date and time'} aria-invalid={!!error} {required} {min} {max} {disabled} value={value ?? ''} oninput={onInput} />
   {:else}
     <BitsDatePicker.Root value={calendarValue} onValueChange={onCalendarChange} minValue={minimum} maxValue={maximum} {disabled} {required} weekdayFormat="short" fixedWeeks>
       <BitsDatePicker.Input class={`m-input m-date-picker${error ? ' m-input--invalid' : ''}`} aria-label={label ?? 'Choose date'}>

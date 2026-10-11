@@ -50,3 +50,14 @@ test('component scopes isolate and nested state paths are immutable', () => {
   assert.equal(second.component.getPath('dialog.open'), undefined);
   assert.throws(() => state.form.setPath('__proto__.polluted', true), /Invalid state path/);
 });
+
+test('reactive proxy values can be stored and isolated from later mutations', () => {
+  const address = new Proxy({ city: 'Cape Town' }, {});
+  const initial = new Proxy({ address }, {});
+  const state = createMosaicState({ form: initial });
+  address.city = 'Johannesburg';
+  assert.equal(state.form.getPath('address.city'), 'Cape Town');
+  state.form.setPath('address', address);
+  address.city = 'Durban';
+  assert.equal(state.form.getPath('address.city'), 'Johannesburg');
+});

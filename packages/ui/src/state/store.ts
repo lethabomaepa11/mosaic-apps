@@ -6,7 +6,12 @@
 export type StateListener<T extends object> = (state: Readonly<T>, revision: number) => void;
 
 function clone<T>(value: T): T {
-  if (typeof structuredClone === 'function') return structuredClone(value);
+  if (value === undefined) return value;
+  if (typeof structuredClone === 'function') {
+    try { return structuredClone(value); }
+    catch (error) { if (!(error instanceof Error) || error.name !== 'DataCloneError') throw error; }
+  }
+  // Svelte reactive proxies are serializable but cannot be structured-cloned.
   return JSON.parse(JSON.stringify(value)) as T;
 }
 

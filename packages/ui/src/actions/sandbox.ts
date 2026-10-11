@@ -26,7 +26,7 @@ function execute<T extends ComponentAction[] | boolean>(mode: SandboxRequest['mo
       callback();
     };
     const abort = () => finish(() => reject(new DOMException('Script cancelled', 'AbortError')));
-    const timer = setTimeout(() => finish(() => reject(new Error(`Script exceeded its ${timeoutMs}ms deadline`))), timeoutMs + 250);
+    let timer = setTimeout(() => finish(() => reject(new Error('Script sandbox could not initialize within 15 seconds'))), 15_000);
     options.signal?.addEventListener('abort', abort, { once: true });
     if (options.signal?.aborted) return abort();
 
@@ -34,6 +34,11 @@ function execute<T extends ComponentAction[] | boolean>(mode: SandboxRequest['mo
     worker.onmessage = (event: MessageEvent<SandboxResponse>) => {
       const response = event.data;
       if (response.id !== id) return;
+      if ('phase' in response) {
+        clearTimeout(timer);
+        timer = setTimeout(() => finish(() => reject(new Error(`Script exceeded its ${timeoutMs}ms deadline`))), timeoutMs + 250);
+        return;
+      }
       if (response.ok === true) {
         const value = response.value as T;
         finish(() => resolve(value));
@@ -43,14 +48,15 @@ function execute<T extends ComponentAction[] | boolean>(mode: SandboxRequest['mo
       }
     };
 
-    worker.postMessage({
+    try { worker.postMessage({
       id,
       mode,
       source: options.source,
       language: options.language ?? 'typescript',
-      state: options.state,
+      state: JSON.parse(JSON.stringify(options.state)) as ScriptStateSnapshot,
       timeoutMs,
-    } satisfies SandboxRequest);
+    } satisfies SandboxRequest); }
+    catch (error) { finish(() => reject(error)); }
   });
 }
 

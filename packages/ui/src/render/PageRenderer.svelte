@@ -8,7 +8,7 @@
   import type { MosaicClient } from '../client/api';
   import NodeRenderer from './NodeRenderer.svelte';
   import { fade } from 'svelte/transition';
-  import { getContext, setContext } from 'svelte';
+  import { getContext, setContext, onDestroy } from 'svelte';
   import { themeState } from '../lib/theme.svelte';
   import { createMosaicState, MOSAIC_STATE_CONTEXT, type MosaicState } from '../state/store';
 
@@ -26,6 +26,10 @@
   // svelte-ignore state_referenced_locally -- choose the page state scope once at renderer creation.
   const runtimeState = suppliedState ?? inheritedState?.forkPage() ?? createMosaicState();
   setContext(MOSAIC_STATE_CONTEXT, runtimeState);
+  let stateRevision = $state(0);
+  const unsubscribers = [runtimeState.application, runtimeState.page, runtimeState.form]
+    .map((store) => store.subscribe(() => { stateRevision += 1; }, false));
+  onDestroy(() => unsubscribers.forEach((unsubscribe) => unsubscribe()));
 
   $effect(() => {
     if (scope) runtimeState.page.update(() => ({ ...scope }));
@@ -37,6 +41,7 @@
   const seo = $derived(page.settings?.seo);
 
   function expressionScope() {
+    stateRevision;
     return { data: scope ?? {}, application: runtimeState.application.snapshot(), page: runtimeState.page.snapshot(), form: runtimeState.form.snapshot() };
   }
   function visible(node: FormNode): boolean {

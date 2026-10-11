@@ -13,7 +13,7 @@
 .m-drawer__header { display: flex; align-items: center; justify-content: space-between; padding: var(--m-space-4); border-bottom: 1px solid var(--m-border); font-weight: 700; }
 .m-drawer__body { padding: var(--m-space-4); overflow: auto; flex: 1; }
 @keyframes m-fade { from { opacity: 0; } }
-@keyframes m-pop { from { opacity: 0; transform: translateY(8px) scale(0.98); } }
+@keyframes m-pop { from { opacity: 0; transform: translate(-50%, calc(-50% + 8px)) scale(0.98); } }
 @keyframes m-slide { from { transform: translateX(30px); opacity: 0.5; } }
 @keyframes m-slide-left { from { transform: translateX(-30px); opacity: 0.5; } }
 

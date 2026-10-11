@@ -42,7 +42,7 @@
   let conditionRun = 0;
   const unsubscribers = [componentState.application, componentState.page, componentState.form, componentState.component]
     .map((store) => store.subscribe(() => (stateRevision += 1)));
-  onDestroy(() => unsubscribers.forEach((unsubscribe) => unsubscribe()));
+  onDestroy(() => { actionRunner.cancel(node.id); unsubscribers.forEach((unsubscribe) => unsubscribe()); });
   $effect(() => {
     actionContext.client = client;
     actionContext.data = data;
@@ -71,20 +71,22 @@
     JSON.stringify(data);
     stateRevision;
     const run = ++conditionRun;
+    const controller = new AbortController();
     const state = actionScope(actionContext);
     void Promise.all([
-      visibleCondition ? runBooleanScript({ ...visibleCondition, state }) : Promise.resolve(true),
-      disabledCondition ? runBooleanScript({ ...disabledCondition, state }) : Promise.resolve(false),
+      visibleCondition ? runBooleanScript({ ...visibleCondition, state, signal: controller.signal }) : Promise.resolve(true),
+      disabledCondition ? runBooleanScript({ ...disabledCondition, state, signal: controller.signal }) : Promise.resolve(false),
     ]).then(([nextVisible, nextDisabled]) => {
       if (run !== conditionRun) return;
       scriptVisible = nextVisible;
       scriptDisabled = nextDisabled;
     }).catch((error) => {
-      if (run !== conditionRun) return;
+      if (run !== conditionRun || controller.signal.aborted) return;
       scriptVisible = true;
       scriptDisabled = false;
       toast.error('Condition script failed', error instanceof Error ? error.message : String(error));
     });
+    return () => controller.abort();
   });
 
   // strip framework-level props before spreading into the component
@@ -117,6 +119,9 @@
   <div class={`m-node-enter m-transition-${transition?.kind ?? 'fade'}`} style={`--m-enter-duration:${duration}ms;--m-enter-delay:${delay}ms;grid-column:span ${Math.max(1, Math.min(4, Number(nodeProps.colSpan ?? 1)))}`} in:fade={{ duration, delay }}>
   {#if def}
     {@const Comp = def.component}
+    {#snippet renderChildren()}
+      <NodeChildren nodes={node.children ?? []} {visible} {disabled} {client} {data} {errors} {mode} {onField} {transition} />
+    {/snippet}
     <Comp
       {...rest}
       {client}
@@ -126,11 +131,8 @@
       disabled={actionRunning || scriptDisabled || nodeProps.disabled === true || disabled?.(node) === true}
       oninput={oninput}
       onclick={actions.length ? runActions : undefined}
-    >
-      {#if isContainerType(node.type)}
-        <NodeChildren nodes={node.children ?? []} {visible} {disabled} {client} {data} {errors} {mode} {onField} {transition}></NodeChildren>
-      {/if}
-    </Comp>
+      children={isContainerType(node.type) ? renderChildren : undefined}
+    />
   {:else}
     <div class="m-alert m-alert--warning">Unknown component <code>{node.type}</code></div>
   {/if}

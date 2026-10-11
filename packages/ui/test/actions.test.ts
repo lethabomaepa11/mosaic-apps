@@ -37,4 +37,5 @@ test('starting an action again cancels its previous request', async () => {
   const second = runner.execute('load', []);
   await Promise.all([first, second]);
   assert.equal(aborted, 1);
+  assert.equal((state.component.getPath('actions.load') as { status: string }).status, 'succeeded');
 });

@@ -4,6 +4,7 @@
   import ShadcnInput from '../shadcn/input/Input.svelte';
 
   interface Props {
+    id?: string;
     label?: string;
     value?: string | number;
     oninput?: (value: string) => void;
@@ -18,6 +19,7 @@
   }
 
   let {
+    id,
     label,
     value = $bindable(''),
     oninput,
@@ -30,6 +32,9 @@
     maxlength,
     autocomplete,
   }: Props = $props();
+  const generatedId = $props.id();
+  const inputId = $derived(id ?? generatedId);
+  const messageId = $derived(`${inputId}-message`);
 
   const inputType = $derived(
     format === 'email' ? 'email'
@@ -57,23 +62,25 @@
 
 <div class="m-field">
   {#if label}
-    <span class="m-field__label">{label}{#if required}<span class="m-field__req">*</span>{/if}</span>
+    <label for={inputId} class="m-field__label">{label}{#if required}<span class="m-field__req">*</span>{/if}</label>
   {/if}
   {#if format === 'money'}
     <div class="m-search" style="position:relative">
       <span class="m-search__icon">$</span>
       <ShadcnInput class={`m-input${error ? ' m-input--invalid' : ''}`} style="padding-left:26px"
+        id={inputId} {required} aria-invalid={!!error} ariaDescribedBy={error || helpText ? messageId : undefined}
         type="text" inputmode="decimal" {placeholder} {disabled} {maxlength} {autocomplete}
         value={String(value ?? '')} oninput={onInput} />
     </div>
   {:else}
     <ShadcnInput class={`m-input${error ? ' m-input--invalid' : ''}`}
+      id={inputId} {required} aria-invalid={!!error} ariaDescribedBy={error || helpText ? messageId : undefined}
       type={inputType} {placeholder} {disabled} {maxlength} {autocomplete}
       value={String(value ?? '')} oninput={onInput} />
   {/if}
   {#if error}
-    <span class="m-field__error">{error}</span>
+    <span id={messageId} class="m-field__error">{error}</span>
   {:else if helpText}
-    <span class="m-field__help">{helpText}</span>
+    <span id={messageId} class="m-field__help">{helpText}</span>
   {/if}
 </div>

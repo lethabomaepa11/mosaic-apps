@@ -10,7 +10,7 @@
   import type { MosaicClient } from '../client/api';
   import { toast } from '../stores/toast.svelte';
   import { fade } from 'svelte/transition';
-  import { getContext, setContext } from 'svelte';
+  import { getContext, setContext, untrack, onDestroy } from 'svelte';
   import { themeState } from '../lib/theme.svelte';
   import { createMosaicState, MOSAIC_STATE_CONTEXT, type MosaicState } from '../state/store';
   import NodeRenderer from './NodeRenderer.svelte';
@@ -47,13 +47,26 @@
   setContext(MOSAIC_STATE_CONTEXT, runtimeState);
 
   // svelte-ignore state_referenced_locally -- intentional: snapshot initial record into local editable state
-  let data = $state<Record<string, unknown>>({ ...(record ?? {}) });
+  let data = $state<Record<string, unknown>>({ ...(record ?? runtimeState.form.snapshot()) });
   let errors = $state<Record<string, string>>({});
   let saving = $state(false);
+  let stateRevision = $state(0);
+
+  const unsubscribers = [runtimeState.application, runtimeState.page, runtimeState.form, runtimeState.component]
+    .map((store) => store.subscribe(() => { stateRevision += 1; }, false));
+  unsubscribers.push(runtimeState.form.subscribe((next) => {
+    if (JSON.stringify(data) === JSON.stringify(next)) return;
+    data = { ...next };
+    onchange?.(structuredClone($state.snapshot(data)));
+  }, false));
+  onDestroy(() => unsubscribers.forEach((unsubscribe) => unsubscribe()));
 
   $effect(() => {
-    if (record) data = { ...record };
-    runtimeState.form.update(() => ({ ...data }));
+    const next = record ? structuredClone($state.snapshot(record)) : undefined;
+    untrack(() => {
+      if (next) data = next;
+      runtimeState.form.update(() => structuredClone($state.snapshot(data)));
+    });
   });
 
   const root = $derived(ensureRoot({ ...form.root }));
@@ -63,6 +76,7 @@
   const seo = $derived(form.settings?.seo);
 
   function expressionScope() {
+    stateRevision;
     return {
       ...data,
       data,
@@ -164,7 +178,7 @@
       onsaved?.(data);
       if (form.settings?.redirectAfterSubmit && typeof window !== 'undefined') {
         const target = form.settings.redirectAfterSubmit.trim();
-        if (target.startsWith('/') || /^https?:\/\//i.test(target)) window.location.assign(target);
+        if ((target.startsWith('/') && !target.startsWith('//') && !target.includes('\\')) || /^https?:\/\//i.test(target)) window.location.assign(target);
       }
     } catch (err) {
       toast.error(form.settings?.errorMessage || 'Could not save', err instanceof Error ? err.message : String(err));

@@ -31,7 +31,7 @@ export function actionScope(context: ActionContext, result?: unknown): ScriptSta
     page: context.state.page.snapshot(),
     form: context.state.form.snapshot(),
     component: context.state.component.snapshot(),
-    data: context.data ?? context.state.form.snapshot(),
+    data: context.data ? JSON.parse(JSON.stringify(context.data)) as Record<string, unknown> : context.state.form.snapshot(),
     result,
   };
 }
@@ -58,7 +58,7 @@ function navigationHref(action: Extract<ComponentAction, { type: 'navigate' }>, 
   if (!to) throw new Error('Navigation target is required');
   if (action.target === 'form') return `/f/${encodeURIComponent(to)}`;
   if (action.target === 'page') return `/p/${encodeURIComponent(to)}`;
-  if (!to.startsWith('/') && !/^https?:\/\//i.test(to)) throw new Error('URL actions require a relative path or an HTTP(S) URL');
+  if (!(to.startsWith('/') && !to.startsWith('//') && !to.includes('\\')) && !/^https?:\/\//i.test(to)) throw new Error('URL actions require a relative path or an HTTP(S) URL');
   return to;
 }
 
@@ -78,15 +78,15 @@ export class ActionRunner {
     this.setStatus(key, { status: 'running', startedAt: new Date().toISOString() });
     try {
       const result = await this.runActions(actions, controller);
-      this.setStatus(key, { status: 'succeeded', finishedAt: new Date().toISOString() });
+      if (this.controllers.get(key) === controller) this.setStatus(key, { status: 'succeeded', finishedAt: new Date().toISOString() });
       return result;
     } catch (error) {
       if (controller.signal.aborted || (error instanceof DOMException && error.name === 'AbortError')) {
-        this.setStatus(key, { status: 'cancelled', finishedAt: new Date().toISOString() });
+        if (this.controllers.get(key) === controller) this.setStatus(key, { status: 'cancelled', finishedAt: new Date().toISOString() });
         return undefined;
       }
       const message = error instanceof Error ? error.message : String(error);
-      this.setStatus(key, { status: 'failed', finishedAt: new Date().toISOString(), error: message });
+      if (this.controllers.get(key) === controller) this.setStatus(key, { status: 'failed', finishedAt: new Date().toISOString(), error: message });
       throw error;
     } finally {
       if (this.controllers.get(key) === controller) this.controllers.delete(key);
