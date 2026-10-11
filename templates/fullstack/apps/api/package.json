@@ -1,21 +1,26 @@
 {
-  "name": "@__PROJECT_SLUG__/api",
+  "name": "api",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "node --env-file-if-exists=../../.env --import tsx src/index.ts",
     "build": "tsc -p tsconfig.json",
-    "start": "node --env-file-if-exists=../../.env dist/index.js",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "start": "node dist/index.js",
+    "migrate": "node --import tsx src/migrate/runner.ts",
+    "seed": "node --import tsx src/seed.ts"
   },
   "dependencies": {
+    "@mosaic-apps/mosaic-core": "^0.1.1",
+    "@mosaic-apps/mosaic-server": "^0.1.1",
+    "@electric-sql/pglite": "^0.5.8",
     "@hono/node-server": "^1.0.0",
-    "@mosaic-apps/mosaic-core": "0.1.0",
-    "@mosaic-apps/mosaic-server": "0.1.0"
+    "@types/pg": "^8.23.1",
+    "hono": "^4.13.13",
+    "pg": "^8.23.1",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
-    "@types/node": "^26.0.0",
     "tsx": "^4.20.0",
     "typescript": "^6.0.3"
   }

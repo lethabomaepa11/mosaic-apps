@@ -1,6 +1,6 @@
 {
   "name": "@mosaic-apps/mosaic-cli",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Mosaic CLI: scaffold, migrate, seed and drive Mosaic full-stack apps",
   "publishConfig": {
     "access": "public"
@@ -29,8 +29,8 @@
     "dev": "node --import tsx src/index.ts"
   },
   "dependencies": {
-    "@mosaic-apps/mosaic-core": "file:../mosaic-core",
-    "@mosaic-apps/mosaic-server": "file:../mosaic-server"
+    "@mosaic-apps/mosaic-core": "0.1.0",
+    "@mosaic-apps/mosaic-server": "0.1.0"
   },
   "devDependencies": {
     "tsx": "^4.20.0",
