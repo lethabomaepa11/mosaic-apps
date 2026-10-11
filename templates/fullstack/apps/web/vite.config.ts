@@ -9,10 +9,11 @@ import { fileURLToPath } from 'node:url';
 export default defineConfig({
   optimizeDeps: { include: ['monaco-editor/editor/editor.main', '@jitl/quickjs-wasmfile-release-sync', 'quickjs-emscripten-core', 'typescript'] },
   envPrefix: ['VITE_', 'PUBLIC_'],
-  preview: { port: __WEB_PORT__ },
+  preview: { host: '127.0.0.1', port: __WEB_PORT__ },
   plugins: [tailwindcss(), sveltekit({ adapter: process.env.MOSAIC_DEPLOY_TARGET === 'netlify' ? netlifyAdapter() : adapter() })],
   resolve: { alias: { '#lib': fileURLToPath(new URL('./src/lib', import.meta.url)) } },
   server: {
+    host: '127.0.0.1',
     fs: { allow: [fileURLToPath(new URL('./', import.meta.resolve('@mosaic-apps/ui')))] },
     port: __WEB_PORT__,
     proxy: {
