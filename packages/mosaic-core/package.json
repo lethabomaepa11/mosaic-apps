@@ -1,6 +1,6 @@
 {
   "name": "@mosaic-apps/mosaic-core",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Mosaic core: entity/page/form metadata types, form tree operations, expression evaluator, query parsing",
   "publishConfig": {
     "access": "public"

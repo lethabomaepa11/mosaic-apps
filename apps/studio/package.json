@@ -1,6 +1,6 @@
 {
   "name": "studio",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -10,8 +10,8 @@
     "check": "svelte-check --tsconfig ./tsconfig.json"
   },
   "dependencies": {
-    "@mosaic-apps/mosaic-core": "file:../../packages/mosaic-core",
-    "@mosaic-apps/mosaic-ui": "file:../../packages/mosaic-ui",
+    "@mosaic-apps/mosaic-core": "0.1.0",
+    "@mosaic-apps/mosaic-ui": "0.1.0",
     "monaco-editor": "^0.57.0"
   },
   "imports": {

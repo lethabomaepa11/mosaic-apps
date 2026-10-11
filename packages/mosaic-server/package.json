@@ -1,6 +1,6 @@
 {
   "name": "@mosaic-apps/mosaic-server",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Mosaic server: Hono app with metadata registry, migration engine, auto CRUD, JSON forms, auth/RBAC, audit, ref lists and settings over PostgreSQL",
   "publishConfig": {
     "access": "public"
@@ -27,7 +27,7 @@
   "dependencies": {
     "@electric-sql/pglite": "^0.5.8",
     "@hono/node-server": "^1.0.0",
-    "@mosaic-apps/mosaic-core": "file:../mosaic-core",
+    "@mosaic-apps/mosaic-core": "0.1.0",
     "@types/pg": "^8.23.1",
     "hono": "^4.13.13",
     "pg": "^8.23.1",
