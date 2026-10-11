@@ -7,6 +7,7 @@ export type ComponentCategory = 'Inputs' | 'Data' | 'Layout' | 'Display' | 'Feed
 export type PropKind =
   | 'string'
   | 'text'
+  | 'code'
   | 'number'
   | 'boolean'
   | 'color'

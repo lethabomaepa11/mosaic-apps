@@ -1,5 +1,6 @@
 <script lang="ts">
-  import ShadcnTextarea from '../shadcn/textarea/Textarea.svelte';
+  import CodeEditorField from './CodeEditorField.svelte';
+
   interface Props {
     label?: string;
     value?: unknown;
@@ -7,33 +8,15 @@
     rows?: number;
     disabled?: boolean;
     helpText?: string;
+    validate?: (value: unknown) => string | undefined;
   }
-
-  let { label, value = $bindable<unknown>(null), oninput, rows = 6, disabled, helpText }: Props = $props();
-
-  let text = $state(typeof value === 'string' ? value : value === null || value === undefined ? '' : JSON.stringify(value, null, 2));
-  let error = $state('');
-
-  function onInput(e: Event & { currentTarget: EventTarget & HTMLTextAreaElement }) {
-    text = e.currentTarget.value;
-    if (!text.trim()) {
-      value = null;
-      error = '';
-      oninput?.(null);
-      return;
-    }
-    try {
-      value = JSON.parse(text);
-      error = '';
-      oninput?.(value);
-    } catch (err) {
-      error = (err as Error).message;
-    }
+  let { label = 'JSON', value = $bindable<unknown>(null), oninput, disabled, helpText, validate }: Props = $props();
+  const text = $derived(JSON.stringify(value ?? null, null, 2));
+  function validateJson(raw: string): string | undefined {
+    try { const parsed: unknown = JSON.parse(raw); return validate?.(parsed); }
+    catch (error) { return error instanceof Error ? error.message : 'Enter valid JSON'; }
   }
+  function apply(raw: string) { value = JSON.parse(raw); oninput?.(value); }
 </script>
 
-<div class="m-field">
-  {#if label}<span class="m-field__label">{label}</span>{/if}
-  <ShadcnTextarea class={`m-textarea m-mono${error ? ' m-textarea--invalid' : ''}`} {rows} {disabled} spellcheck="false" value={text} oninput={onInput}></ShadcnTextarea>
-  {#if error}<span class="m-field__error">{error}</span>{:else if helpText}<span class="m-field__help">{helpText}</span>{/if}
-</div>
+<CodeEditorField {label} value={text} language="json" {disabled} {helpText} validate={validateJson} oninput={apply} />

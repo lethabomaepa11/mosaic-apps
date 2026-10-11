@@ -147,8 +147,8 @@ export const INPUT_ENTRIES_B: ComponentDef[] = [
     icon: 'braces',
     component: JsonEditor,
     isField: true,
-    defaults: { label: 'JSON', rows: 6 },
-    inspector: inspector([{ key: 'rows', label: 'Rows', kind: 'number', min: 2, max: 24 }]),
+    defaults: { label: 'JSON' },
+    inspector: inspector(),
   },
   {
     type: 'fileUpload',

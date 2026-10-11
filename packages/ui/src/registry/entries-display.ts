@@ -31,7 +31,7 @@ export const DISPLAY_ENTRIES: ComponentDef[] = [
   { type: 'descriptionList', label: 'Description list', category: 'Display', icon: 'clipboardList', component: DescriptionList, defaults: { items: [{ label: 'Field', value: 'Value' }] },
     inspector: [{ key: 'items', label: 'Items (JSON: [{label,value}])', kind: 'json' }] },
   { type: 'codeBlock', label: 'Code block', category: 'Display', icon: 'code', component: CodeBlock, defaults: { code: '// code', language: 'ts' },
-    inspector: [{ key: 'code', label: 'Code', kind: 'text' }] },
+    inspector: [{ key: 'code', label: 'Code', kind: 'code' }, { key: 'language', label: 'Language', kind: 'select', options: [{ value: 'typescript', label: 'TypeScript' }, { value: 'javascript', label: 'JavaScript' }, { value: 'json', label: 'JSON' }, { value: 'plaintext', label: 'Plain text' }] }] },
   { type: 'jsonView', label: 'JSON viewer', category: 'Display', icon: 'json', component: JsonView, defaults: { value: { hello: 'world' } },
     inspector: [{ key: 'value', label: 'Value (JSON)', kind: 'json' }, { key: 'collapsed', label: 'Start collapsed', kind: 'boolean' }] },
   { type: 'treeView', label: 'Tree view', category: 'Display', icon: 'treeView', component: TreeView, defaults: { nodes: [{ id: '1', label: 'Root', children: [{ id: '1.1', label: 'Child' }] }] },

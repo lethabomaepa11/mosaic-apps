@@ -3,6 +3,11 @@ declare module '*.css' {
   export default content;
 }
 
+declare module '*?worker' {
+  const WorkerConstructor: { new (): Worker };
+  export default WorkerConstructor;
+}
+
 declare module '*.svelte' {
   import type { Component } from 'svelte';
   const component: Component;

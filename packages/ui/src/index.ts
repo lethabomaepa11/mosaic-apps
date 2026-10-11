@@ -1,3 +1,4 @@
+/// <reference path="./lib/monaco.d.ts" />
 /**
  * @mosaic-apps/ui - enterprise Svelte 5 kit: 57 component types, drag & drop engine,
  * JSON FormRenderer/PageRenderer, entity-driven forms, API client, toasts.
@@ -65,6 +66,8 @@ export { default as ColorPicker } from './components/ColorPicker.svelte';
 export { default as RateInput } from './components/RateInput.svelte';
 export { default as RefSelect } from './components/RefSelect.svelte';
 export { default as JsonEditor } from './components/JsonEditor.svelte';
+export { default as CodeEditor } from './components/CodeEditor.svelte';
+export { default as CodeEditorField } from './components/CodeEditorField.svelte';
 export { default as FileUpload } from './components/FileUpload.svelte';
 export { default as SearchField } from './components/SearchField.svelte';
 export { default as DataTable } from './components/DataTable.svelte';
