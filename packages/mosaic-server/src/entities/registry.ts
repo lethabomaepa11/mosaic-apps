@@ -1,9 +1,6 @@
-/** Entity registry: metadata rows in mosaic_entities + optional filesystem sync. */
+/** Entity registry: metadata rows in mosaic_entities + filesystem sync. */
 
-import 'reflect-metadata';
-import { readdir, readFile } from 'node:fs/promises';
-import { join } from 'node:path';
-import { newId, validateEntity, type EntityDef, extractEntityDef } from '@mosaic/core';
+import { loadEntityDefs, newId, validateEntity, type EntityDef } from '@mosaic/core';
 import type { Db } from '../db/driver.js';
 import { RESERVED_ENTITY_NAMES } from '../platform.js';
 
@@ -70,7 +67,7 @@ export function assertValidEntity(def: EntityDef): void {
 export async function saveEntity(db: Db, def: EntityDef, source: 'file' | 'database' = 'database'): Promise<RegistryRow> {
   assertValidEntity(def);
   const current = await getEntity(db, def.name);
-  const changed = !current || JSON.stringify(stripVersion(current.definition)) !== JSON.stringify(stripVersion(def));
+  const changed = !current || stableStringify(stripVersion(current.definition)) !== stableStringify(stripVersion(def));
   const version = current ? (changed ? current.version + 1 : current.version) : 1;
   const definition: EntityDef = { ...def, version };
   await db.query(
@@ -91,29 +88,50 @@ function stripVersion(def: EntityDef): EntityDef {
   return rest as EntityDef;
 }
 
+/** JSON.stringify with sorted object keys, so key order never counts as a change. */
+function stableStringify(value: unknown): string {
+  return JSON.stringify(sortKeys(value));
+}
+
+function sortKeys(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(sortKeys);
+  if (value && typeof value === 'object' && !(value instanceof Date)) {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+        .map(([key, val]) => [key, sortKeys(val)]),
+    );
+  }
+  return value;
+}
+
 export async function deleteEntity(db: Db, name: string): Promise<boolean> {
   const res = await db.query('DELETE FROM mosaic_entities WHERE name = $1', [name]);
   await db.query('DELETE FROM mosaic_entity_columns WHERE entity_name = $1', [name]);
   return (res.rowCount ?? 0) > 0;
 }
 
-/** Sync `*.entity.ts` files into the registry (class wins when changed). */
-export async function syncEntitiesDir(db: Db, dir: string): Promise<RegistryRow[]> {
-  let files: string[];
-  try {
-    files = await readdir(dir);
-  } catch {
-    return [];
-  }
+/**
+ * Sync an entities directory into the registry.
+ *
+ * Reads `*.entity.{ts,js}` classes (via decorators) and `*.entity.json` files —
+ * a class wins when both declare the same name. Definitions that live in the
+ * directory are `source: 'file'`; registry rows previously written from a file
+ * that no longer exists are removed (the table is left untouched).
+ */
+export async function syncEntitiesDir(db: Db, dir: string | string[]): Promise<RegistryRow[]> {
+  const dirs = Array.isArray(dir) ? dir : [dir];
+  const byName = new Map<string, EntityDef>();
+  for (const d of dirs) for (const def of await loadEntityDefs(d)) byName.set(def.name, def);
+
   const saved: RegistryRow[] = [];
-  for (const file of files.filter((f) => f.endsWith('.entity.ts'))) {
-    const mod = await import(join(dir, file));
-    for (const exp of Object.values(mod)) {
-      if (typeof exp === 'function' && Reflect.getMetadata('mosaic:entity', exp)) {
-        const def = extractEntityDef(exp);
-        saved.push(await saveEntity(db, def, 'file'));
-      }
-    }
+  for (const def of byName.values()) saved.push(await saveEntity(db, def, 'file'));
+
+  const names = new Set(byName.keys());
+  for (const row of await listEntities(db)) {
+    if (row.source !== 'file' || names.has(row.name)) continue;
+    await deleteEntity(db, row.name);
+    console.warn(`[mosaic] entity "${row.name}" has no source file in ${dirs.join(', ')} - removed from the registry.`);
   }
   return saved;
 }

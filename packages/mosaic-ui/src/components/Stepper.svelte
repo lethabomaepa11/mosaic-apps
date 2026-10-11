@@ -1,4 +1,6 @@
 <script lang="ts">
+  import Icon from './Icon.svelte';
+
   interface Props {
     steps: string[];
     current?: number;
@@ -10,9 +12,15 @@
 <nav class="m-steps" aria-label="Progress">
   {#each steps as label, i (label)}
     <div class="m-steps__step" class:active={i === current} class:done={i < current}>
-      <span class="m-steps__num">{i < current ? '✓' : i + 1}</span>
+      <span class="m-steps__num">
+        {#if i < current}
+          <Icon name="check" size={14} />
+        {:else}
+          {i + 1}
+        {/if}
+      </span>
       <span>{label}</span>
-      {#if i < steps.length - 1}<span style="opacity:.35;margin:0 6px">→</span>{/if}
+      {#if i < steps.length - 1}<Icon name="chevronRight" size={12} style="opacity:.35;margin:0 6px" />{/if}
     </div>
   {/each}
 </nav>

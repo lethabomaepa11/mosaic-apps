@@ -48,7 +48,7 @@ export class MosaicClient {
     }
   }
 
-  private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  private async request<T>(method: string, path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
     const headers: Record<string, string> = {};
     if (this.token) headers['Authorization'] = `Bearer ${this.token}`;
     let payload: BodyInit | undefined;
@@ -56,7 +56,7 @@ export class MosaicClient {
       headers['Content-Type'] = 'application/json';
       payload = JSON.stringify(body);
     }
-    const res = await fetch(`${this.baseUrl}${path}`, { method, headers, body: payload });
+    const res = await fetch(`${this.baseUrl}${path}`, { method, headers, body: payload, signal });
     if (res.status === 204) return undefined as T;
     let json: unknown;
     try {
@@ -72,6 +72,14 @@ export class MosaicClient {
       throw new ApiError(error?.message ?? `HTTP ${res.status}`, res.status, error?.code, error?.details);
     }
     return (parsed as Ok<T>).data;
+  }
+
+  /** Call a route on this client's configured API origin. Absolute and protocol-relative URLs are rejected. */
+  call<T = unknown>(method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE', path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
+    if (!path.startsWith('/') || path.startsWith('//') || /^[a-z][a-z\d+.-]*:/i.test(path)) {
+      return Promise.reject(new Error('API action paths must be relative to the configured Mosaic API'));
+    }
+    return this.request<T>(method, path, body, signal);
   }
 
   // ---- auth ----
@@ -158,14 +166,29 @@ export class MosaicClient {
   listForms(publishedOnly = false): Promise<FormDef[]> {
     return this.request('GET', `/forms${publishedOnly ? '?published=true' : ''}`);
   }
+  listFormFolders(): Promise<string[]> {
+    return this.request('GET', '/forms/folders');
+  }
+  createFormFolder(path: string): Promise<{ path: string }> {
+    return this.request('POST', '/forms/folders', { path });
+  }
+  renameFormFolder(from: string, to: string): Promise<{ from: string; to: string; updated: number }> {
+    return this.request('POST', '/forms/folders/rename', { from, to });
+  }
+  deleteFormFolder(path: string): Promise<{ path: string; movedToRoot: number }> {
+    return this.request('POST', '/forms/folders/delete', { path });
+  }
   getForm(idOrSlug: string): Promise<FormDef> {
     return this.request('GET', `/forms/${idOrSlug}`);
   }
-  createForm(input: { name: string; slug?: string; entity?: string; description?: string; schema?: unknown; settings?: unknown; dataSource?: unknown }): Promise<FormDef> {
+  createForm(input: { name: string; slug?: string; entity?: string; folder?: string; description?: string; schema?: unknown; settings?: unknown; dataSource?: unknown }): Promise<FormDef> {
     return this.request('POST', '/forms', input);
   }
   saveForm(form: Partial<FormDef> & { id: string; name: string }): Promise<FormDef> {
-    return this.request('PUT', `/forms/${form.id}`, form);
+    return this.request('PUT', `/forms/${form.id}`, { ...form, schema: form.root });
+  }
+  saveAndPublishForm(form: Partial<FormDef> & { id: string; name: string; expectedVersion: number }): Promise<FormDef> {
+    return this.request('PUT', `/forms/${form.id}/save-and-publish`, { ...form, schema: form.root });
   }
   publishForm(id: string): Promise<FormDef> {
     return this.request('POST', `/forms/${id}/publish`);
@@ -176,14 +199,35 @@ export class MosaicClient {
   listPages(publishedOnly = false): Promise<PageDef[]> {
     return this.request('GET', `/pages${publishedOnly ? '?published=true' : ''}`);
   }
+  listPageFolders(): Promise<string[]> {
+    return this.request('GET', '/pages/folders');
+  }
+  createPageFolder(path: string): Promise<{ path: string }> {
+    return this.request('POST', '/pages/folders', { path });
+  }
+  renamePageFolder(from: string, to: string): Promise<{ from: string; to: string; updated: number }> {
+    return this.request('POST', '/pages/folders/rename', { from, to });
+  }
+  deletePageFolder(path: string): Promise<{ path: string; movedToRoot: number }> {
+    return this.request('POST', '/pages/folders/delete', { path });
+  }
+  getNav(): Promise<{ items: import('@mosaic/core').NavItemDef[] }> {
+    return this.request('GET', '/nav');
+  }
+  getTheme(): Promise<import('@mosaic/core').ThemeConfig> {
+    return this.request('GET', '/theme');
+  }
   getPage(idOrSlug: string): Promise<PageDef> {
     return this.request('GET', `/pages/${idOrSlug}`);
   }
-  createPage(input: { name: string; slug?: string; route?: string; description?: string; schema?: unknown; settings?: unknown }): Promise<PageDef> {
+  createPage(input: { name: string; slug?: string; route?: string; folder?: string; description?: string; schema?: unknown; settings?: unknown }): Promise<PageDef> {
     return this.request('POST', '/pages', input);
   }
   savePage(page: Partial<PageDef> & { id: string; name: string }): Promise<PageDef> {
-    return this.request('PUT', `/pages/${page.id}`, page);
+    return this.request('PUT', `/pages/${page.id}`, { ...page, schema: page.root });
+  }
+  saveAndPublishPage(page: Partial<PageDef> & { id: string; name: string; expectedVersion: number }): Promise<PageDef> {
+    return this.request('PUT', `/pages/${page.id}/save-and-publish`, { ...page, schema: page.root });
   }
   publishPage(id: string): Promise<PageDef> {
     return this.request('POST', `/pages/${id}/publish`);

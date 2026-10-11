@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { Checkbox as BitsCheckbox } from 'bits-ui';
+  import { Check } from 'lucide-svelte';
   import type { Option } from './SelectField.svelte';
 
   interface Props {
@@ -29,7 +31,9 @@
   <div class="m-choice m-choice--row">
     {#each opts as o (o.value)}
       <label class="m-check">
-        <input type="checkbox" checked={(value ?? []).includes(o.value)} {disabled} onchange={() => toggle(o.value)} />
+        <BitsCheckbox.Root class="m-checkbox" checked={(value ?? []).includes(o.value)} {disabled} onCheckedChange={() => toggle(o.value)} aria-label={o.label ?? o.value}>
+          {#if (value ?? []).includes(o.value)}<Check size={12} />{/if}
+        </BitsCheckbox.Root>
         <span>{o.label ?? o.value}</span>
       </label>
     {/each}

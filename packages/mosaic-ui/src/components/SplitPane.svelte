@@ -11,6 +11,7 @@
 
   let { first, second, direction = 'row', initial = 30, min = 15 }: Props = $props();
 
+  // svelte-ignore state_referenced_locally -- intentional: initial size from prop
   let size = $state(initial);
   let dragging = $state(false);
   let wrap: HTMLDivElement | undefined = $state();

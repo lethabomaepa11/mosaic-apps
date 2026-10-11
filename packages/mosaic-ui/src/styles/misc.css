@@ -35,8 +35,7 @@
 .m-breadcrumbs a { color: inherit; text-decoration: none; }
 .m-breadcrumbs a:hover { color: var(--m-primary); }
 .m-menu { position: relative; display: inline-block; }
-.m-menu__list { position: absolute; top: calc(100% + 5px); left: 0; min-width: 190px; background: var(--m-surface); border: 1px solid var(--m-border); border-radius: var(--m-radius-sm); box-shadow: var(--m-shadow-lg); padding: 5px; z-index: 60; }
-.m-menu__list--right { left: auto; right: 0; }
+.m-menu__list { min-width: 190px; background: var(--m-surface); border: 1px solid var(--m-border); border-radius: var(--m-radius-sm); box-shadow: var(--m-shadow-lg); padding: 5px; z-index: 60; }
 .m-menu__item { display: flex; width: 100%; gap: 9px; align-items: center; font: inherit; font-size: 0.8125rem; padding: 7px 10px; border: none; background: none; border-radius: 5px; cursor: pointer; text-align: left; color: var(--m-fg); text-decoration: none; }
 .m-menu__item:hover { background: var(--m-surface-2); }
 .m-menu__item--danger { color: var(--m-danger); }

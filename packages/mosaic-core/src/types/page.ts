@@ -1,4 +1,4 @@
-import type { FormNode } from './form.js';
+import type { FormNode, FormSeoSettings } from './form.js';
 
 /** Page JSON - a composed layout of components (tables, forms, charts, ...). */
 
@@ -15,6 +15,8 @@ export interface PageSettings {
   layout?: 'default' | 'bare';
   menu?: PageMenuConfig;
   description?: string;
+  transition?: import('./platform.js').TransitionConfig;
+  seo?: FormSeoSettings;
 }
 
 export interface PageDef {
@@ -24,6 +26,8 @@ export interface PageDef {
   route: string;
   name: string;
   description?: string;
+  /** Workspace folder path used by the Studio explorer (for example `sales/quotes`). */
+  folder?: string;
   version: number;
   published: boolean;
   root: FormNode;

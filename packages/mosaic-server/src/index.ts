@@ -41,4 +41,20 @@ export { entityAdminRoutes } from './modules/entity-admin.js';
 export { seedPlatform, type SeedOptions, type SeedResult } from './seed.js';
 export { ensurePlatformTables, DEFAULT_ROLES, RESERVED_ENTITY_NAMES, PLATFORM_DDL } from './platform.js';
 export { HttpError, fail, ok, readJson, mapDbError } from './modules/http.js';
-export { extractEntityDef, loadEntitiesFromDir, autoRegisterEntities, type EntityClass } from '@mosaic/core';
+export {
+  extractEntityDef,
+  loadEntitiesFromDir,
+  loadEntityDefs,
+  loadEntityJsonDefs,
+  autoRegisterEntities,
+  importEntityModule,
+  registerEntity,
+  getEntityClass,
+  Entity,
+  Field,
+  Relation,
+  type EntityClass,
+  type EntityOptions,
+  type FieldOptions,
+  type RelationOptions,
+} from '@mosaic/core';

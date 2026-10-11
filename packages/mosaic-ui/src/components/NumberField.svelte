@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ShadcnInput from '../shadcn/input/Input.svelte';
   interface Props {
     label?: string;
     value?: number | string | null;
@@ -31,7 +32,7 @@
 
 <div class="m-field">
   {#if label}<span class="m-field__label">{label}{#if required}<span class="m-field__req">*</span>{/if}</span>{/if}
-  <input class="m-input" class:m-input--invalid={!!error}
+  <ShadcnInput class={`m-input${error ? ' m-input--invalid' : ''}`}
     type="number" inputmode="decimal" {placeholder} {min} {max} {step} {disabled}
     value={value === null || value === undefined ? '' : String(value)}
     oninput={onInput} />

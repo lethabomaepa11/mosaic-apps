@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ShadcnInput from '../shadcn/input/Input.svelte';
   interface Props {
     value?: string;
     oninput?: (value: string) => void;
@@ -21,5 +22,5 @@
 
 <div class="m-search">
   <span class="m-search__icon">⌕</span>
-  <input class="m-input" type="search" {placeholder} {value} oninput={onInput} aria-label={placeholder} />
+  <ShadcnInput class="m-input" type="search" {placeholder} {value} oninput={onInput} ariaLabel={placeholder} />
 </div>

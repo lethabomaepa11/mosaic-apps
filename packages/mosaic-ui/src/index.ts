@@ -36,15 +36,29 @@ export type { DragPayload, DragState, DropTarget, ZoneSpec } from './dnd/dnd.sve
 export { MosaicClient, createClient, ApiError, type ClientOptions, type MigrationStatement } from './client/api.js';
 export { toast } from './stores/toast.svelte.js';
 export type { Toast, ToastVariant } from './stores/toast.svelte.js';
+export { createMosaicState, MosaicState, StateStore, MOSAIC_STATE_CONTEXT } from './state/store.js';
+export type { MosaicStateInitials, StateListener } from './state/store.js';
+export { ActionRunner, createActionRunner, type ActionContext } from './actions/runner.js';
+export { runActionScript, runBooleanScript, type SandboxOptions } from './actions/sandbox.js';
+
+// utilities
+export { cn } from './lib/cn';
+export { applyThemeConfig } from './lib/theme';
 
 // components
+export { default as Icon } from './components/Icon.svelte';
 export { default as TextField } from './components/TextField.svelte';
+export { default as Button } from './components/Button.svelte';
+export { Button as ShadcnButton } from './shadcn/button/index.ts';
+export { Input as ShadcnInput } from './shadcn/input/index.ts';
+export { Textarea as ShadcnTextarea } from './shadcn/textarea/index.ts';
 export { default as TextArea } from './components/TextArea.svelte';
 export { default as NumberField } from './components/NumberField.svelte';
 export { default as SelectField } from './components/SelectField.svelte';
 export { default as MultiSelect } from './components/MultiSelect.svelte';
 export { default as ChoiceGroup } from './components/ChoiceGroup.svelte';
 export { default as Switch } from './components/Switch.svelte';
+export { default as Checkbox } from './components/Checkbox.svelte';
 export { default as Slider } from './components/Slider.svelte';
 export { default as DatePicker } from './components/DatePicker.svelte';
 export { default as ColorPicker } from './components/ColorPicker.svelte';
@@ -55,6 +69,8 @@ export { default as FileUpload } from './components/FileUpload.svelte';
 export { default as SearchField } from './components/SearchField.svelte';
 export { default as DataTable } from './components/DataTable.svelte';
 export { default as EntityTable } from './components/EntityTable.svelte';
+export { default as Subform } from './components/Subform.svelte';
+export { default as Image } from './components/Image.svelte';
 export { default as Pagination } from './components/Pagination.svelte';
 export { default as Toolbar } from './components/Toolbar.svelte';
 export { default as FilterBar } from './components/FilterBar.svelte';
@@ -76,7 +92,8 @@ export { default as Avatar } from './components/Avatar.svelte';
 export { default as DescriptionList } from './components/DescriptionList.svelte';
 export { default as CodeBlock } from './components/CodeBlock.svelte';
 export { default as JsonView } from './components/JsonView.svelte';
-export { default as TreeView, type TreeNode } from './components/TreeView.svelte';
+export { default as TreeView } from './components/TreeView.svelte';
+export type { TreeNode } from './components/TreeView.svelte';
 export { default as Breadcrumbs } from './components/Breadcrumbs.svelte';
 export { default as Alert } from './components/Alert.svelte';
 export { default as Badge } from './components/Badge.svelte';
@@ -85,7 +102,7 @@ export { default as Spinner } from './components/Spinner.svelte';
 export { default as Skeleton } from './components/Skeleton.svelte';
 export { default as Tooltip } from './components/Tooltip.svelte';
 export { default as Toaster } from './components/Toaster.svelte';
-export { default as Button } from './components/Button.svelte';
+export { default as LegacyButton } from './components/Button.svelte';
 export { default as Menu } from './components/Menu.svelte';
 export { default as Chart } from './components/Chart.svelte';
 export { default as PanelCard } from './components/Card.svelte';

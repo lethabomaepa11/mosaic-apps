@@ -1,6 +1,6 @@
 /** Shared props for the recursive node renderers (breaks the import cycle). */
 
-import type { FormNode } from '@mosaic/core';
+import type { FormNode, TransitionConfig } from '@mosaic/core';
 import type { MosaicClient } from '../client/api';
 
 export interface NodeRendererProps {
@@ -12,6 +12,8 @@ export interface NodeRendererProps {
   data?: Record<string, unknown>;
   errors?: Record<string, string>;
   onField?: (binding: string, value: unknown) => void;
+  transition?: TransitionConfig;
+  mode?: 'create' | 'edit' | 'view';
 }
 
 export interface NodeChildrenProps {
@@ -22,4 +24,6 @@ export interface NodeChildrenProps {
   data?: Record<string, unknown>;
   errors?: Record<string, string>;
   onField?: (binding: string, value: unknown) => void;
+  transition?: TransitionConfig;
+  mode?: 'create' | 'edit' | 'view';
 }

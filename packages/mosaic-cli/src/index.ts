@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 /** mosaic CLI - scaffold, migrate, seed and drive Mosaic full-stack apps. */
 
+import { spawn } from 'node:child_process';
 import { parseArgs } from 'node:util';
 import { create } from './create.js';
 import { info, studio, entity } from './commands-entity.js';
 import { migrate as runMigrate, seed as runSeed } from './commands-migrate.js';
+import { loadProjectConfig } from './project.js';
 
 const HELP = `
 mosaic — the metadata-driven full-stack platform
@@ -15,8 +17,8 @@ Commands:
   create <name>          Scaffold a new Mosaic app (Hono API + SvelteKit PWA web)
   migrate                Plan + apply pending migrations (dry-run preview)
   seed [--demo]          Seed roles, settings, admin user (and demo data)
-  entity <Name>          Add an entity JSON definition to ./entities
-  dev                    Run the project's API + web apps
+  entity <Name>          Scaffold an entity class in apps/api/src/entities
+  dev                    Run the project's API + web apps together
   studio                 Open the Mosaic drag & drop studio against this project
   info                   Show project info (config + live server status)
   help                   Show this help
@@ -85,7 +87,7 @@ async function main(): Promise<void> {
           link: { type: 'string' },
           'npm-mode': { type: 'boolean', default: false },
           force: { type: 'boolean', default: false },
-          dir: { type: 'string' },
+          dir: { type: 'string', short: 'C' },
         },
         allowPositionals: true,
       });
@@ -122,7 +124,7 @@ async function main(): Promise<void> {
       const { values, positionals } = parseArgs({
         args: rest,
         options: {
-          dir: { type: 'string' },
+          dir: { type: 'string', short: 'C' },
           demo: { type: 'boolean', default: false },
           fields: { type: 'string' },
           'soft-delete': { type: 'boolean', default: false },
@@ -149,8 +151,13 @@ async function main(): Promise<void> {
       } else if (command === 'studio') {
         await studio({ dir, port: values.port ? Number(values.port) : undefined });
       } else {
-        console.error('`mosaic dev` is not implemented here — run `npm run dev` in your project.');
-        process.exit(1);
+        await loadProjectConfig(dir); // validates we're in a project
+        const child = spawn('npm', ['run', 'dev'], {
+          cwd: dir,
+          stdio: 'inherit',
+          shell: process.platform === 'win32',
+        });
+        child.on('exit', (code) => process.exit(code ?? 0));
       }
       return;
     }

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ShadcnTextarea from '../shadcn/textarea/Textarea.svelte';
   interface Props {
     label?: string;
     value?: string;
@@ -22,7 +23,7 @@
 
 <div class="m-field">
   {#if label}<span class="m-field__label">{label}{#if required}<span class="m-field__req">*</span>{/if}</span>{/if}
-  <textarea class="m-textarea" class:m-textarea--invalid={!!error} {rows} {placeholder} {disabled} {maxlength}
-    oninput={onInput}>{value ?? ''}</textarea>
+  <ShadcnTextarea class={`m-textarea${error ? ' m-textarea--invalid' : ''}`} {rows} {placeholder} {disabled} {maxlength}
+    value={value ?? ''} oninput={onInput}></ShadcnTextarea>
   {#if error}<span class="m-field__error">{error}</span>{:else if helpText}<span class="m-field__help">{helpText}</span>{/if}
 </div>

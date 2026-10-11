@@ -13,7 +13,7 @@ import { authRoutes } from './modules/auth-routes.js';
 import { crudRoutes } from './crud/router.js';
 import { entityAdminRoutes } from './modules/entity-admin.js';
 import { artifactRoutes } from './modules/artifacts.js';
-import { settingsRoutes } from './modules/settings.js';
+import { navRoutes, settingsRoutes, themeRoutes } from './modules/settings.js';
 import { refListRoutes } from './modules/reflists.js';
 import { roleAdminRoutes, userAdminRoutes } from './modules/users.js';
 import { migrationRoutes } from './modules/migrations-routes.js';
@@ -33,9 +33,9 @@ export interface MosaicServerConfig {
     tokenTtlSeconds?: number;
     allowRegistration?: boolean;
   };
-  /** enable/disable CORS (default true with `*`) */
-  cors?: boolean;
-  /** directory scanned for `*.entity.json` at boot */
+  /** Enable/disable CORS, or restrict browser access to an explicit origin list. */
+  cors?: boolean | { origins: string[] };
+  /** directory scanned for entity classes (`*.entity.ts`) and `*.entity.json` at boot */
   entitiesDir?: string;
   uploadsDir?: string;
   publicFiles?: boolean;
@@ -87,10 +87,11 @@ export async function createMosaicServer(config: MosaicServerConfig): Promise<Mo
   const app = new Hono<AuthEnv>();
 
   if (config.cors !== false) {
+    const allowedOrigins = typeof config.cors === 'object' ? config.cors.origins : undefined;
     app.use(
       '*',
       cors({
-        origin: '*',
+        origin: allowedOrigins?.length ? allowedOrigins : '*',
         allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
         allowHeaders: ['Content-Type', 'Authorization'],
         maxAge: 86400,
@@ -113,6 +114,8 @@ export async function createMosaicServer(config: MosaicServerConfig): Promise<Mo
         pages: '/api/pages',
         migrations: '/api/migrations/plan',
         settings: '/api/settings',
+        nav: '/api/nav',
+        theme: '/api/theme',
         refLists: '/api/ref-lists',
         users: '/api/users',
         roles: '/api/roles',
@@ -129,6 +132,8 @@ export async function createMosaicServer(config: MosaicServerConfig): Promise<Mo
   app.route('/api/forms', artifactRoutes({ db, kind: 'form', managePerm: 'forms:manage' }));
   app.route('/api/pages', artifactRoutes({ db, kind: 'page', managePerm: 'pages:manage' }));
   app.route('/api/settings', settingsRoutes(db));
+  app.route('/api/nav', navRoutes(db));
+  app.route('/api/theme', themeRoutes(db));
   app.route('/api/ref-lists', refListRoutes(db));
   app.route('/api/users', userAdminRoutes(db));
   app.route('/api/roles', roleAdminRoutes(db));

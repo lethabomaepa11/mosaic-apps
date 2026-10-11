@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS mosaic_forms (
   slug        text NOT NULL UNIQUE,
   name        text NOT NULL,
   description text,
+  folder      text,
   entity      text,
   version     integer NOT NULL DEFAULT 1,
   published   boolean NOT NULL DEFAULT false,
@@ -60,6 +61,7 @@ CREATE TABLE IF NOT EXISTS mosaic_pages (
   route       text NOT NULL DEFAULT '/',
   name        text NOT NULL,
   description text,
+  folder      text,
   version     integer NOT NULL DEFAULT 1,
   published   boolean NOT NULL DEFAULT false,
   schema      jsonb NOT NULL DEFAULT '{}'::jsonb,
@@ -116,6 +118,9 @@ CREATE TABLE IF NOT EXISTS mosaic_settings (
   description text,
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+
+ALTER TABLE mosaic_forms ADD COLUMN IF NOT EXISTS folder text;
+ALTER TABLE mosaic_pages ADD COLUMN IF NOT EXISTS folder text;
 
 CREATE TABLE IF NOT EXISTS mosaic_files (
   id          text PRIMARY KEY,

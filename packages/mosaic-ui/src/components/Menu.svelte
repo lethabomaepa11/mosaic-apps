@@ -1,5 +1,7 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
+  import { DropdownMenu as BitsDropdownMenu } from 'bits-ui';
+  import Icon from './Icon.svelte';
 
   interface MenuItem {
     label: string;
@@ -11,43 +13,37 @@
 
   interface Props {
     label?: string;
+    icon?: string;
     items: MenuItem[];
     align?: 'left' | 'right';
     trigger?: Snippet;
   }
 
-  let { label = '⋮', items, align = 'left', trigger }: Props = $props();
-  let open = $state(false);
-
-  function close() {
-    open = false;
-  }
+  let { label = 'More', icon = 'moreVertical', items, align = 'left', trigger }: Props = $props();
 </script>
 
 <div class="m-menu">
-  {#if trigger}
-    <!-- svelte-ignore a11y_click_events_have_key_events -->
-    <span onclick={(e) => { e.stopPropagation(); open = !open; }}>{@render trigger()}</span>
-  {:else}
-    <button class="m-btn m-btn--secondary m-btn--sm" aria-haspopup="menu" aria-expanded={open}
-      onclick={(e) => { e.stopPropagation(); open = !open; }}>{label}</button>
-  {/if}
-  {#if open}
-    <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-    <div class="m-menu__list" class:m-menu__list--right={align === 'right'} role="menu" onclick={close}>
-      {#each items as item (item.label)}
+<BitsDropdownMenu.Root>
+  <BitsDropdownMenu.Trigger class="m-btn m-btn--secondary m-btn--sm" aria-haspopup="menu">
+    {#if trigger}
+      {@render trigger()}
+    {:else}
+      <Icon name={icon} size={14} /> {label}
+    {/if}
+  </BitsDropdownMenu.Trigger>
+  <BitsDropdownMenu.Portal>
+    <BitsDropdownMenu.Content class="m-menu__list" align={align === 'right' ? 'end' : 'start'} sideOffset={4}>
+      {#each items as item, index (`${item.label}-${index}`)}
         {#if item.separator}
-          <div class="m-menu__sep"></div>
+          <BitsDropdownMenu.Separator class="m-menu__sep" />
         {:else}
-          <button class="m-menu__item" class:m-menu__item--danger={item.danger} role="menuitem"
-            onclick={() => { item.onclick?.(); close(); }}>
-            {#if item.icon}<span style="opacity:.6">{item.icon}</span>{/if}
+          <BitsDropdownMenu.Item class={item.danger ? 'm-menu__item m-menu__item--danger' : 'm-menu__item'} onSelect={() => item.onclick?.()}>
+            {#if item.icon}<Icon name={item.icon} size={14} />{/if}
             {item.label}
-          </button>
+          </BitsDropdownMenu.Item>
         {/if}
       {/each}
-    </div>
-  {/if}
+    </BitsDropdownMenu.Content>
+  </BitsDropdownMenu.Portal>
+</BitsDropdownMenu.Root>
 </div>
-
-<svelte:window onclick={close} />

@@ -1,7 +1,7 @@
-<script lang="ts" generics="T extends Record<string, unknown>">
+<script module lang="ts">
   import type { Snippet } from 'svelte';
 
-  interface Props {
+  export interface Props<T extends Record<string, unknown>> {
     title?: string;
     subtitle?: string;
     columns: { key: string; label: string; width?: string; render?: (row: T) => string; sortable?: boolean }[];
@@ -18,10 +18,14 @@
     actions?: Snippet<[T]>;
     toolbarLeft?: Snippet;
     toolbarRight?: Snippet;
+    table?: Snippet;
     emptyText?: string;
   }
+</script>
 
-  let { title, subtitle, columns, rows, total, page = 1, pageSize = 20, loading, sortBy, sortDir, onsort, onpage, onrowclick, actions, toolbarLeft, toolbarRight, emptyText }: Props = $props();
+<script lang="ts" generics="T extends Record<string, unknown>">
+
+  let { title, subtitle, total, page = 1, pageSize = 20, loading, onpage, toolbarLeft, toolbarRight, table }: Props<T> = $props();
 </script>
 
 <div class="m-card m-card--flush">
@@ -38,8 +42,6 @@
     {#if toolbarLeft}<div class="m-row" style="margin-bottom:var(--m-space-3)">{@render toolbarLeft?.()}</div>{/if}
   </div>
   <div style="padding:0 var(--m-space-4) var(--m-space-3)">
-    <slot name="table">
-      <!-- TablePlaceholder -->
-    </slot>
+    {@render table?.()}
   </div>
 </div>

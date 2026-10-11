@@ -1,10 +1,10 @@
-/**
- * EntityForm - auto-generates a CRUD form from entity metadata (Shesha-style
- * "tick a box" experience): every writable field becomes the right input,
- * submit hits the auto-generated CRUD endpoint.
- */
-
 <script lang="ts">
+  /**
+   * EntityForm - auto-generates a CRUD form from entity metadata (Shesha-style
+   * "tick a box" experience): every writable field becomes the right input,
+   * submit hits the auto-generated CRUD endpoint.
+   */
+
   import { allFields, enumOptions, newId, type EntityDef, type FormDef } from '@mosaic/core';
   import type { MosaicClient } from '../client/api';
   import FormRenderer from './FormRenderer.svelte';

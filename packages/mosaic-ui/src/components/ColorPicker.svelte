@@ -1,4 +1,6 @@
 <script lang="ts">
+  import ShadcnInput from '../shadcn/input/Input.svelte';
+  import ShadcnButton from '../shadcn/button/Button.svelte';
   interface Props {
     label?: string;
     value?: string;
@@ -18,12 +20,12 @@
 
 <div class="m-field m-field--inline">
   {#if label}<span class="m-field__label">{label}</span>{/if}
-  <input class="m-color" type="color" {value} {disabled} oninput={onChange} />
+  <ShadcnInput class="m-color" type="color" {value} {disabled} oninput={onChange} />
   {#if presets.length}
     <span class="m-row" style="gap:5px">
       {#each presets as p (p)}
-        <button type="button" class="m-btn m-btn--icon" style="background:{p};border:1px solid var(--m-border);width:22px;height:22px;padding:0"
-          {disabled} aria-label={`Use ${p}`} onclick={() => { value = p; oninput?.(p); }}></button>
+        <ShadcnButton type="button" variant="ghost" class="m-btn m-btn--icon" style={`background:${p};border:1px solid var(--m-border);width:22px;height:22px;padding:0`}
+          {disabled} aria-label={`Use ${p}`} onclick={() => { value = p; oninput?.(p); }}></ShadcnButton>
       {/each}
     </span>
   {/if}

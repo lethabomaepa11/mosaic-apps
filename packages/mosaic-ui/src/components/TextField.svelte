@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
   import type { FullAutoFill } from 'svelte/elements';
+  import ShadcnInput from '../shadcn/input/Input.svelte';
 
   interface Props {
     label?: string;
@@ -61,12 +62,12 @@
   {#if format === 'money'}
     <div class="m-search" style="position:relative">
       <span class="m-search__icon">$</span>
-      <input class="m-input" class:m-input--invalid={!!error} style="padding-left:26px"
+      <ShadcnInput class={`m-input${error ? ' m-input--invalid' : ''}`} style="padding-left:26px"
         type="text" inputmode="decimal" {placeholder} {disabled} {maxlength} {autocomplete}
         value={String(value ?? '')} oninput={onInput} />
     </div>
   {:else}
-    <input class="m-input" class:m-input--invalid={!!error}
+    <ShadcnInput class={`m-input${error ? ' m-input--invalid' : ''}`}
       type={inputType} {placeholder} {disabled} {maxlength} {autocomplete}
       value={String(value ?? '')} oninput={onInput} />
   {/if}

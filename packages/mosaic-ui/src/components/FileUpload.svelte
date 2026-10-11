@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { MosaicClient } from '../client/api';
+  import ShadcnInput from '../shadcn/input/Input.svelte';
 
   interface Props {
     label?: string;
@@ -46,7 +47,7 @@
 
 <div class="m-field">
   {#if label}<span class="m-field__label">{label}</span>{/if}
-  <input class="m-file" type="file" {accept} {disabled} onchange={onUpload} />
+  <ShadcnInput class="m-file" type="file" {accept} {disabled} onchange={onUpload} />
   {#if uploading}<span class="m-field__help">Uploading…</span>{/if}
   {#if fileName}<span class="m-field__help">Attached: {fileName}</span>{/if}
   {#if helpText}<span class="m-field__help">{helpText}</span>{/if}

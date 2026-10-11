@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
+  import ShadcnCard from '../shadcn/card/Card.svelte';
 
   interface Props {
     title?: string;
@@ -13,7 +14,7 @@
   let { title, subtitle, actions, footer, children, flush }: Props = $props();
 </script>
 
-<div class="m-card" class:m-card--flush={flush}>
+<ShadcnCard class={flush ? 'm-card m-card--flush' : 'm-card'}>
   {#if title || actions}
     <div class="m-card__header">
       <div>
@@ -25,4 +26,4 @@
   {/if}
   {@render children()}
   {#if footer}<div style="padding:0 var(--m-space-4) var(--m-space-4)">{@render footer()}</div>{/if}
-</div>
+</ShadcnCard>

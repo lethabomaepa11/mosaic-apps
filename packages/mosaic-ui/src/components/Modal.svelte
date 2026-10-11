@@ -1,5 +1,7 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
+  import { Dialog as BitsDialog } from 'bits-ui';
+  import Icon from './Icon.svelte';
 
   interface Props {
     open?: boolean;
@@ -12,30 +14,26 @@
 
   let { open = $bindable(false), title, size = 'md', onclose, footer, children }: Props = $props();
 
-  function close() {
-    open = false;
-    onclose?.();
-  }
-
-  function onKey(e: KeyboardEvent) {
-    if (e.key === 'Escape') close();
+  function onOpenChange(next: boolean) {
+    open = next;
+    if (!next) onclose?.();
   }
 </script>
 
-<svelte:window onkeydown={onKey} />
-
 {#if open}
-  <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-  <div class="m-overlay" onclick={(e) => { if (e.target === e.currentTarget) close(); }}>
-    <div class="m-modal" class:m-modal--lg={size === 'lg'} role="dialog" aria-modal="true">
-      {#if title}
-        <header class="m-modal__header">
-          <span>{title}</span>
-          <button class="m-btn m-btn--ghost m-btn--icon" aria-label="Close" onclick={close}>✕</button>
-        </header>
-      {/if}
-      <div class="m-modal__body">{@render children()}</div>
-      {#if footer}<footer class="m-modal__footer">{@render footer()}</footer>{/if}
-    </div>
-  </div>
+  <BitsDialog.Root {open} {onOpenChange}>
+    <BitsDialog.Portal>
+      <BitsDialog.Overlay class="m-overlay" />
+      <BitsDialog.Content class={size === 'lg' ? 'm-modal m-modal--lg' : 'm-modal'}>
+        {#if title}
+          <header class="m-modal__header">
+            <BitsDialog.Title>{title}</BitsDialog.Title>
+            <BitsDialog.Close class="m-btn m-btn--ghost m-btn--icon" aria-label="Close"><Icon name="x" size={16} /></BitsDialog.Close>
+          </header>
+        {/if}
+        <div class="m-modal__body">{@render children()}</div>
+        {#if footer}<footer class="m-modal__footer">{@render footer()}</footer>{/if}
+      </BitsDialog.Content>
+    </BitsDialog.Portal>
+  </BitsDialog.Root>
 {/if}

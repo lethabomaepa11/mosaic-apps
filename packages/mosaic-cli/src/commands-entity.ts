@@ -1,11 +1,11 @@
 /** Project commands: entity scaffold + info + studio. */
 
 import { existsSync } from 'node:fs';
-import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { spawn } from 'node:child_process';
-import { validateEntity, type EntityDef, type FieldDef } from '@mosaic/core';
-import { findRepoRoot, loadProjectConfig, slugify, titleCase } from './project.js';
+import { humanize, snakeCase, validateEntity, type EntityDef, type FieldDef } from '@mosaic/core';
+import { entitiesDirOf, findRepoRoot, loadProjectConfig, titleCase } from './project.js';
 
 function parseFields(spec: string): FieldDef[] {
   return spec
@@ -25,7 +25,7 @@ function parseFields(spec: string): FieldDef[] {
     });
 }
 
-function generateEntityClass(def: EntityDef): string {
+function generateEntityClass(def: EntityDef, className: string): string {
   const lines: string[] = [];
   lines.push(`import { Entity, Field, Relation } from '@mosaic/core';`);
   lines.push('');
@@ -33,44 +33,50 @@ function generateEntityClass(def: EntityDef): string {
   lines.push(`  name: '${def.name}',`);
   lines.push(`  label: '${def.label}',`);
   lines.push(`  labelPlural: '${def.labelPlural}',`);
+  if (def.icon) lines.push(`  icon: '${def.icon}',`);
   lines.push(`  softDelete: ${def.softDelete},`);
   lines.push(`  timestamps: ${def.timestamps ?? true},`);
   lines.push(`  audit: ${def.audit ?? true},`);
+  lines.push(`  list: { defaultSort: '-createdAt' },`);
+  lines.push(`  permissions: {`);
+  lines.push(`    read: ['*'],`);
+  lines.push(`    create: ['admin', 'editor'],`);
+  lines.push(`    update: ['admin', 'editor'],`);
+  lines.push(`    delete: ['admin'],`);
+  lines.push(`  },`);
   lines.push(`})`);
-  lines.push(`export class ${titleCase(def.name)} {`);
-  lines.push(`  @Field({ type: 'id' })`);
-  lines.push(`  id!: string;`);
-  lines.push('');
-  
+  lines.push(`export class ${className} {`);
   for (const field of def.fields) {
-    const fieldOpts: string[] = [];
-    if (field.required) fieldOpts.push('required: true');
-    if (field.unique) fieldOpts.push('unique: true');
-    if (field.indexed) fieldOpts.push('indexed: true');
-    if (field.length) fieldOpts.push(`length: ${field.length}`);
-    if (field.precision) fieldOpts.push(`precision: ${field.precision}`);
-    if (field.scale) fieldOpts.push(`scale: ${field.scale}`);
-    if (field.format) fieldOpts.push(`format: '${field.format}'`);
-    if (field.min !== undefined) fieldOpts.push(`min: ${field.min}`);
-    if (field.max !== undefined) fieldOpts.push(`max: ${field.max}`);
-    if (field.minLength !== undefined) fieldOpts.push(`minLength: ${field.minLength}`);
-    if (field.maxLength !== undefined) fieldOpts.push(`maxLength: ${field.maxLength}`);
-    if (field.enumOptions) fieldOpts.push(`enumOptions: ${JSON.stringify(field.enumOptions)}`);
-    if (field.refEntity) fieldOpts.push(`refEntity: '${field.refEntity}'`);
-    if (field.onDelete) fieldOpts.push(`onDelete: '${field.onDelete}'`);
-    if (field.readable === false) fieldOpts.push('readable: false');
-    if (field.writable === false) fieldOpts.push('writable: false');
-    if (field.ui) fieldOpts.push(`ui: ${JSON.stringify(field.ui)}`);
-    
-    let decorator = 'Field';
-    if (field.type === 'ref') decorator = 'Relation';
-    
-    const optsStr = fieldOpts.length ? `{ ${fieldOpts.join(', ')} }` : '';
-    lines.push(`  @${decorator}(${optsStr})`);
+    if (field.type === 'ref') {
+      const opts: string[] = [`entity: '${field.refEntity}'`];
+      if (field.required) opts.push('required: true');
+      if (field.onDelete && field.onDelete !== 'restrict') opts.push(`onDelete: '${field.onDelete}'`);
+      if (field.label) opts.push(`label: '${field.label}'`);
+      lines.push(`  @Relation({ ${opts.join(', ')} })`);
+    } else {
+      const fieldOpts: string[] = [`type: '${field.type}'`];
+      if (field.label) fieldOpts.push(`label: '${field.label}'`);
+      if (field.required) fieldOpts.push('required: true');
+      if (field.unique) fieldOpts.push('unique: true');
+      if (field.indexed) fieldOpts.push('indexed: true');
+      if (field.searchable) fieldOpts.push('searchable: true');
+      if (field.length) fieldOpts.push(`length: ${field.length}`);
+      if (field.maxLength) fieldOpts.push(`maxLength: ${field.maxLength}`);
+      if (field.minLength) fieldOpts.push(`minLength: ${field.minLength}`);
+      if (field.precision) fieldOpts.push(`precision: ${field.precision}`);
+      if (field.scale) fieldOpts.push(`scale: ${field.scale}`);
+      if (field.format) fieldOpts.push(`format: '${field.format}'`);
+      if (field.min !== undefined) fieldOpts.push(`min: ${field.min}`);
+      if (field.max !== undefined) fieldOpts.push(`max: ${field.max}`);
+      if (field.default !== undefined) fieldOpts.push(`default: ${JSON.stringify(field.default)}`);
+      if (field.options) fieldOpts.push(`options: ${JSON.stringify(field.options)}`);
+      if (field.readonly) fieldOpts.push('readonly: true');
+      if (field.ui) fieldOpts.push(`ui: ${JSON.stringify(field.ui)}`);
+      lines.push(`  @Field({ ${fieldOpts.join(', ')} })`);
+    }
     lines.push(`  ${field.name}!: ${tsType(field.type)};`);
     lines.push('');
   }
-  
   lines.push('}');
   return lines.join('\n');
 }
@@ -100,13 +106,22 @@ function tsType(type: string): string {
   }
 }
 
+function pascalCase(input: string): string {
+  return input
+    .split(/[^a-zA-Z0-9]+/)
+    .filter(Boolean)
+    .map((part) => part[0]!.toUpperCase() + part.slice(1))
+    .join('');
+}
+
 export async function entity(opts: { dir: string; name: string; fields?: string; softDelete: boolean }): Promise<void> {
   await loadProjectConfig(opts.dir); // validates we're in a project
-  const name = slugify(opts.name);
+  const name = snakeCase(opts.name);
+  const label = humanize(name);
   const def: EntityDef = {
     name,
-    label: titleCase(opts.name),
-    labelPlural: `${titleCase(opts.name)}s`,
+    label,
+    labelPlural: `${label}s`,
     icon: 'table',
     softDelete: opts.softDelete,
     list: { defaultSort: '-createdAt' },
@@ -119,11 +134,14 @@ export async function entity(opts: { dir: string; name: string; fields?: string;
     for (const e of errors) console.error(`  • ${e}`);
     process.exit(1);
   }
-  const dir = join(opts.dir, 'apps', 'api', 'entities');
+  const dir = entitiesDirOf(opts.dir);
   await mkdir(dir, { recursive: true });
   const file = join(dir, `${name}.entity.ts`);
-  const content = generateEntityClass(def);
-  await writeFile(file, content + '\n', 'utf8');
+  if (existsSync(file)) {
+    console.error(`${file} already exists — edit it instead.`);
+    process.exit(1);
+  }
+  await writeFile(file, generateEntityClass(def, pascalCase(name)) + '\n', 'utf8');
   console.log(`✓ Created ${file}`);
   console.log('  Next: mosaic migrate  (or npm run migrate)');
 }
@@ -169,9 +187,10 @@ export async function studio(opts: { dir: string; port?: number }): Promise<void
 }
 
 export async function listEntityFiles(dir: string): Promise<string[]> {
-  const entitiesDir = join(dir, 'apps', 'api', 'entities');
+  const entitiesDir = entitiesDirOf(dir);
   if (!existsSync(entitiesDir)) return [];
   const files = await readdir(entitiesDir);
+  const { readFile } = await import('node:fs/promises');
   const out: string[] = [];
   for (const f of files.filter((f) => f.endsWith('.entity.json'))) {
     out.push(await readFile(join(entitiesDir, f), 'utf8'));

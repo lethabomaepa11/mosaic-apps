@@ -76,7 +76,7 @@ export async function create(opts: CreateOptions): Promise<void> {
   });
 
   // .env with generated secret
-  await writeEnv(target, databaseUrl, opts.apiPort, jwtSecret, opts.auth);
+  await writeEnv(target, databaseUrl, opts.apiPort, opts.webPort, jwtSecret, opts.auth);
 
   // link @mosaic packages
   let linkDir: string | null = null;
@@ -131,7 +131,7 @@ Next:
 `);
 }
 
-async function writeEnv(target: string, db: string, port: number, secret: string, auth: boolean): Promise<void> {
+async function writeEnv(target: string, db: string, port: number, webPort: number, secret: string, auth: boolean): Promise<void> {
   const env = `# Database
 DATABASE_URL=${db}
 
@@ -143,6 +143,10 @@ MOSAIC_JWT_SECRET=${secret}
 PORT=${port}
 SEED=true
 SEED_DEMO=true
+
+# Web/API topology
+PUBLIC_API_URL=
+CORS_ORIGINS=http://localhost:${webPort}
 `;
   const { writeFile } = await import('node:fs/promises');
   await writeFile(join(target, '.env'), env, 'utf8');

@@ -2,12 +2,14 @@
   "name": "@mosaic/core",
   "version": "0.1.0",
   "description": "Mosaic core: entity/page/form metadata types, form tree operations, expression evaluator, query parsing",
+  "publishConfig": { "access": "public" },
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
+      "browser": "./dist/browser.js",
       "default": "./dist/index.js"
     }
   },
@@ -16,6 +18,7 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "prepack": "npm run build",
     "typecheck": "tsc -p tsconfig.test.json",
     "test": "node --import tsx --test \"src/**/*.test.ts\""
   },
@@ -23,6 +26,7 @@
     "typescript": "^6.0.3"
   },
   "dependencies": {
-    "reflect-metadata": "^0.2.2"
+    "reflect-metadata": "^0.2.2",
+    "tsx": "^4.20.0"
   }
 }

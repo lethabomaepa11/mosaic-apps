@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { MosaicClient } from '../client/api';
+  import SelectField from './SelectField.svelte';
 
   interface Props {
     label?: string;
@@ -34,20 +35,7 @@
       .finally(() => { loading = false; });
   });
 
-  function onChange(e: Event & { currentTarget: EventTarget & HTMLSelectElement }) {
-    const v = e.currentTarget.value;
-    value = v === '' ? null : v;
-    oninput?.(value);
-  }
 </script>
 
-<div class="m-field">
-  {#if label}<span class="m-field__label">{label}{#if required}<span class="m-field__req">*</span>{/if}</span>{/if}
-  <select class="m-select" class:m-select--invalid={!!error} {disabled} value={value ?? ''} onchange={onChange}>
-    <option value="">{loading ? 'Loading…' : placeholder}</option>
-    {#each options as o (o.value)}
-      <option value={o.value}>{o.label}</option>
-    {/each}
-  </select>
-  {#if error}<span class="m-field__error">{error}</span>{:else if helpText}<span class="m-field__help">{helpText}</span>{/if}
-</div>
+<SelectField {label} {value} {options} {required} {disabled} {error} {helpText}
+  placeholder={loading ? 'Loading…' : placeholder} clearable oninput={(next) => { value = next; oninput?.(next); }} />

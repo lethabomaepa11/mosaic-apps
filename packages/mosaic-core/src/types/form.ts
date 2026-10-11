@@ -44,6 +44,18 @@ export interface FormSettings {
   redirectAfterSubmit?: string;
   /** hide system fields (createdAt...) when rendered against an entity */
   hideSystemFields?: boolean;
+  transition?: import('./platform.js').TransitionConfig;
+  seo?: FormSeoSettings;
+}
+
+export interface FormSeoSettings {
+  title?: string;
+  description?: string;
+  canonicalUrl?: string;
+  robots?: 'index,follow' | 'noindex,nofollow' | 'noindex,follow' | 'index,nofollow';
+  socialTitle?: string;
+  socialDescription?: string;
+  socialImage?: string;
 }
 
 export interface FormDef {
@@ -51,6 +63,8 @@ export interface FormDef {
   slug: string;
   name: string;
   description?: string;
+  /** Workspace folder path used by the Studio explorer (for example `sales/quotes`). */
+  folder?: string;
   /** bound entity (drives data + submit target) */
   entity?: string;
   version: number;

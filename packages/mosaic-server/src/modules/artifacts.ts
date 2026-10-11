@@ -22,6 +22,7 @@ export interface ArtifactRow {
   slug: string;
   name: string;
   description: string | null;
+  folder: string | null;
   entity: string | null;
   route: string | null;
   version: number;
@@ -41,12 +42,21 @@ function prefixFor(kind: ArtifactKind): string {
   return kind === 'form' ? 'frm' : 'pg';
 }
 
+function folderPath(value: unknown): string {
+  const path = String(value ?? '').replace(/\\/g, '/').split('/').map((part) => part.trim()).filter(Boolean).join('/');
+  if (path.split('/').some((part) => part === '.' || part === '..')) {
+    throw new HttpError(422, 'Folder path cannot contain . or .. segments', 'BAD_FOLDER');
+  }
+  return path;
+}
+
 function toRecord(row: ArtifactRow, kind: ArtifactKind): FormDef | PageDef {
   const base = {
     id: row.id,
     slug: row.slug,
     name: row.name,
     description: row.description ?? undefined,
+    folder: row.folder ?? undefined,
     version: row.version,
     published: row.published,
     root: row.schema as never,
@@ -60,13 +70,11 @@ function toRecord(row: ArtifactRow, kind: ArtifactKind): FormDef | PageDef {
   return { ...base, route: row.route ?? `/${row.slug}` } as PageDef;
 }
 
-  'id, slug, name, description, entity, route, version, published, schema, data_source, settings, created_at, updated_at';
-
-/** RETURNING must match the table's columns (mosaic_forms has no `route`). */
+/** Columns must match each table exactly (mosaic_pages has no entity/data_source; mosaic_forms has no route). */
 function returnCols(kind: ArtifactKind): string {
-  const base =
-    'id, slug, name, description, entity, version, published, schema, data_source, settings, created_at, updated_at';
-  return kind === 'page' ? `${base}, route` : base;
+  return kind === 'page'
+    ? 'id, slug, name, description, folder, route, version, published, schema, settings, created_at, updated_at'
+    : 'id, slug, name, description, folder, entity, version, published, schema, data_source, settings, created_at, updated_at';
 }
 
 async function uniqueSlug(db: Db, kind: ArtifactKind, desired: string): Promise<string> {
@@ -102,6 +110,26 @@ function requireManage(user: AuthUser | null, perm: string, action: string): Aut
   return user;
 }
 
+function canonical(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
+  if (value && typeof value === 'object') {
+    return `{${Object.entries(value as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b)).map(([key, item]) => `${JSON.stringify(key)}:${canonical(item)}`).join(',')}}`;
+  }
+  return JSON.stringify(value) ?? 'undefined';
+}
+
+function samePublishedContent(row: ArtifactRow, snapshot: unknown): boolean {
+  if (!snapshot || typeof snapshot !== 'object') return false;
+  const old = snapshot as Partial<ArtifactRow>;
+  return ['id', 'slug', 'name', 'description', 'folder', 'entity', 'route', 'schema', 'data_source', 'settings']
+    .every((key) => canonical((row as unknown as Record<string, unknown>)[key]) === canonical((old as Record<string, unknown>)[key]));
+}
+
+function sameArtifactContent(left: ArtifactRow, right: ArtifactRow): boolean {
+  return ['id', 'slug', 'name', 'description', 'folder', 'entity', 'route', 'schema', 'data_source', 'settings']
+    .every((key) => canonical((left as unknown as Record<string, unknown>)[key]) === canonical((right as unknown as Record<string, unknown>)[key]));
+}
+
 export function artifactRoutes(deps: ArtifactDeps): Hono<AuthEnv> {
   const app = new Hono<AuthEnv>();
   const table = tableFor(deps.kind);
@@ -115,6 +143,71 @@ export function artifactRoutes(deps: ArtifactDeps): Hono<AuthEnv> {
     return row;
   };
 
+  app.get('/folders', async (c) => {
+    if (!c.get('user')) throw new HttpError(401, 'Authentication required', 'UNAUTHENTICATED');
+    const res = await deps.db.query<{ folder: string }>(`SELECT DISTINCT folder FROM ${table} WHERE folder IS NOT NULL ORDER BY folder`);
+    const stored = await deps.db.query<{ value: unknown }>(`SELECT value FROM mosaic_settings WHERE key = $1`, [`studio.${deps.kind}s.folders`]);
+    const configured = Array.isArray(stored.rows[0]?.value) ? stored.rows[0]!.value as string[] : [];
+    return ok(c, [...new Set([...configured, ...res.rows.map((row) => row.folder)])].sort());
+  });
+
+  app.post('/folders', async (c) => {
+    requireManage(c.get('user'), deps.managePerm, 'update');
+    const body = await readJson<{ path?: unknown }>(c);
+    const path = folderPath(body.path);
+    if (!path) throw new HttpError(422, 'Folder path is required', 'BAD_FOLDER');
+    const key = `studio.${deps.kind}s.folders`;
+    const current = await deps.db.query<{ value: unknown }>('SELECT value FROM mosaic_settings WHERE key = $1', [key]);
+    const paths = Array.isArray(current.rows[0]?.value) ? current.rows[0]!.value as string[] : [];
+    await deps.db.query(
+      'INSERT INTO mosaic_settings (key, value, description, updated_at) VALUES ($1, $2::jsonb, $3, now()) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()',
+      [key, JSON.stringify([...new Set([...paths, path])]), `Studio ${deps.kind} folders`],
+    );
+    return ok(c, { path }, 201);
+  });
+
+  app.post('/folders/rename', async (c) => {
+    const user = requireManage(c.get('user'), deps.managePerm, 'update');
+    const body = await readJson<{ from?: unknown; to?: unknown }>(c);
+    const from = folderPath(body.from);
+    const to = folderPath(body.to);
+    if (!from || !to || from === to || to.startsWith(`${from}/`)) {
+      throw new HttpError(422, 'Choose a different folder path', 'BAD_FOLDER');
+    }
+    const result = await deps.db.query(
+      `UPDATE ${table}
+       SET folder = CASE WHEN folder = $1 THEN $2 ELSE $2 || substring(folder from length($1) + 1) END,
+           updated_at = now()
+       WHERE folder = $1 OR left(folder, length($1) + 1) = $1 || '/'`,
+      [from, to],
+    );
+    const key = `studio.${deps.kind}s.folders`;
+    const current = await deps.db.query<{ value: unknown }>('SELECT value FROM mosaic_settings WHERE key = $1', [key]);
+    const paths = Array.isArray(current.rows[0]?.value) ? current.rows[0]!.value as string[] : [];
+    const renamed = paths.map((path) => path === from || path.startsWith(`${from}/`) ? `${to}${path.slice(from.length)}` : path);
+    await deps.db.query('UPDATE mosaic_settings SET value = $2::jsonb, updated_at = now() WHERE key = $1', [key, JSON.stringify(renamed)]);
+    writeAudit(deps.db, { action: 'update', entity: `${deps.kind}_folder`, recordId: from, user });
+    return ok(c, { from, to, updated: result.rowCount ?? 0 });
+  });
+
+  app.post('/folders/delete', async (c) => {
+    const user = requireManage(c.get('user'), deps.managePerm, 'update');
+    const body = await readJson<{ path?: unknown }>(c);
+    const path = folderPath(body.path);
+    if (!path) throw new HttpError(422, 'Folder path is required', 'BAD_FOLDER');
+    const result = await deps.db.query(
+      `UPDATE ${table} SET folder = NULL, updated_at = now()
+       WHERE folder = $1 OR left(folder, length($1) + 1) = $1 || '/'`,
+      [path],
+    );
+    const key = `studio.${deps.kind}s.folders`;
+    const current = await deps.db.query<{ value: unknown }>('SELECT value FROM mosaic_settings WHERE key = $1', [key]);
+    const paths = Array.isArray(current.rows[0]?.value) ? current.rows[0]!.value as string[] : [];
+    await deps.db.query('UPDATE mosaic_settings SET value = $2::jsonb, updated_at = now() WHERE key = $1', [key, JSON.stringify(paths.filter((item) => item !== path && !item.startsWith(`${path}/`)))]);
+    writeAudit(deps.db, { action: 'update', entity: `${deps.kind}_folder`, recordId: path, user });
+    return ok(c, { path, movedToRoot: result.rowCount ?? 0 });
+  });
+
   // list
   app.get('/', async (c) => {
     const user = c.get('user');
@@ -124,7 +217,7 @@ export function artifactRoutes(deps: ArtifactDeps): Hono<AuthEnv> {
     const params: unknown[] = [];
     if (publishedOnly) filters.push('published = true');
     const entity = c.req.query('entity');
-    if (entity) {
+    if (entity && deps.kind === 'form') {
       params.push(entity);
       filters.push(`entity = $${params.length}`);
     }
@@ -192,21 +285,20 @@ export function artifactRoutes(deps: ArtifactDeps): Hono<AuthEnv> {
     const id = `${prefixFor(deps.kind)}_${Math.random().toString(36).slice(2, 12)}`;
     const slug = await uniqueSlug(deps.db, deps.kind, String(body.slug ?? name));
     const cols = deps.kind === 'page'
-      ? '(id, slug, name, description, entity, route, version, published, schema, data_source, settings)'
-      : '(id, slug, name, description, entity, version, published, schema, data_source, settings)';
+      ? '(id, slug, name, description, folder, route, version, published, schema, settings)'
+      : '(id, slug, name, description, folder, entity, version, published, schema, data_source, settings)';
     const vals = deps.kind === 'page'
-      ? '($1, $2, $3, $4, $5, $6, 1, false, $7::jsonb, $8::jsonb, $9::jsonb)'
-      : '($1, $2, $3, $4, $5, 1, false, $6::jsonb, $7::jsonb, $8::jsonb)';
+      ? '($1, $2, $3, $4, $5, $6, 1, false, $7::jsonb, $8::jsonb)'
+      : '($1, $2, $3, $4, $5, $6, 1, false, $7::jsonb, $8::jsonb, $9::jsonb)';
     const params = deps.kind === 'page'
       ? [
           id,
           slug,
           name,
           body.description ? String(body.description) : null,
-          body.entity ? String(body.entity) : null,
+          folderPath(body.folder) || null,
           String(body.route ?? `/${slug}`),
           JSON.stringify(root),
-          JSON.stringify(body.dataSource ?? { kind: 'none' }),
           JSON.stringify(body.settings ?? {}),
         ]
       : [
@@ -214,17 +306,85 @@ export function artifactRoutes(deps: ArtifactDeps): Hono<AuthEnv> {
           slug,
           name,
           body.description ? String(body.description) : null,
+          folderPath(body.folder) || null,
           body.entity ? String(body.entity) : null,
           JSON.stringify(root),
           JSON.stringify(body.dataSource ?? { kind: 'none' }),
           JSON.stringify(body.settings ?? {}),
         ];
     const res = await deps.db.query<ArtifactRow>(
-      `INSERT INTO ${table} ${cols} VALUES ${vals} RETURNING ${returnCols(deps.kind)}`,
+        `INSERT INTO ${table} ${cols} VALUES ${vals} RETURNING ${returnCols(deps.kind)}`,
       params,
     );
     writeAudit(deps.db, { action: 'create', entity: deps.kind, recordId: id, user });
     return ok(c, toRecord(res.rows[0]!, deps.kind), 201);
+  });
+
+  // Atomic authoring lifecycle: update and publish under one row lock.
+  app.put('/:idOrSlug/save-and-publish', async (c) => {
+    const user = requireManage(c.get('user'), deps.managePerm, 'publish');
+    const idOrSlug = c.req.param('idOrSlug');
+    const body = await readJson<Record<string, unknown>>(c);
+    const expectedVersion = body.expectedVersion === undefined ? undefined : Number(body.expectedVersion);
+    const result = await deps.db.tx(async (tx) => {
+      const selected = await tx.query<ArtifactRow>(`SELECT ${returnCols(deps.kind)} FROM ${table} WHERE id = $1 OR slug = $1 FOR UPDATE`, [idOrSlug]);
+      const row = selected.rows[0];
+      if (!row) throw new HttpError(404, `${deps.kind} not found`, 'NOT_FOUND');
+      if (expectedVersion !== undefined && (!Number.isInteger(expectedVersion) || expectedVersion !== row.version)) {
+        throw new HttpError(409, `This ${deps.kind} changed after it was loaded`, 'STALE_VERSION', { expectedVersion, actualVersion: row.version });
+      }
+      const schemaInput = body.root ?? body.schema;
+      const root = schemaInput !== undefined ? assertUsableSchema(schemaInput, deps.kind) : row.schema;
+      let updated: ArtifactRow;
+      if (deps.kind === 'page') {
+        const res = await tx.query<ArtifactRow>(
+          `UPDATE ${table} SET
+             name = COALESCE($2, name), description = COALESCE($3, description),
+             folder = CASE WHEN $4::boolean THEN NULLIF($5, '') ELSE folder END,
+             route = CASE WHEN $6::boolean THEN $7 ELSE route END,
+             schema = $8::jsonb, settings = COALESCE($9::jsonb, settings), updated_at = now()
+           WHERE id = $1 RETURNING ${returnCols(deps.kind)}`,
+          [row.id, body.name !== undefined ? String(body.name) : null, body.description !== undefined ? String(body.description) : null,
+            body.folder !== undefined, folderPath(body.folder), body.route !== undefined, String(body.route ?? '') || null,
+            JSON.stringify(root), body.settings !== undefined ? JSON.stringify(body.settings) : null],
+        );
+        updated = res.rows[0]!;
+      } else {
+        const res = await tx.query<ArtifactRow>(
+          `UPDATE ${table} SET
+             name = COALESCE($2, name), description = COALESCE($3, description),
+             folder = CASE WHEN $4::boolean THEN NULLIF($5, '') ELSE folder END,
+             entity = CASE WHEN $6::boolean THEN $7 ELSE entity END,
+             schema = $8::jsonb, data_source = COALESCE($9::jsonb, data_source),
+             settings = COALESCE($10::jsonb, settings), updated_at = now()
+           WHERE id = $1 RETURNING ${returnCols(deps.kind)}`,
+          [row.id, body.name !== undefined ? String(body.name) : null, body.description !== undefined ? String(body.description) : null,
+            body.folder !== undefined, folderPath(body.folder), body.entity !== undefined,
+            body.entity !== undefined ? String(body.entity ?? '') || null : null, JSON.stringify(root),
+            body.dataSource !== undefined ? JSON.stringify(body.dataSource) : null,
+            body.settings !== undefined ? JSON.stringify(body.settings) : null],
+        );
+        updated = res.rows[0]!;
+      }
+
+      const changed = !row.published || !sameArtifactContent(row, updated);
+      const nextVersion = changed ? row.version + 1 : row.version;
+      const final = await tx.query<ArtifactRow>(
+        `UPDATE ${table} SET published = true, version = $2, updated_at = now() WHERE id = $1 RETURNING ${returnCols(deps.kind)}`,
+        [row.id, nextVersion],
+      );
+      updated = final.rows[0]!;
+      if (deps.kind === 'form' && changed) {
+        await tx.query(
+          'INSERT INTO mosaic_form_versions (id, form_id, version, snapshot) VALUES ($1, $2, $3, $4::jsonb)',
+          [`fv_${Math.random().toString(36).slice(2, 12)}`, row.id, nextVersion, JSON.stringify(updated)],
+        );
+      }
+      return { row: updated, changed };
+    });
+    writeAudit(deps.db, { action: 'update', entity: deps.kind, recordId: result.row.id, user });
+    if (result.changed) writeAudit(deps.db, { action: 'publish', entity: deps.kind, recordId: result.row.id, user });
+    return ok(c, toRecord(result.row, deps.kind));
   });
 
   // update
@@ -232,13 +392,40 @@ export function artifactRoutes(deps: ArtifactDeps): Hono<AuthEnv> {
     const user = requireManage(c.get('user'), deps.managePerm, 'update');
     const row = await rowOr404(c.req.param('idOrSlug'));
     const body = await readJson<Record<string, unknown>>(c);
-    const root = body.schema !== undefined ? assertUsableSchema(body.schema, deps.kind) : (row.schema as never);
+    const schemaInput = body.root ?? body.schema;
+    const root = schemaInput !== undefined ? assertUsableSchema(schemaInput, deps.kind) : (row.schema as never);
+    if (deps.kind === 'page') {
+      const res = await deps.db.query<ArtifactRow>(
+        `UPDATE ${table} SET
+           name = COALESCE($2, name),
+           description = COALESCE($3, description),
+           folder = CASE WHEN $4::boolean THEN NULLIF($5, '') ELSE folder END,
+           route = CASE WHEN $6::boolean THEN $7 ELSE route END,
+           schema = $8::jsonb,
+           settings = COALESCE($9::jsonb, settings),
+           updated_at = now()
+         WHERE id = $1 RETURNING ${returnCols(deps.kind)}`,
+        [
+          row.id,
+          body.name !== undefined ? String(body.name) : null,
+          body.description !== undefined ? String(body.description) : null,
+          body.folder !== undefined,
+          folderPath(body.folder),
+          body.route !== undefined,
+          String(body.route ?? '') || null,
+          JSON.stringify(root),
+          body.settings !== undefined ? JSON.stringify(body.settings) : null,
+        ],
+      );
+      writeAudit(deps.db, { action: 'update', entity: deps.kind, recordId: row.id, user });
+      return ok(c, toRecord(res.rows[0]!, deps.kind));
+    }
     const res = await deps.db.query<ArtifactRow>(
       `UPDATE ${table} SET
          name = COALESCE($2, name),
          description = COALESCE($3, description),
-         entity = CASE WHEN $4::boolean THEN $5 ELSE entity END,
-         route = CASE WHEN $6::boolean THEN $7 ELSE route END,
+         folder = CASE WHEN $4::boolean THEN NULLIF($5, '') ELSE folder END,
+         entity = CASE WHEN $6::boolean THEN $7 ELSE entity END,
          schema = $8::jsonb,
          data_source = COALESCE($9::jsonb, data_source),
          settings = COALESCE($10::jsonb, settings),
@@ -248,10 +435,10 @@ export function artifactRoutes(deps: ArtifactDeps): Hono<AuthEnv> {
         row.id,
         body.name !== undefined ? String(body.name) : null,
         body.description !== undefined ? String(body.description) : null,
+        body.folder !== undefined,
+        folderPath(body.folder),
         body.entity !== undefined,
         body.entity !== undefined ? String(body.entity ?? '') || null : null,
-        body.route !== undefined && deps.kind === 'page',
-        String(body.route ?? '') || null,
         JSON.stringify(root),
         body.dataSource !== undefined ? JSON.stringify(body.dataSource) : null,
         body.settings !== undefined ? JSON.stringify(body.settings) : null,
@@ -264,22 +451,31 @@ export function artifactRoutes(deps: ArtifactDeps): Hono<AuthEnv> {
   // publish (bumps version, snapshots for forms)
   app.post('/:idOrSlug/publish', async (c) => {
     const user = requireManage(c.get('user'), deps.managePerm, 'publish');
-    const row = await rowOr404(c.req.param('idOrSlug'));
-    const nextVersion = row.version + 1;
-    await deps.db.query(`UPDATE ${table} SET published = true, version = $2, updated_at = now() WHERE id = $1`, [
-      row.id,
-      nextVersion,
-    ]);
-    if (deps.kind === 'form') {
-      const snapshot = { ...row, version: nextVersion, published: true };
-      await deps.db.query(
-        `INSERT INTO mosaic_form_versions (id, form_id, version, snapshot) VALUES ($1, $2, $3, $4::jsonb)`,
-        [`fv_${Math.random().toString(36).slice(2, 12)}`, row.id, nextVersion, JSON.stringify(snapshot)],
-      );
-    }
-    writeAudit(deps.db, { action: 'publish', entity: deps.kind, recordId: row.id, user });
-    const updated = await rowOr404(row.id);
-    return ok(c, toRecord(updated, deps.kind));
+    const idOrSlug = c.req.param('idOrSlug');
+    const result = await deps.db.tx(async (tx) => {
+      const selected = await tx.query<ArtifactRow>(`SELECT ${returnCols(deps.kind)} FROM ${table} WHERE id = $1 OR slug = $1 FOR UPDATE`, [idOrSlug]);
+      const row = selected.rows[0];
+      if (!row) throw new HttpError(404, `${deps.kind} not found`, 'NOT_FOUND');
+      if (deps.kind === 'form' && row.published) {
+        const previous = await tx.query<{ snapshot: unknown }>(
+          'SELECT snapshot FROM mosaic_form_versions WHERE form_id = $1 ORDER BY version DESC LIMIT 1', [row.id],
+        );
+        if (previous.rows[0] && samePublishedContent(row, previous.rows[0].snapshot)) return { row, changed: false };
+      }
+      const nextVersion = row.version + 1;
+      await tx.query(`UPDATE ${table} SET published = true, version = $2, updated_at = now() WHERE id = $1`, [row.id, nextVersion]);
+      if (deps.kind === 'form') {
+        const snapshot = { ...row, version: nextVersion, published: true };
+        await tx.query(
+          'INSERT INTO mosaic_form_versions (id, form_id, version, snapshot) VALUES ($1, $2, $3, $4::jsonb)',
+          [`fv_${Math.random().toString(36).slice(2, 12)}`, row.id, nextVersion, JSON.stringify(snapshot)],
+        );
+      }
+      const updated = await tx.query<ArtifactRow>(`SELECT ${returnCols(deps.kind)} FROM ${table} WHERE id = $1`, [row.id]);
+      return { row: updated.rows[0]!, changed: true };
+    });
+    if (result.changed) writeAudit(deps.db, { action: 'publish', entity: deps.kind, recordId: result.row.id, user });
+    return ok(c, toRecord(result.row, deps.kind));
   });
 
   // unpublish

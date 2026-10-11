@@ -8,6 +8,31 @@ import { requirePermission } from './rbac.js';
 import { writeAudit } from './audit.js';
 import type { AuthEnv } from './auth.js';
 
+export const DEFAULT_NAV = [{ label: 'Home', href: '/', icon: 'home' }];
+
+export function navRoutes(db: Db): Hono<AuthEnv> {
+  const app = new Hono<AuthEnv>();
+  app.get('/', async (c) => {
+    const res = await db.query<{ value: unknown }>("SELECT value FROM mosaic_settings WHERE key = 'app.nav'");
+    const value = res.rows[0]?.value;
+    const items = Array.isArray(value) && value.every((item) => item && typeof item.label === 'string' && typeof item.href === 'string')
+      ? value
+      : DEFAULT_NAV;
+    return ok(c, { items });
+  });
+  return app;
+}
+
+export function themeRoutes(db: Db): Hono<AuthEnv> {
+  const app = new Hono<AuthEnv>();
+  app.get('/', async (c) => {
+    const res = await db.query<{ value: unknown }>("SELECT value FROM mosaic_settings WHERE key = 'theme.config'");
+    const value = res.rows[0]?.value;
+    return ok(c, value && typeof value === 'object' && !Array.isArray(value) ? value : {});
+  });
+  return app;
+}
+
 export const DEFAULT_SETTINGS: SettingRecord[] = [
   { key: 'app.name', value: 'Mosaic App', description: 'Application display name' },
   { key: 'app.logo', value: '', description: 'Logo URL (empty = text logo)' },

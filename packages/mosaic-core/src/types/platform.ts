@@ -66,6 +66,48 @@ export interface SettingRecord {
   updatedAt?: string;
 }
 
+export interface NavItemDef {
+  label: string;
+  href: string;
+  icon?: string;
+  section?: string;
+}
+
+export interface ThemePalette {
+  primary?: string;
+  background?: string;
+  surface?: string;
+  surface2?: string;
+  foreground?: string;
+  foregroundMuted?: string;
+  border?: string;
+  space1?: string;
+  space2?: string;
+  space3?: string;
+  space4?: string;
+  space5?: string;
+  space6?: string;
+  radius?: string;
+  font?: string;
+  mono?: string;
+}
+
+export interface ThemeConfig extends ThemePalette {
+  mode?: 'light' | 'dark' | 'system';
+  /** Independent tokens used when the mode is dark; old flat tokens remain the light palette. */
+  dark?: ThemePalette;
+  activeTheme?: string;
+  /** Optional named palettes, inspired by daisyUI's theme gallery. */
+  themes?: Record<string, ThemePalette>;
+  transition?: { kind?: 'fade' | 'slide' | 'scale' | 'blur' | 'none'; duration?: number; delay?: number };
+}
+
+export interface TransitionConfig {
+  kind?: 'fade' | 'slide' | 'scale' | 'blur' | 'none';
+  duration?: number;
+  delay?: number;
+}
+
 export type MigrationStatus = 'applied' | 'planned' | 'failed';
 
 export interface MigrationStatement {

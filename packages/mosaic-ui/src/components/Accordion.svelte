@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
+  import Icon from './Icon.svelte';
 
   interface Item {
     id: string;
@@ -15,6 +16,7 @@
 
   let { items, multiple = false }: Props = $props();
 
+  // svelte-ignore state_referenced_locally -- intentional: initial open state from props
   let open = $state<Set<string>>(new Set(multiple ? [] : [items[0]?.id ?? '']));
 
   function toggle(id: string) {
@@ -32,7 +34,7 @@
   {#each items as item (item.id)}
     <div class="m-accordion__item">
       <button class="m-accordion__trigger" aria-expanded={open.has(item.id)} onclick={() => toggle(item.id)}>
-        {item.title}<span style="opacity:.5">{open.has(item.id) ? '▾' : '▸'}</span>
+        {item.title}<Icon name={open.has(item.id) ? 'chevronUp' : 'chevronDown'} size={12} class="accordion-chevron" />
       </button>
       {#if open.has(item.id)}
         <div class="m-accordion__content">

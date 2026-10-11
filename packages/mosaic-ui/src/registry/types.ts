@@ -15,7 +15,10 @@ export type PropKind =
   | 'binding'
   | 'options'
   | 'entityRef'
-  | 'columns';
+  | 'formRef'
+  | 'columns'
+  | 'condition'
+  | 'actions';
 
 export interface PropDesc {
   key: string;
@@ -55,13 +58,13 @@ export interface ComponentDef {
 }
 
 export const CATEGORIES: { id: ComponentCategory; label: string; icon: string }[] = [
-  { id: 'Inputs', label: 'Inputs', icon: '⌨️' },
-  { id: 'Data', label: 'Data', icon: '🗂️' },
-  { id: 'Layout', label: 'Layout', icon: '🧱' },
-  { id: 'Display', label: 'Display', icon: '🖼️' },
-  { id: 'Feedback', label: 'Feedback', icon: '🔔' },
-  { id: 'Navigation', label: 'Navigation', icon: '🧭' },
-  { id: 'Charts', label: 'Charts', icon: '📊' },
+  { id: 'Inputs', label: 'Inputs', icon: 'keyboard' },
+  { id: 'Data', label: 'Data', icon: 'database' },
+  { id: 'Layout', label: 'Layout', icon: 'layoutGrid' },
+  { id: 'Display', label: 'Display', icon: 'image' },
+  { id: 'Feedback', label: 'Feedback', icon: 'bell' },
+  { id: 'Navigation', label: 'Navigation', icon: 'compass' },
+  { id: 'Charts', label: 'Charts', icon: 'barChart' },
 ];
 
 /** Common inspector props reused by field components. */
@@ -70,7 +73,7 @@ export const FIELD_PROPS: PropDesc[] = [
   { key: 'required', label: 'Required', kind: 'boolean' },
   { key: 'placeholder', label: 'Placeholder', kind: 'string' },
   { key: 'helpText', label: 'Help text', kind: 'string' },
-  { key: 'visibleIf', label: 'Visible when (expression)', kind: 'string', help: 'e.g. status === "active"' },
-  { key: 'disabledIf', label: 'Disabled when (expression)', kind: 'string' },
+  { key: 'visibleIf', label: 'Visible when', kind: 'condition', help: 'Use a safe expression or an isolated JavaScript/TypeScript condition.' },
+  { key: 'disabledIf', label: 'Disabled when', kind: 'condition' },
   { key: 'colSpan', label: 'Grid columns', kind: 'select', options: [{ value: '1', label: '1' }, { value: '2', label: '2' }, { value: '3', label: '3' }, { value: '4', label: '4' }] },
 ];

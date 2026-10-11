@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ShadcnBadge from '../shadcn/badge/Badge.svelte';
   interface Props {
     text?: string;
     variant?: 'default' | 'primary' | 'success' | 'warning' | 'danger' | 'info' | 'outline';
@@ -8,10 +9,6 @@
   let { text, variant = 'default', color }: Props = $props();
 </script>
 
-{#if color}
-  <span class="m-badge" style="background:{color}1a;color:{color};border-color:transparent">{text}</span>
-{:else}
-  <span class="m-badge" class:m-badge--primary={variant === 'primary'} class:m-badge--success={variant === 'success'}
-    class:m-badge--warning={variant === 'warning'} class:m-badge--danger={variant === 'danger'}
-    class:m-badge--info={variant === 'info'} class:m-badge--outline={variant === 'outline'}>{text}</span>
-{/if}
+<ShadcnBadge class={`m-badge${variant !== 'default' ? ` m-badge--${variant}` : ''}`} variant={variant === 'primary' ? 'default' : variant === 'danger' ? 'destructive' : variant} style={color ? `background:${color}1a;color:${color};border-color:transparent` : undefined}>
+  {#snippet children()}{text}{/snippet}
+</ShadcnBadge>

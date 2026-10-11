@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ShadcnButton from '../shadcn/button/Button.svelte';
   interface Props {
     page: number;
     pageSize: number;
@@ -26,12 +27,12 @@
 <div class="m-pagination">
   <span>{from}–{to} of {total}</span>
   <div class="m-pagination__pages">
-    <button class="m-btn m-btn--ghost m-btn--sm" disabled={page <= 1} onclick={() => onpage?.(page - 1)}>‹ Prev</button>
+    <ShadcnButton variant="ghost" size="sm" class="m-btn m-btn--ghost m-btn--sm" disabled={page <= 1} onclick={() => onpage?.(page - 1)}>‹ Prev</ShadcnButton>
     {#each pages() as p (p)}
-      <button class="m-btn m-btn--sm" class:m-btn--primary={p === page} class:m-btn--ghost={p !== page}
-        style="min-width:32px" onclick={() => onpage?.(p)}>{p}</button>
+      <ShadcnButton variant={p === page ? 'default' : 'ghost'} size="sm" class={p === page ? 'm-btn m-btn--sm m-btn--primary' : 'm-btn m-btn--sm m-btn--ghost'}
+        style="min-width:32px" onclick={() => onpage?.(p)}>{p}</ShadcnButton>
     {/each}
-    <button class="m-btn m-btn--ghost m-btn--sm" disabled={page >= pageCount} onclick={() => onpage?.(page + 1)}>Next ›</button>
+    <ShadcnButton variant="ghost" size="sm" class="m-btn m-btn--ghost m-btn--sm" disabled={page >= pageCount} onclick={() => onpage?.(page + 1)}>Next ›</ShadcnButton>
   </div>
   <label class="m-row" style="gap:6px">
     <span class="m-small m-muted">Rows</span>

@@ -44,6 +44,25 @@ export function findTemplateDir(cliFileUrl: string): string | null {
   return null;
 }
 
+/**
+ * Entity directories of a project, in precedence order (last wins).
+ *
+ * Modern projects keep entity classes in `apps/api/src/entities`; projects
+ * scaffolded before classes existed used `apps/api/entities`.
+ */
+export function entitiesDirsOf(dir: string): string[] {
+  const legacy = join(dir, 'apps', 'api', 'entities');
+  const modern = join(dir, 'apps', 'api', 'src', 'entities');
+  const found = [legacy, modern].filter((path) => existsSync(path));
+  return found.length ? found : [modern];
+}
+
+/** The directory new entity files are written to. */
+export function entitiesDirOf(dir: string): string {
+  const dirs = entitiesDirsOf(dir);
+  return dirs[dirs.length - 1]!;
+}
+
 export interface ProjectConfig {
   name: string;
   slug: string;

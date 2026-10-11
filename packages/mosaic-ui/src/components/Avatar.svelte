@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ShadcnAvatar from '../shadcn/avatar/Avatar.svelte';
   interface Props {
     name: string;
     color?: string;
@@ -12,4 +13,4 @@
   const bg = $derived(color ?? `hsl(${hue} 65% 55%)`);
 </script>
 
-<span class="m-avatar" class:m-avatar--lg={size === 'lg'} style="background:{bg}" title={name}>{initials}</span>
+<ShadcnAvatar class={size === 'lg' ? 'm-avatar m-avatar--lg' : 'm-avatar'} fallbackClass="m-avatar__fallback" ariaLabel={name} style={`background:${bg}`} title={name}>{initials}</ShadcnAvatar>

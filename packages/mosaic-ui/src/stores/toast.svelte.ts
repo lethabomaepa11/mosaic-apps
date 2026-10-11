@@ -1,5 +1,7 @@
 /** Toast notifications (module store, Svelte 5 runes). */
 
+import { toast as sonnerToast } from 'svelte-sonner';
+
 export type ToastVariant = 'info' | 'success' | 'warning' | 'error';
 
 export interface Toast {
@@ -14,13 +16,22 @@ let toasts = $state<Toast[]>([]);
 let seq = 0;
 
 function push(variant: ToastVariant, title: string, text?: string, ttl = 4000): string {
-  const id = `t_${++seq}`;
+  const options = { description: text, duration: ttl };
+  const sonnerId = variant === 'success'
+    ? sonnerToast.success(title, options)
+    : variant === 'warning'
+      ? sonnerToast.warning(title, options)
+      : variant === 'error'
+        ? sonnerToast.error(title, options)
+        : sonnerToast.info(title, options);
+  const id = String(sonnerId ?? `t_${++seq}`);
   toasts = [...toasts, { id, variant, title, text, ttl }];
   if (ttl > 0) setTimeout(() => dismiss(id), ttl);
   return id;
 }
 
 function dismiss(id: string): void {
+  sonnerToast.dismiss(id);
   toasts = toasts.filter((t) => t.id !== id);
 }
 

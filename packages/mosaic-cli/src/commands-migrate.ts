@@ -1,17 +1,15 @@
 /** Project commands: migrate + seed. */
 
-import { existsSync } from 'node:fs';
-import { join } from 'node:path';
 import { applyPlan, computePlan, createDb, ensurePlatformTables, seedPlatform, syncEntitiesDir } from '@mosaic/server';
-import { loadProjectConfig } from './project.js';
+import { entitiesDirsOf, loadProjectConfig } from './project.js';
 
 export async function migrate(opts: { dir: string; allowDestructive: boolean; dryRun: boolean }): Promise<void> {
   const config = await loadProjectConfig(opts.dir);
   const db = await createDb(config.databaseUrl);
   try {
     await ensurePlatformTables(db);
-    const entitiesDir = join(opts.dir, 'apps', 'api', 'entities');
-    if (existsSync(entitiesDir)) await syncEntitiesDir(db, entitiesDir);
+    const entitiesDirs = entitiesDirsOf(opts.dir);
+    if (entitiesDirs.length) await syncEntitiesDir(db, entitiesDirs);
     const plan = await computePlan(db);
     if (plan.statements.length === 0) {
       console.log('✓ Schema is up to date — nothing to migrate.');
