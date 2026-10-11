@@ -13,7 +13,7 @@ import {
   type Paginated,
   type QuerySpec,
   type RawQuery,
-} from '@mosaic/core';
+} from '@mosaic-apps/mosaic-core';
 import type { Db } from '../db/driver.js';
 import {
   buildInsertSql,
@@ -281,3 +281,4 @@ export function crudRoutes(deps: CrudDeps): Hono<AuthEnv> {
 
   return app;
 }
+

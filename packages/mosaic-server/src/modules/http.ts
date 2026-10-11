@@ -1,7 +1,7 @@
 /** Shared HTTP helpers for JSON responses and error mapping. */
 
 import type { Context } from 'hono';
-import type { ApiErr, ApiOk } from '@mosaic/core';
+import type { ApiErr, ApiOk } from '@mosaic-apps/mosaic-core';
 
 export function ok<T>(c: Context, data: T, status = 200): Response {
   const body: ApiOk<T> = { success: true, data };
@@ -60,3 +60,4 @@ export async function readJson<T = Record<string, unknown>>(c: Context): Promise
     throw new HttpError(400, 'Request body must be valid JSON', 'BAD_JSON');
   }
 }
+

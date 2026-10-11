@@ -1,6 +1,6 @@
 <script lang="ts">
   import { getContext, setContext } from 'svelte';
-  import type { FormDef } from '@mosaic/core';
+  import type { FormDef } from '@mosaic-apps/mosaic-core';
   import type { MosaicClient } from '../client/api';
   import FormRenderer from '../render/FormRenderer.svelte';
 

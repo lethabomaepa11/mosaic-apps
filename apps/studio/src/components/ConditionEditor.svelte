@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { SelectField, TextField } from '@mosaic/ui';
-  import type { ScriptCondition, ScriptLanguage } from '@mosaic/core';
+  import { SelectField, TextField } from '@mosaic-apps/mosaic-ui';
+  import type { ScriptCondition, ScriptLanguage } from '@mosaic-apps/mosaic-core';
   import CodeEditor from './CodeEditor.svelte';
 
   interface Props { label: string; value: unknown; onchange: (value: unknown) => void }
@@ -40,4 +40,5 @@
   .condition-editor__heading { display:flex; align-items:center; justify-content:space-between; gap:8px; }
   .condition-editor__summary { width:100%; padding:9px; overflow:hidden; text-align:left; color:var(--m-muted); background:var(--m-surface-2); border:1px solid var(--m-border); border-radius:var(--m-radius); white-space:nowrap; text-overflow:ellipsis; cursor:pointer; }
 </style>
+
 

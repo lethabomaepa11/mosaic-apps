@@ -3,7 +3,7 @@
 import RELEASE_SYNC from '@jitl/quickjs-wasmfile-release-sync';
 import { newQuickJSWASMModuleFromVariant, shouldInterruptAfterDeadline } from 'quickjs-emscripten-core';
 import * as ts from 'typescript';
-import type { ComponentAction } from '@mosaic/core';
+import type { ComponentAction } from '@mosaic-apps/mosaic-core';
 import type { SandboxRequest, SandboxResponse } from './sandbox-types.js';
 
 const MAX_SOURCE_LENGTH = 50_000;
@@ -117,4 +117,5 @@ self.onmessage = async (event: MessageEvent<SandboxRequest>) => {
   }
   self.postMessage(response);
 };
+
 

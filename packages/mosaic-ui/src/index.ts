@@ -1,5 +1,5 @@
 /**
- * @mosaic/ui - enterprise Svelte 5 kit: 57 component types, drag & drop engine,
+ * @mosaic-apps/mosaic-ui - enterprise Svelte 5 kit: 57 component types, drag & drop engine,
  * JSON FormRenderer/PageRenderer, entity-driven forms, API client, toasts.
  */
 
@@ -106,3 +106,4 @@ export { default as LegacyButton } from './components/Button.svelte';
 export { default as Menu } from './components/Menu.svelte';
 export { default as Chart } from './components/Chart.svelte';
 export { default as PanelCard } from './components/Card.svelte';
+

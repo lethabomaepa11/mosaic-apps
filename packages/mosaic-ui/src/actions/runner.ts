@@ -1,4 +1,4 @@
-import { evaluateBoolean, type ActionExecutionState, type ComponentAction, type StateScope } from '@mosaic/core';
+import { evaluateBoolean, type ActionExecutionState, type ComponentAction, type StateScope } from '@mosaic-apps/mosaic-core';
 import type { MosaicClient } from '../client/api.js';
 import type { MosaicState, StateStore } from '../state/store.js';
 import { runActionScript } from './sandbox.js';
@@ -140,3 +140,4 @@ export class ActionRunner {
 export function createActionRunner(context: ActionContext): ActionRunner {
   return new ActionRunner(context);
 }
+

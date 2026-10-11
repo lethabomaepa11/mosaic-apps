@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { TextArea, toast } from '@mosaic/ui';
+  import { TextArea, toast } from '@mosaic-apps/mosaic-ui';
   import { client } from '#lib/client';
 
   interface Role {
@@ -60,3 +60,4 @@
     </section>
   {/each}
 </div>
+

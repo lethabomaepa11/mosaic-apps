@@ -1,4 +1,4 @@
-/** @mosaic/core - shared metadata types and pure logic for the Mosaic platform. */
+/** @mosaic-apps/mosaic-core - shared metadata types and pure logic for the Mosaic platform. */
 
 export * from './types/common.js';
 export * from './types/entity.js';
@@ -12,3 +12,4 @@ export * from './form/tree.js';
 export * from './expression/index.js';
 export * from './entity/defaults.js';
 export * from './decorators.js';
+

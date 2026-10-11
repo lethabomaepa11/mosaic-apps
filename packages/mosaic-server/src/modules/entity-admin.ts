@@ -1,7 +1,7 @@
 /** Admin: create/update/delete entity definitions (metadata-first modeling). */
 
 import { Hono } from 'hono';
-import { validateEntity, type EntityDef } from '@mosaic/core';
+import { validateEntity, type EntityDef } from '@mosaic-apps/mosaic-core';
 import type { Db } from '../db/driver.js';
 import { assertValidEntity, EntityRegistryError, getEntity, listEntities, saveEntity } from '../entities/registry.js';
 import { HttpError, fail, ok, readJson } from './http.js';
@@ -80,3 +80,4 @@ export function entityAdminRoutes(db: Db, onChange?: () => Promise<void> | void)
 }
 
 void assertValidEntity;
+

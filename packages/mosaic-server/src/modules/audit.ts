@@ -1,7 +1,7 @@
 /** Audit log: every write lands in mosaic_audit_log with the acting user. */
 
 import { Hono } from 'hono';
-import type { AuditEntry } from '@mosaic/core';
+import type { AuditEntry } from '@mosaic-apps/mosaic-core';
 import type { Db } from '../db/driver.js';
 import { fail, ok } from './http.js';
 import { requirePermission } from './rbac.js';
@@ -95,3 +95,4 @@ export function auditRoutes(db: Db): Hono<AuthEnv> {
 
   return app;
 }
+

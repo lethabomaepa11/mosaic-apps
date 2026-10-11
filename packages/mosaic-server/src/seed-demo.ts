@@ -1,6 +1,6 @@
 /** Demo forms, pages and reference lists used by `seed --demo`. */
 
-import type { FormDef, PageDef } from '@mosaic/core';
+import type { FormDef, PageDef } from '@mosaic-apps/mosaic-core';
 import type { Db } from './db/driver.js';
 
 async function upsertForm(db: Db, form: FormDef): Promise<void> {
@@ -212,3 +212,4 @@ function buildDashboardPage(): PageDef {
     },
   };
 }
+

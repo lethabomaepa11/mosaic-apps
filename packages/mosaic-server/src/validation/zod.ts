@@ -1,6 +1,6 @@
 /** Build Zod validation schemas from entity metadata. */
 
-import { enumOptions, systemFields, type EntityDef, type FieldDef } from '@mosaic/core';
+import { enumOptions, systemFields, type EntityDef, type FieldDef } from '@mosaic-apps/mosaic-core';
 import { z } from 'zod';
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -117,3 +117,4 @@ export interface Issue {
 export function formatIssues(err: z.ZodError): Issue[] {
   return err.issues.map((i) => ({ path: i.path.join('.'), message: i.message }));
 }
+

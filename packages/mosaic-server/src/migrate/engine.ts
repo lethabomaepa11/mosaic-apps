@@ -9,7 +9,7 @@
  */
 
 import { createHash } from 'node:crypto';
-import { systemFields, type EntityDef, type MigrationPlan, type MigrationStatement } from '@mosaic/core';
+import { systemFields, type EntityDef, type MigrationPlan, type MigrationStatement } from '@mosaic-apps/mosaic-core';
 import type { SchemaSnapshot } from '../db/introspect.js';
 import {
   checkName,
@@ -342,3 +342,4 @@ export function checksumStatements(statements: MigrationStatement[]): string {
     .digest('hex')
     .slice(0, 20);
 }
+

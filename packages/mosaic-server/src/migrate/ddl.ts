@@ -1,6 +1,6 @@
 /** Desired DDL fragments derived from entity metadata. */
 
-import { enumOptions, systemFields, type EntityDef, type FieldDef } from '@mosaic/core';
+import { enumOptions, systemFields, type EntityDef, type FieldDef } from '@mosaic-apps/mosaic-core';
 import { ident } from '../db/driver.js';
 
 export interface DesiredColumn {
@@ -157,3 +157,4 @@ export function normaliseDefault(sql: string | null): string {
     .trim()
     .toLowerCase();
 }
+

@@ -4,7 +4,7 @@
    * Data-aware components (entityTable, statCard, refSelect) receive the client.
    */
 
-  import { ensureRoot, evaluateBoolean, type FormNode, type PageDef } from '@mosaic/core';
+  import { ensureRoot, evaluateBoolean, type FormNode, type PageDef } from '@mosaic-apps/mosaic-core';
   import type { MosaicClient } from '../client/api';
   import NodeRenderer from './NodeRenderer.svelte';
   import { fade } from 'svelte/transition';

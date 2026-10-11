@@ -1,7 +1,7 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { auth } from '#lib/auth.svelte';
-  import { toast } from '@mosaic/ui';
+  import { toast } from '@mosaic-apps/mosaic-ui';
 
   let email = $state('admin@mosaic.local');
   let password = $state('admin1234');
@@ -51,3 +51,4 @@
     <p class="m-small m-muted" style="margin:0">Default seeded admin: admin@mosaic.local / admin1234</p>
   </form>
 </div>
+

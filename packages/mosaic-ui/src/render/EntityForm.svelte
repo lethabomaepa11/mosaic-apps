@@ -5,7 +5,7 @@
    * submit hits the auto-generated CRUD endpoint.
    */
 
-  import { allFields, enumOptions, newId, type EntityDef, type FormDef } from '@mosaic/core';
+  import { allFields, enumOptions, newId, type EntityDef, type FormDef } from '@mosaic-apps/mosaic-core';
   import type { MosaicClient } from '../client/api';
   import FormRenderer from './FormRenderer.svelte';
 

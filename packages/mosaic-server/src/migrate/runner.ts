@@ -1,6 +1,6 @@
 /** Plan and apply migrations against PostgreSQL. */
 
-import { newId, type MigrationPlan, type MigrationRecord, type MigrationStatement } from '@mosaic/core';
+import { newId, type MigrationPlan, type MigrationRecord, type MigrationStatement } from '@mosaic-apps/mosaic-core';
 import type { Db } from '../db/driver.js';
 import { introspectTables } from '../db/introspect.js';
 import { loadKnownColumns, listEntities, replaceKnownColumns, type RegistryRow } from '../entities/registry.js';
@@ -132,3 +132,4 @@ export async function migrationHistory(db: Db, limit = 100): Promise<MigrationRe
     appliedAt: new Date(r.applied_at).toISOString(),
   }));
 }
+

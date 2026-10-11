@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { walk, type FormNode } from '@mosaic/core';
+  import { walk, type FormNode } from '@mosaic-apps/mosaic-core';
   import { designer } from '#lib/designer.svelte';
   import { Icon, Menu } from '$ui';
 
@@ -43,3 +43,4 @@
   .layer-row { display:flex; align-items:center; }
   .layer-row > button:first-child { flex:1; min-width:0; }
 </style>
+

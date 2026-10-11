@@ -35,8 +35,8 @@ create options:
   --pm npm|pnpm|yarn     Package manager (default npm)
   --install | --no-install   Run package install (default install)
   --git | --no-git       git init (default git)
-  --link <path>          Link @mosaic/* packages from a local repo checkout
-  --npm-mode             Use published @mosaic/* versions instead of file: links
+  --link <path>          Link @mosaic-apps/mosaic-* packages from a local repo checkout
+  --npm-mode             Use published @mosaic-apps/mosaic-* versions instead of file: links
   --force                Overwrite existing directory
 
 entity options:
@@ -172,3 +172,4 @@ main().catch((err) => {
   console.error('[mosaic] error:', err instanceof Error ? err.message : err);
   process.exit(1);
 });
+

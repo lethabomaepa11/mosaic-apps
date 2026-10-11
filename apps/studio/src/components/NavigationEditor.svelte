@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { Icon, TextField, toast } from '@mosaic/ui';
-  import type { NavItemDef } from '@mosaic/core';
+  import { Icon, TextField, toast } from '@mosaic-apps/mosaic-ui';
+  import type { NavItemDef } from '@mosaic-apps/mosaic-core';
   import { client } from '#lib/client';
 
   const icons = ['home', 'layoutGrid', 'fileText', 'database', 'chartNoAxesCombined', 'settings', 'users', 'bookOpen', 'calendar', 'folder', 'briefcase', 'helpCircle'];
@@ -56,3 +56,4 @@
   .nav-live span { margin-left:auto; opacity:.55; font-size:.72rem; }
   @media(max-width:900px) { .nav-row { grid-template-columns:24px 1fr 1fr; } .nav-row > :nth-child(n+4) { grid-column:auto; } }
 </style>
+

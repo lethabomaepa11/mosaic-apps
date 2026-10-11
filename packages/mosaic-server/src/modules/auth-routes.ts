@@ -1,7 +1,7 @@
 /** /api/auth routes: login, register (bootstrap-safe), me, logout, change-password. */
 
 import { Hono } from 'hono';
-import type { LoginResponse, UserRecord } from '@mosaic/core';
+import type { LoginResponse, UserRecord } from '@mosaic-apps/mosaic-core';
 import type { Db } from '../db/driver.js';
 import { HttpError, fail, ok, readJson } from './http.js';
 import {
@@ -142,3 +142,4 @@ export function authRoutes(deps: AuthRoutesDeps): Hono<AuthEnv> {
 
   return app;
 }
+

@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { JsonEditor, Modal, SelectField, Switch, TextArea, TextField } from '@mosaic/ui';
-  import type { ComponentAction, ScriptLanguage, StateScope } from '@mosaic/core';
+  import { JsonEditor, Modal, SelectField, Switch, TextArea, TextField } from '@mosaic-apps/mosaic-ui';
+import type { ComponentAction, ScriptAction, ScriptLanguage, StateScope } from '@mosaic-apps/mosaic-core';
   import CodeEditor from './CodeEditor.svelte';
 
   interface ArtifactOption { value: string; label: string; kind: 'form' | 'page' }
@@ -9,7 +9,7 @@
   const actions = $derived(Array.isArray(value) ? value as ComponentAction[] : []);
   let scriptOpen = $state(false);
   let scriptIndex = $state<number | null>(null);
-  const selectedScript = $derived(scriptIndex === null ? undefined : actions[scriptIndex]?.type === 'script' ? actions[scriptIndex] : undefined);
+  const selectedScript = $derived(scriptIndex === null ? undefined : actions[scriptIndex]?.type === 'script' ? (actions[scriptIndex] as ScriptAction) : undefined);
   const scopes = [{ value: 'application', label: 'Application' }, { value: 'page', label: 'Page' }, { value: 'form', label: 'Form' }, { value: 'component', label: 'Component' }];
 
   function replace(index: number, action: ComponentAction) {
@@ -111,3 +111,4 @@
   .script-modal__toolbar .m-alert { display:flex; gap:8px; align-items:center; min-height:40px; }
   @media(max-width:720px) { .script-modal__toolbar { grid-template-columns:1fr; } }
 </style>
+

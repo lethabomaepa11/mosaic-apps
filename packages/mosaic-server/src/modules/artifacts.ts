@@ -1,7 +1,7 @@
-﻿/** Form & page artifacts: JSON schemas stored in postgres, with publish-versioning. */
+/** Form & page artifacts: JSON schemas stored in postgres, with publish-versioning. */
 
 import { Hono } from 'hono';
-import { ensureRoot, slugify, type FormDef, type PageDef } from '@mosaic/core';
+import { ensureRoot, slugify, type FormDef, type PageDef } from '@mosaic-apps/mosaic-core';
 import type { Db } from '../db/driver.js';
 import { HttpError, fail, ok, readJson } from './http.js';
 import { requirePermission } from './rbac.js';
@@ -508,3 +508,4 @@ export function artifactRoutes(deps: ArtifactDeps): Hono<AuthEnv> {
 
   return app;
 }
+

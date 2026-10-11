@@ -1,6 +1,6 @@
 <script lang="ts">
   import { getComponent, Tabs, toast, type PropDesc } from '$ui';
-  import { findNode, type FormNode } from '@mosaic/core';
+  import { findNode, type FormNode } from '@mosaic-apps/mosaic-core';
   import { designer } from '#lib/designer.svelte';
   import Control from './Control.svelte';
   let activeTab = $state('properties');
@@ -86,3 +86,4 @@
 <style>
   .inspector-tab { display:grid; gap:12px; padding-top:12px; }
 </style>
+

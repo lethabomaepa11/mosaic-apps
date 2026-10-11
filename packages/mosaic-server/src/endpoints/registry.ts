@@ -1,4 +1,4 @@
-﻿/** Endpoint registry: discovers custom API endpoint modules and exposes them to Studio/forms. */
+/** Endpoint registry: discovers custom API endpoint modules and exposes them to Studio/forms. */
 
 import { readdir } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
@@ -8,7 +8,7 @@ import type { Db } from '../db/driver.js';
 import { ok } from '../modules/http.js';
 import { requirePermission } from '../modules/rbac.js';
 import type { AuthEnv, AuthUser } from '../modules/auth.js';
-import { importEntityModule } from '@mosaic/core';
+import { importEntityModule } from '@mosaic-apps/mosaic-core';
 
 export interface EndpointDef {
   method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
@@ -81,3 +81,4 @@ export function endpointRegistryRoutes(_db: Db): Hono<AuthEnv> {
 
   return app;
 }
+

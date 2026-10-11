@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
-import type { EntityDef } from '@mosaic/core';
+import type { EntityDef } from '@mosaic-apps/mosaic-core';
 import { emptyTable, type SchemaSnapshot } from '../db/introspect.js';
 import { checksumStatements, diffEntities, diffEntity } from './engine.js';
 
@@ -193,3 +193,4 @@ test('checksum is deterministic', () => {
   const b = diffEntities([base], {}).plans[0]!.statements;
   assert.equal(checksumStatements(a), checksumStatements(b));
 });
+

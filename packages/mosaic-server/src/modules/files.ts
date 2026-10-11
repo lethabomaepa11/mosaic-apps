@@ -3,7 +3,7 @@
 import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Hono } from 'hono';
-import { newId } from '@mosaic/core';
+import { newId } from '@mosaic-apps/mosaic-core';
 import type { Db } from '../db/driver.js';
 import { HttpError, fail, ok } from './http.js';
 import type { AuthEnv } from './auth.js';
@@ -103,3 +103,4 @@ export function fileRoutes(deps: FilesDeps): Hono<AuthEnv> {
 
   return app;
 }
+

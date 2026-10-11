@@ -3,7 +3,7 @@
 import { randomBytes } from 'node:crypto';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import type { EntityDef } from '@mosaic/core';
+import type { EntityDef } from '@mosaic-apps/mosaic-core';
 import { createPgDriver, type Db } from './db/driver.js';
 import { createPgliteDriver, isPgliteUrl } from './db/pglite.js';
 import { ensurePlatformTables } from './platform.js';
@@ -176,3 +176,4 @@ export async function createMosaicApp(config: MosaicServerConfig): Promise<Hono<
   const server = await createMosaicServer(config);
   return server.app;
 }
+

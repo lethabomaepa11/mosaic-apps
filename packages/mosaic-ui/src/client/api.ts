@@ -1,7 +1,7 @@
 /** MosaicClient - typed fetch wrapper for the Mosaic API (part 1: core/auth/meta/entities). */
 
-import type { AuditEntry, EntityDef, FormDef, PageDef, QuerySpec, RefList, SettingRecord, UserRecord } from '@mosaic/core';
-import { buildQueryString } from '@mosaic/core';
+import type { AuditEntry, EntityDef, FormDef, PageDef, QuerySpec, RefList, SettingRecord, UserRecord } from '@mosaic-apps/mosaic-core';
+import { buildQueryString } from '@mosaic-apps/mosaic-core';
 
 export interface ClientOptions {
   /** API base, e.g. '/api' (proxied) or 'http://localhost:8787/api' */
@@ -211,10 +211,10 @@ export class MosaicClient {
   deletePageFolder(path: string): Promise<{ path: string; movedToRoot: number }> {
     return this.request('POST', '/pages/folders/delete', { path });
   }
-  getNav(): Promise<{ items: import('@mosaic/core').NavItemDef[] }> {
+  getNav(): Promise<{ items: import('@mosaic-apps/mosaic-core').NavItemDef[] }> {
     return this.request('GET', '/nav');
   }
-  getTheme(): Promise<import('@mosaic/core').ThemeConfig> {
+  getTheme(): Promise<import('@mosaic-apps/mosaic-core').ThemeConfig> {
     return this.request('GET', '/theme');
   }
   getPage(idOrSlug: string): Promise<PageDef> {
@@ -309,3 +309,4 @@ export interface MigrationStatement {
 export function createClient(opts?: Partial<ClientOptions>): MosaicClient {
   return new MosaicClient({ baseUrl: opts?.baseUrl ?? '/api', onUnauthorized: opts?.onUnauthorized });
 }
+

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { getComponent, isContainerType, draggable, dropzone, dragState, targetIndexFor, type DragPayload } from '$ui';
-  import type { FormNode } from '@mosaic/core';
+  import type { FormNode } from '@mosaic-apps/mosaic-core';
   import { designer } from '#lib/designer.svelte';
   import { Icon } from '$ui';
   import CanvasNode from './CanvasNode.svelte';
@@ -151,3 +151,4 @@
   .node-context button { display:flex; align-items:center; gap:8px; padding:7px 9px; border:0; background:none; color:var(--m-fg); text-align:left; border-radius:5px; cursor:pointer; font:inherit; font-size:.78rem; }
   .node-context button:hover { background:var(--m-surface-2); }
 </style>
+

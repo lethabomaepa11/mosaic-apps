@@ -134,7 +134,7 @@ export async function copyTemplate(
   return files;
 }
 
-/** Rewrite @mosaic/* deps to file: links (link mode). */
+/** Rewrite @mosaic-apps/mosaic-* deps to file: links (link mode). */
 export async function rewriteMosaicDeps(dir: string, linkDir: string): Promise<void> {
   const packages = join(linkDir, 'packages');
   const files: string[] = [];
@@ -158,8 +158,8 @@ export async function rewriteMosaicDeps(dir: string, linkDir: string): Promise<v
       const deps = raw[section];
       if (!deps) continue;
       for (const name of Object.keys(deps)) {
-        if (!name.startsWith('@mosaic/')) continue;
-        const short = name.replace('@mosaic/', '');
+        if (!name.startsWith('@mosaic-apps/mosaic-')) continue;
+        const short = name.replace('@mosaic-apps/mosaic-', '');
         const abs = join(packages, `mosaic-${short}`);
         if (existsSync(abs)) {
           deps[name] = `file:${abs.split('\\').join('/')}`;
@@ -184,3 +184,4 @@ export async function ensureDir(path: string): Promise<void> {
 export async function removeDir(path: string): Promise<void> {
   await rm(path, { recursive: true, force: true });
 }
+

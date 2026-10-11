@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { TextField, toast } from '@mosaic/ui';
-  import type { FormDef } from '@mosaic/core';
+  import { TextField, toast } from '@mosaic-apps/mosaic-ui';
+  import type { FormDef } from '@mosaic-apps/mosaic-core';
   import { client } from '#lib/client';
 
   let forms = $state<FormDef[]>([]);
@@ -60,3 +60,4 @@
     {/each}
   </div>
 {/if}
+

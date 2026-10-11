@@ -5,7 +5,7 @@
    * defaults, submit via MosaicClient (or custom onsubmit), toasts.
    */
 
-  import { ensureRoot, evaluateBoolean, walk, type EntityDef, type FormDef, type FormNode } from '@mosaic/core';
+  import { ensureRoot, evaluateBoolean, walk, type EntityDef, type FormDef, type FormNode } from '@mosaic-apps/mosaic-core';
   import { getComponent } from '../registry/index';
   import type { MosaicClient } from '../client/api';
   import { toast } from '../stores/toast.svelte';

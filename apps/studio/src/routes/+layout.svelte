@@ -1,7 +1,7 @@
 <script lang="ts">
   import '../app.css';
   import { page } from '$app/state';
-  import { applyThemeConfig, Toaster } from '@mosaic/ui';
+  import { applyThemeConfig, Toaster } from '@mosaic-apps/mosaic-ui';
   import { client } from '#lib/client';
   import { auth } from '#lib/auth.svelte';
   import Sidebar from '../components/Sidebar.svelte';
@@ -33,3 +33,4 @@
 <style>
   .full { padding: 0; display: grid; place-items: center; }
 </style>
+

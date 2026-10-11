@@ -46,7 +46,7 @@ export async function create(opts: CreateOptions): Promise<void> {
   if (!templateDir) {
     console.error(
       'Could not locate the Mosaic template. Run the CLI from the mosaic-apps repo checkout,\n' +
-        'or reinstall @mosaic/cli (templates are bundled with the published package).',
+        'or reinstall @mosaic-apps/mosaic-cli (templates are bundled with the published package).',
     );
     process.exit(1);
   }
@@ -84,7 +84,7 @@ export async function create(opts: CreateOptions): Promise<void> {
     linkDir = opts.link && existsSync(opts.link) ? opts.link : findRepoRoot(dirname(fileURLToPath(import.meta.url)));
     if (linkDir) {
       await rewriteMosaicDeps(target, linkDir);
-      console.log('🔗 Linked @mosaic/* packages to the local repo checkout');
+      console.log('🔗 Linked @mosaic-apps/mosaic-* packages to the local repo checkout');
     } else if (opts.link) {
       console.warn(`⚠ --link path not found: ${opts.link}`);
     }
@@ -151,3 +151,4 @@ CORS_ORIGINS=http://localhost:${webPort}
   const { writeFile } = await import('node:fs/promises');
   await writeFile(join(target, '.env'), env, 'utf8');
 }
+

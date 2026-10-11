@@ -1,4 +1,4 @@
-/** Local development server: `npm run dev -w @mosaic/server`. */
+/** Local development server: `npm run dev -w @mosaic-apps/mosaic-server`. */
 
 import { serve } from '@hono/node-server';
 import { createMosaicServer } from './app.js';

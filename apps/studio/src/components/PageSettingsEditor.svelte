@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { Card, NumberField, SelectField, Switch, TextArea, TextField } from '@mosaic/ui';
-  import type { PageSettings } from '@mosaic/core';
+  import { Card, NumberField, SelectField, Switch, TextArea, TextField } from '@mosaic-apps/mosaic-ui';
+  import type { PageSettings } from '@mosaic-apps/mosaic-core';
   import { designer } from '#lib/designer.svelte';
 
   interface Props {
@@ -65,4 +65,5 @@
   .settings-toggles { display:flex; flex-wrap:wrap; gap:20px; padding:0 16px 16px; }
   @media(max-width:760px) { .settings-grid { grid-template-columns:1fr; } }
 </style>
+
 

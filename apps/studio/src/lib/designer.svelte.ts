@@ -11,7 +11,7 @@ import {
   type FormDef,
   type FormNode,
   type PageDef,
-} from '@mosaic/core';
+} from '@mosaic-apps/mosaic-core';
 import { createNode as createRegistryNode } from '$ui';
 
 function clone<T>(v: T): T {
@@ -188,3 +188,4 @@ class DesignerStore {
 }
 
 export const designer = new DesignerStore();
+

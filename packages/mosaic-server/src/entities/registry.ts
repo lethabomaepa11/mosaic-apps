@@ -1,6 +1,6 @@
 /** Entity registry: metadata rows in mosaic_entities + filesystem sync. */
 
-import { loadEntityDefs, newId, validateEntity, type EntityDef } from '@mosaic/core';
+import { loadEntityDefs, newId, validateEntity, type EntityDef } from '@mosaic-apps/mosaic-core';
 import type { Db } from '../db/driver.js';
 import { RESERVED_ENTITY_NAMES } from '../platform.js';
 
@@ -162,3 +162,4 @@ export async function replaceKnownColumns(db: Db, columnsByEntity: Map<string, s
 }
 
 export { newId };
+

@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { Card, JsonEditor, NumberField, SelectField, Switch, TextArea, TextField } from '@mosaic/ui';
-  import type { EntityDef, FormDataSource, FormSettings } from '@mosaic/core';
+  import { Card, JsonEditor, NumberField, SelectField, Switch, TextArea, TextField } from '@mosaic-apps/mosaic-ui';
+  import type { EntityDef, FormDataSource, FormSettings } from '@mosaic-apps/mosaic-core';
   import { designer } from '#lib/designer.svelte';
 
   interface Props {
@@ -100,3 +100,4 @@
   .settings-json { padding:0 16px 16px; }
   @media(max-width:760px) { .settings-grid { grid-template-columns:1fr; } }
 </style>
+

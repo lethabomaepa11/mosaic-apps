@@ -1,6 +1,6 @@
 /** Project commands: migrate + seed. */
 
-import { applyPlan, computePlan, createDb, ensurePlatformTables, seedPlatform, syncEntitiesDir } from '@mosaic/server';
+import { applyPlan, computePlan, createDb, ensurePlatformTables, seedPlatform, syncEntitiesDir } from '@mosaic-apps/mosaic-server';
 import { entitiesDirsOf, loadProjectConfig } from './project.js';
 
 export async function migrate(opts: { dir: string; allowDestructive: boolean; dryRun: boolean }): Promise<void> {
@@ -60,3 +60,4 @@ export async function seed(opts: { dir: string; demo: boolean }): Promise<void> 
     await db.close();
   }
 }
+

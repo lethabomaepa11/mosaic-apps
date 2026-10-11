@@ -1,6 +1,6 @@
 <script lang="ts">
-  import type { EntityDef, FieldDef } from '@mosaic/core';
-  import { allFields, entityLabelPlural } from '@mosaic/core';
+  import type { EntityDef, FieldDef } from '@mosaic-apps/mosaic-core';
+  import { allFields, entityLabelPlural } from '@mosaic-apps/mosaic-core';
   import type { MosaicClient } from '../client/api';
   import DataTable from './DataTable.svelte';
   import Pagination from './Pagination.svelte';

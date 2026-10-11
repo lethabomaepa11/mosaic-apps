@@ -57,4 +57,5 @@ export {
   type EntityOptions,
   type FieldOptions,
   type RelationOptions,
-} from '@mosaic/core';
+} from '@mosaic-apps/mosaic-core';
+

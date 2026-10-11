@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { toast } from '@mosaic/ui';
-  import type { EntityDef } from '@mosaic/core';
+  import { toast } from '@mosaic-apps/mosaic-ui';
+  import type { EntityDef } from '@mosaic-apps/mosaic-core';
   import { client } from '#lib/client';
 
   let entities = $state<{ name: string; label: string; labelPlural: string; version: number; rowCount: number }[]>([]);
@@ -62,3 +62,4 @@
     </a>
   {/each}
 </div>
+

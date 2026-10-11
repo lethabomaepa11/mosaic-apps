@@ -1,4 +1,4 @@
-import type { ComponentAction, ScriptLanguage } from '@mosaic/core';
+import type { ComponentAction, ScriptLanguage } from '@mosaic-apps/mosaic-core';
 import type { SandboxRequest, SandboxResponse, ScriptStateSnapshot } from './sandbox-types.js';
 
 export interface SandboxOptions {
@@ -61,4 +61,5 @@ export function runActionScript(options: SandboxOptions): Promise<ComponentActio
 export function runBooleanScript(options: SandboxOptions): Promise<boolean> {
   return execute<boolean>('boolean', options);
 }
+
 

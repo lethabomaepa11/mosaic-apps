@@ -1,8 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { page } from '$app/state';
-  import { FormRenderer, Modal, toast, Icon } from '@mosaic/ui';
-  import type { FormDataSource, FormDef, EntityDef, FormSettings } from '@mosaic/core';
+  import { FormRenderer, Modal, toast, Icon } from '@mosaic-apps/mosaic-ui';
+  import type { FormDataSource, FormDef, EntityDef, FormSettings } from '@mosaic-apps/mosaic-core';
   import { client } from '#lib/client';
   import { designer } from '#lib/designer.svelte';
   import Palette from '../../../../components/Palette.svelte';

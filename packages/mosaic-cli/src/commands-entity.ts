@@ -4,7 +4,7 @@ import { existsSync } from 'node:fs';
 import { mkdir, readdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { spawn } from 'node:child_process';
-import { humanize, snakeCase, validateEntity, type EntityDef, type FieldDef } from '@mosaic/core';
+import { humanize, snakeCase, validateEntity, type EntityDef, type FieldDef } from '@mosaic-apps/mosaic-core';
 import { entitiesDirOf, findRepoRoot, loadProjectConfig, titleCase } from './project.js';
 
 function parseFields(spec: string): FieldDef[] {
@@ -27,7 +27,7 @@ function parseFields(spec: string): FieldDef[] {
 
 function generateEntityClass(def: EntityDef, className: string): string {
   const lines: string[] = [];
-  lines.push(`import { Entity, Field, Relation } from '@mosaic/core';`);
+  lines.push(`import { Entity, Field, Relation } from '@mosaic-apps/mosaic-core';`);
   lines.push('');
   lines.push(`@Entity({`);
   lines.push(`  name: '${def.name}',`);
@@ -197,3 +197,4 @@ export async function listEntityFiles(dir: string): Promise<string[]> {
   }
   return out;
 }
+

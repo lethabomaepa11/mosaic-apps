@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { Tabs, toast } from '@mosaic/ui';
-  import type { AuditEntry, RefList, SettingRecord, UserRecord } from '@mosaic/core';
+  import { Tabs, toast } from '@mosaic-apps/mosaic-ui';
+  import type { AuditEntry, RefList, SettingRecord, UserRecord } from '@mosaic-apps/mosaic-core';
   import { client } from '#lib/client';
   import SettingsUsers from '../../components/SettingsUsers.svelte';
   import SettingsRoles from '../../components/SettingsRoles.svelte';
@@ -79,3 +79,4 @@
     />
   {/if}
 </div>
+

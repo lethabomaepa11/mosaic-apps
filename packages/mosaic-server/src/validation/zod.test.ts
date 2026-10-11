@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
-import type { EntityDef } from '@mosaic/core';
+import type { EntityDef } from '@mosaic-apps/mosaic-core';
 import { buildEntitySchema, formatIssues } from './zod.js';
 
 const entity: EntityDef = {
@@ -69,3 +69,4 @@ test('update mode makes everything optional', () => {
   assert.equal(schema.safeParse({ age: 3 }).success, true);
   assert.equal(schema.safeParse({ status: 'zzz' }).success, false);
 });
+

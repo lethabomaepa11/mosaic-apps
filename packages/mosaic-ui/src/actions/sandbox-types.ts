@@ -1,4 +1,4 @@
-import type { ComponentAction, ScriptLanguage } from '@mosaic/core';
+import type { ComponentAction, ScriptLanguage } from '@mosaic-apps/mosaic-core';
 
 export interface ScriptStateSnapshot {
   application: Record<string, unknown>;
@@ -20,4 +20,5 @@ export interface SandboxRequest {
 export type SandboxResponse =
   | { id: string; ok: true; value: ComponentAction[] | boolean }
   | { id: string; ok: false; error: string };
+
 

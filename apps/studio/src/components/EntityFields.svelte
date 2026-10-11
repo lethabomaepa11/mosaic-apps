@@ -1,6 +1,6 @@
 <script lang="ts">
-  import type { EntityDef, FieldDef, FieldType, EnumOption } from '@mosaic/core';
-  import { Icon, SelectField } from '@mosaic/ui';
+  import type { EntityDef, FieldDef, FieldType, EnumOption } from '@mosaic-apps/mosaic-core';
+  import { Icon, SelectField } from '@mosaic-apps/mosaic-ui';
   import { client } from '#lib/client';
 
   interface Props {
@@ -95,3 +95,4 @@
     <label class="m-check"><input type="checkbox" checked={entity.audit ?? true} onchange={(e) => emit({ ...entity, audit: (e.currentTarget as HTMLInputElement).checked })} /> audit changes</label>
   </div>
 </section>
+

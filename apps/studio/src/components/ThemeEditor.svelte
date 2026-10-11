@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { applyThemeConfig, toast } from '@mosaic/ui';
-  import type { ThemeConfig } from '@mosaic/core';
+  import { applyThemeConfig, toast } from '@mosaic-apps/mosaic-ui';
+  import type { ThemeConfig } from '@mosaic-apps/mosaic-core';
   import { client } from '#lib/client';
 
   interface Props { onsave?: (config: ThemeConfig) => void }
@@ -92,3 +92,4 @@
   .theme-grid input[type=color] { width:100%; height:38px; padding:3px; border:1px solid var(--m-border); border-radius:var(--m-radius-sm); background:var(--m-surface); }
   .theme-preview { display:grid; gap:10px; padding:16px; background:var(--m-bg); border:1px solid var(--m-border); border-radius:var(--m-radius); }
 </style>
+

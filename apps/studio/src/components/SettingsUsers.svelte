@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { Icon, SelectField, TextField, toast } from '@mosaic/ui';
-  import type { UserRecord } from '@mosaic/core';
+  import { Icon, SelectField, TextField, toast } from '@mosaic-apps/mosaic-ui';
+  import type { UserRecord } from '@mosaic-apps/mosaic-core';
   import { client } from '#lib/client';
 
   interface Props {
@@ -85,3 +85,4 @@
     </tbody>
   </table>
 </section>
+

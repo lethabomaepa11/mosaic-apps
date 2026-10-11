@@ -1,6 +1,6 @@
 /** RBAC checks: permission patterns with `*` wildcards + entity action gates. */
 
-import type { EntityAction, EntityDef } from '@mosaic/core';
+import type { EntityAction, EntityDef } from '@mosaic-apps/mosaic-core';
 import type { AuthUser } from './auth.js';
 
 /** Match a user permission against a required permission, segment-wise `*` wildcards. */
@@ -58,3 +58,4 @@ export function requirePermission(user: AuthUser | null, perm: string): boolean 
   if (isAdmin(user)) return true;
   return hasPermission(user, perm);
 }
+

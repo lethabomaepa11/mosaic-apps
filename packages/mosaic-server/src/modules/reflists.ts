@@ -1,7 +1,7 @@
 /** Reference lists (lookups) - Shesha-style controlled vocabularies. */
 
 import { Hono } from 'hono';
-import { newId, slugify, type RefList } from '@mosaic/core';
+import { newId, slugify, type RefList } from '@mosaic-apps/mosaic-core';
 import type { Db } from '../db/driver.js';
 import { HttpError, fail, ok, readJson } from './http.js';
 import { requirePermission } from './rbac.js';
@@ -95,4 +95,5 @@ export function refListRoutes(db: Db): Hono<AuthEnv> {
 
   return app;
 }
+
 

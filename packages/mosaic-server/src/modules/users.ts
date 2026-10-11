@@ -1,7 +1,7 @@
 /** Admin: users & roles management. */
 
 import { Hono } from 'hono';
-import type { RoleRecord, UserRecord } from '@mosaic/core';
+import type { RoleRecord, UserRecord } from '@mosaic-apps/mosaic-core';
 import type { Db } from '../db/driver.js';
 import { HttpError, fail, ok, readJson } from './http.js';
 import { requirePermission } from './rbac.js';
@@ -190,3 +190,4 @@ export function roleAdminRoutes(db: Db): Hono<AuthEnv> {
 
   return app;
 }
+

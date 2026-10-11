@@ -1,7 +1,7 @@
 /** Key/value application settings (mosaic_settings). */
 
 import { Hono } from 'hono';
-import type { SettingRecord } from '@mosaic/core';
+import type { SettingRecord } from '@mosaic-apps/mosaic-core';
 import type { Db } from '../db/driver.js';
 import { HttpError, fail, ok, readJson } from './http.js';
 import { requirePermission } from './rbac.js';
@@ -101,3 +101,4 @@ export function settingsRoutes(db: Db): Hono<AuthEnv> {
 
   return app;
 }
+

@@ -6,7 +6,7 @@
   "description": "Mosaic - next-gen metadata-driven full-stack app platform (entities -> migrations -> auto CRUD -> drag & drop JSON forms) for JS/TS",
   "workspaces": [
     "packages/*",
-    "apps/*"
+    "apps/studio"
   ],
   "scripts": {
     "build": "npm run build -w @mosaic-apps/mosaic-core && npm run build -w @mosaic-apps/mosaic-server && npm run build -w @mosaic-apps/mosaic-cli && npm run build -w studio",

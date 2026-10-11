@@ -1,6 +1,6 @@
 /** First-boot seeding: roles, settings, admin user, optional demo data. */
 
-import { demoEntities } from '@mosaic/core';
+import { demoEntities } from '@mosaic-apps/mosaic-core';
 import type { Db } from './db/driver.js';
 import { hashPassword } from './modules/auth.js';
 import { saveEntity } from './entities/registry.js';
@@ -75,3 +75,4 @@ export async function seedPlatform(db: Db, opts: SeedOptions = {}): Promise<Seed
 
   return result;
 }
+

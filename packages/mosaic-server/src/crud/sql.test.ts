@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
-import { emptyQuery, type EntityDef, type QuerySpec } from '@mosaic/core';
+import { emptyQuery, type EntityDef, type QuerySpec } from '@mosaic-apps/mosaic-core';
 import { buildInsertSql, buildListSql, buildUpdateSql, buildWhere, countParams, QueryError } from './sql.js';
 
 const entity: EntityDef = {
@@ -90,3 +90,4 @@ test('update always bumps updatedAt and excludes id', () => {
   assert.match(sql, /SET "name" = \$1, "updatedAt" = now\(\) WHERE "id" = \$2/);
   assert.deepEqual(params, ['B', 'abc']);
 });
+

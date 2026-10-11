@@ -1,4 +1,4 @@
-import type { ThemeConfig, ThemePalette } from '@mosaic/core';
+import type { ThemeConfig, ThemePalette } from '@mosaic-apps/mosaic-core';
 import { themeState } from './theme.svelte';
 
 const THEME_VARIABLES: Record<keyof ThemePalette, string> = {
@@ -75,3 +75,4 @@ export function applyThemeConfig(config: ThemeConfig, target: HTMLElement | null
   if (config.transition?.duration !== undefined) target.style.setProperty('--m-transition-duration', `${Math.max(0, config.transition.duration)}ms`);
   if (config.transition?.kind) target.style.setProperty('--m-transition-kind', config.transition.kind);
 }
+

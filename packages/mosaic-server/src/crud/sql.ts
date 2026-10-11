@@ -1,6 +1,6 @@
 /** Translate a QuerySpec into safe parameterised SQL (validated against entity metadata). */
 
-import { allFields, searchableFields, type EntityDef, type FieldDef, type QuerySpec } from '@mosaic/core';
+import { allFields, searchableFields, type EntityDef, type FieldDef, type QuerySpec } from '@mosaic-apps/mosaic-core';
 import { ident } from '../db/driver.js';
 
 export class QueryError extends Error {
@@ -323,3 +323,4 @@ export function buildOptionsSql(
     `ORDER BY ${ident('t')}.${ident(labelField)} ASC LIMIT $${params.length}`;
   return { sql, params };
 }
+

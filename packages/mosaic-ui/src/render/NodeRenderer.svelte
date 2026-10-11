@@ -1,6 +1,6 @@
 <script lang="ts">
   import { getComponent, isContainerType } from '../registry/index';
-  import type { ComponentAction, FormNode, ScriptCondition, TransitionConfig } from '@mosaic/core';
+  import type { ComponentAction, FormNode, ScriptCondition, TransitionConfig } from '@mosaic-apps/mosaic-core';
   import NodeChildren from './NodeChildren.svelte';
   import { fade } from 'svelte/transition';
   import { getContext, onDestroy, setContext } from 'svelte';

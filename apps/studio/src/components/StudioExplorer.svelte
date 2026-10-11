@@ -3,7 +3,7 @@
   import { page } from '$app/state';
   import { goto } from '$app/navigation';
   import { Icon, Menu, TextField, toast } from '$ui';
-  import type { FormDef, PageDef } from '@mosaic/core';
+  import type { FormDef, PageDef } from '@mosaic-apps/mosaic-core';
   import { client } from '#lib/client';
   import ResizeHandle from './ResizeHandle.svelte';
 
@@ -217,3 +217,4 @@
   .explorer-recent { display:flex; flex-direction:column; gap:8px; }
   @media(max-width:760px) { .explorer { grid-template-columns:1fr; } .explorer-tree { max-height:42vh; border-right:0; border-bottom:1px solid var(--m-border); } .explorer > :global(.resize-handle) { display:none; } }
 </style>
+

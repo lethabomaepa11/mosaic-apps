@@ -1,6 +1,6 @@
 /** The component registry - single lookup for palette, canvas and runtime. */
 
-import { newId, type FormNode } from '@mosaic/core';
+import { newId, type FormNode } from '@mosaic-apps/mosaic-core';
 import type { ComponentDef, ComponentCategory } from './types.js';
 import { CATEGORIES } from './types.js';
 import { INPUT_ENTRIES_A } from './entries-inputs.js';
@@ -63,3 +63,4 @@ export function paletteCategories(pages = false): { category: ComponentCategory;
 export const TOTAL_COMPONENT_TYPES = COMPONENTS.length;
 
 export * from './types.js';
+
