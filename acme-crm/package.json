@@ -1,0 +1,24 @@
+{
+  "name": "acme-crm",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Acme CRM - built with Mosaic (Hono API + SvelteKit PWA)",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @acme-crm/api & npm run dev -w @acme-crm/web",
+    "dev:api": "npm run dev -w @acme-crm/api",
+    "dev:web": "npm run dev -w @acme-crm/web",
+    "build": "npm run build -w @acme-crm/api && npm run build -w @acme-crm/web",
+    "migrate": "mosaic migrate",
+    "seed": "mosaic seed",
+    "start": "npm run start -w @acme-crm/api"
+  },
+  "devDependencies": {
+    "@mosaic/cli": "file:C:/Users/letha/desktop/projects/experiment/mosaic-apps/packages/mosaic-cli",
+    "tsx": "^4.20.0",
+    "typescript": "^6.0.3"
+  }
+}

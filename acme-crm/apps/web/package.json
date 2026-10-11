@@ -1,0 +1,30 @@
+{
+  "name": "@acme-crm/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "icons": "node scripts/make-icons.mjs",
+    "dev": "vite dev --port 5610",
+    "build": "vite build",
+    "preview": "vite preview --port 5610",
+    "check": "svelte-check --tsconfig ./tsconfig.json"
+  },
+  "dependencies": {
+    "@mosaic/core": "file:C:/Users/letha/desktop/projects/experiment/mosaic-apps/packages/mosaic-core",
+    "@mosaic/ui": "file:C:/Users/letha/desktop/projects/experiment/mosaic-apps/packages/mosaic-ui"
+  },
+  "imports": {
+    "#lib": "./src/lib/index.js",
+    "#lib/*": "./src/lib/*"
+  },
+  "devDependencies": {
+    "@sveltejs/adapter-node": "^6.0.0",
+    "@sveltejs/kit": "^3.0.1",
+    "@sveltejs/vite-plugin-svelte": "^7.3.1",
+    "svelte": "^5.57.2",
+    "svelte-check": "^4.7.6",
+    "typescript": "^6.0.3",
+    "vite": "^8.3.4"
+  }
+}

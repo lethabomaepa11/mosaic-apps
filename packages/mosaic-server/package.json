@@ -1,0 +1,34 @@
+{
+  "name": "@mosaic/server",
+  "version": "0.1.0",
+  "description": "Mosaic server: Hono app with metadata registry, migration engine, auto CRUD, JSON forms, auth/RBAC, audit, ref lists and settings over PostgreSQL",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.test.json",
+    "test": "node --import tsx --test \"src/**/*.test.ts\"",
+    "dev": "node --import tsx src/dev.ts"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "@hono/node-server": "^1.0.0",
+    "@mosaic/core": "0.1.0",
+    "hono": "^4.13.13",
+    "pg": "^8.23.1",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.23.1"
+  }
+}

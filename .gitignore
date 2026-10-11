@@ -1,0 +1,15 @@
+node_modules/
+dist/
+build/
+.svelte-kit/
+.vite/
+*.tsbuildinfo
+.env
+.env.local
+uploads/
+.mosaic-data/
+infra/pgdata/
+docs/build/
+docs/.docusaurus/
+*.log
+.DS_Store

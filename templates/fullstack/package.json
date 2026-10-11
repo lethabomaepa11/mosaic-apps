@@ -1,0 +1,24 @@
+{
+  "name": "__PROJECT_SLUG__",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "__PROJECT_NAME__ - built with Mosaic (Hono API + SvelteKit PWA)",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @__PROJECT_SLUG__/api & npm run dev -w @__PROJECT_SLUG__/web",
+    "dev:api": "npm run dev -w @__PROJECT_SLUG__/api",
+    "dev:web": "npm run dev -w @__PROJECT_SLUG__/web",
+    "build": "npm run build -w @__PROJECT_SLUG__/api && npm run build -w @__PROJECT_SLUG__/web",
+    "migrate": "mosaic migrate",
+    "seed": "mosaic seed",
+    "start": "npm run start -w @__PROJECT_SLUG__/api"
+  },
+  "devDependencies": {
+    "@mosaic/cli": "0.1.0",
+    "tsx": "^4.20.0",
+    "typescript": "^6.0.3"
+  }
+}

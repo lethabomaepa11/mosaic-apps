@@ -1,0 +1,14 @@
+{
+  "extends": "$app/tsconfig",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "#lib": ["./src/lib/client.ts"],
+      "#lib/*": ["./src/lib/*"],
+      "$ui": ["../../packages/mosaic-ui/src/index.ts"],
+      "@mosaic/core": ["../../packages/mosaic-core/src/index.ts"]
+    }
+  },
+  "include": ["src", "test", "*"],
+  "exclude": ["src/service-worker"]
+}
