@@ -1,7 +1,8 @@
 /**
  * __PROJECT_NAME__ API — boots the Mosaic server.
  *
- * Entities live in `entities/*.entity.json` (synced to the registry at boot).
+ * Entities are TypeScript classes in `entities/*.entity.ts` (see
+ * `entities/customer.entity.ts`); they are synced into the registry at boot.
  * Everything else (tables, CRUD, auth, forms, settings) is automatic.
  */
 
@@ -14,12 +15,14 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const databaseUrl = process.env.DATABASE_URL ?? '__DB_URL__';
 const port = Number(process.env.PORT ?? __API_PORT__);
+const corsOrigins = process.env.CORS_ORIGINS?.split(',').map((origin) => origin.trim()).filter(Boolean);
 
 const server = await createMosaicServer({
   databaseUrl,
   log: true,
-  entitiesDir: join(__dirname, '..', 'entities'),
+  entitiesDir: join(__dirname, 'entities'),
   uploadsDir: process.env.UPLOADS_DIR ?? './uploads',
+  cors: corsOrigins?.length ? { origins: corsOrigins } : true,
   auth: {
     enabled: process.env.AUTH !== 'off',
     allowRegistration: false,

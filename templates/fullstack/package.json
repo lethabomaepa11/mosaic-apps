@@ -8,7 +8,7 @@
     "apps/*"
   ],
   "scripts": {
-    "dev": "npm run dev -w @__PROJECT_SLUG__/api & npm run dev -w @__PROJECT_SLUG__/web",
+    "dev": "node scripts/dev.mjs",
     "dev:api": "npm run dev -w @__PROJECT_SLUG__/api",
     "dev:web": "npm run dev -w @__PROJECT_SLUG__/web",
     "build": "npm run build -w @__PROJECT_SLUG__/api && npm run build -w @__PROJECT_SLUG__/web",

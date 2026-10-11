@@ -5,7 +5,7 @@
   import type { PageDef } from '@mosaic/core';
   import { client } from '#lib/client';
 
-  const slug = $derived(page.params.slug);
+  const slug = $derived(page.params.slug ?? '');
 
   let pageDef = $state<PageDef | null>(null);
   let error = $state('');

@@ -1,11 +1,11 @@
 import { createClient } from '@mosaic/ui';
 
 /**
- * The dev server proxies /api to the Hono API (see vite.config.ts),
- * so a relative base works in dev and in the adapter-node build.
+ * Keep PUBLIC_API_URL empty for same-origin hosting, or set it to the API's
+ * public URL when the web and API services are deployed separately.
  */
 export const client = createClient({
-  baseUrl: '/api',
+  baseUrl: import.meta.env.PUBLIC_API_URL || '/api',
   onUnauthorized: () => {
     if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
       window.location.href = '/login';

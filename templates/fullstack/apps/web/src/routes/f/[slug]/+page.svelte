@@ -1,17 +1,21 @@
 <script lang="ts">
   import { page } from '$app/state';
-  import { onMount } from 'svelte';
   import { FormRenderer } from '@mosaic/ui';
   import type { FormDef } from '@mosaic/core';
   import { client } from '#lib/client';
 
-  const slug = $derived(page.params.slug);
+  const slug = $derived(page.params.slug ?? '');
   const recordId = $derived(page.url.searchParams.get('id') ?? undefined);
 
   let form = $state<FormDef | null>(null);
   let record = $state<Record<string, unknown> | undefined>(undefined);
   let error = $state('');
   let mode = $state<'create' | 'edit'>('create');
+
+  function afterSave() {
+    const redirect = form?.settings?.redirectAfterSubmit;
+    if (redirect) window.location.href = redirect;
+  }
 
   $effect(() => {
     form = null;
@@ -49,9 +53,7 @@
       {record}
       {mode}
       {client}
-      onsaved={() => {
-        if (form.settings?.redirectAfterSubmit) window.location.href = form.settings.redirectAfterSubmit;
-      }}
+      onsaved={afterSave}
     />
   </div>
 {:else}

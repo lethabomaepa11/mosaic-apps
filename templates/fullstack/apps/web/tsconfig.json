@@ -1,5 +1,10 @@
 {
   "extends": "$app/tsconfig",
+  "compilerOptions": {
+    "paths": {
+      "#lib/*": ["./src/lib/*"]
+    }
+  },
   "include": ["src", "test", "*"],
   "exclude": ["src/service-worker"]
 }

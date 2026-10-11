@@ -26,9 +26,32 @@ npm run dev
 
 ## Model → migrate → CRUD loop
 
-1. Add `entities/<name>.entity.json` (see `entities/customer.entity.json`).
+Entities are TypeScript classes in `apps/api/src/entities/*.entity.ts`:
+
+```ts
+import { Entity, Field, Relation } from '@mosaic/core';
+
+@Entity({ name: 'invoice', label: 'Invoice', softDelete: true })
+export class Invoice {
+  @Field({ type: 'string', required: true, searchable: true, maxLength: 160 })
+  number!: string;
+
+  @Field({ type: 'enum', options: ['draft', 'sent', 'paid'], default: 'draft' })
+  status!: string;
+
+  @Field({ type: 'decimal', precision: 14, scale: 2, min: 0, default: 0 })
+  total!: number;
+
+  @Relation({ entity: () => Customer, required: true })
+  customer!: string;
+}
+```
+
+1. Add a class (or run `mosaic entity Invoice --fields "number:string,total:decimal"`).
 2. `npm run migrate` — plans SQL (dry-run preview) then applies it.
 3. Instant CRUD: `GET/POST/PATCH/DELETE /api/entities/<name>` (+ `/meta`, `/options`).
+
+`*.entity.json` files still work; a class wins when both declare the same entity.
 
 ## Design forms & pages
 
@@ -44,9 +67,27 @@ network-first with offline fallbacks, and published forms work offline after fir
 ## CLI
 
 ```bash
-mosaic entity Product --fields "name:string,price:decimal,stock:int"  # scaffold entity
+mosaic entity Product --fields "name:string,price:decimal,stock:int"  # scaffold entity class
 mosaic migrate              # plan + apply migrations
 mosaic seed --demo          # seed demo data
+mosaic dev                  # run API + web together
 mosaic studio               # open the drag & drop studio
 mosaic info                 # show project info
 ```
+
+## Deploy
+
+Deploy PostgreSQL first, then the API, then the web app.
+
+1. Set the API's `DATABASE_URL`, `MOSAIC_JWT_SECRET`, `CORS_ORIGINS`,
+   `SEED=false`, and `SEED_DEMO=false`.
+2. Build the API with `npm --prefix apps/api run build`, run
+   `npm run migrate`, then start it with `npm --prefix apps/api run start`.
+3. Set the web build's `PUBLIC_API_URL` to the public API URL including `/api`.
+4. Build and start the Node web service with `npm --prefix apps/web run build`
+   and `npm --prefix apps/web run start`.
+
+For Netlify, set `MOSAIC_DEPLOY_TARGET=netlify` during the web build. For Docker
+or Fly.io, use `Dockerfile.api` and `Dockerfile.web`. Keep `UPLOADS_DIR` on a
+persistent disk when file uploads are enabled. The Mosaic Deployment guide
+covers Netlify, Render, Neon, Supabase, Railway, and Fly.io in detail.
