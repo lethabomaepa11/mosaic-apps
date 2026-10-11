@@ -23,7 +23,8 @@ jobs:
         run: npm ci
 
       - name: Generate SvelteKit types (studio)
-        run: npx svelte-kit sync --workspace=studio
+        working-directory: apps/studio
+        run: npx svelte-kit sync
 
       - name: Typecheck
         run: npm run typecheck
@@ -51,7 +52,8 @@ jobs:
         run: npm ci
 
       - name: Generate SvelteKit types (studio)
-        run: npx svelte-kit sync --workspace=studio
+        working-directory: apps/studio
+        run: npx svelte-kit sync
 
       - name: Build all packages
         run: npm run build
