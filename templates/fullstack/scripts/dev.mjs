@@ -3,6 +3,7 @@ import { spawn } from "node:child_process";
 const targets = [
   { name: "api", color: "\x1b[36m", args: ["run", "dev", "-w", "@__PROJECT_SLUG__/api"] },
   { name: "web", color: "\x1b[35m", args: ["run", "dev", "-w", "@__PROJECT_SLUG__/web"] },
+  { name: "studio", color: "\x1b[33m", args: ["run", "dev", "-w", "@__PROJECT_SLUG__/studio"] },
 ];
 
 const reset = "\x1b[0m";

@@ -8,7 +8,10 @@
   ],
   "scripts": {
     "dev": "node scripts/dev.mjs",
-    "build": "npm run build -w apps/api && npm run build -w apps/web",
+    "dev:api": "npm run dev -w @__PROJECT_SLUG__/api",
+    "dev:web": "npm run dev -w @__PROJECT_SLUG__/web",
+    "dev:studio": "npm run dev -w @__PROJECT_SLUG__/studio",
+    "build": "npm run build -w apps/api && npm run build -w apps/web && npm run build -w apps/studio",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down -v",
     "migrate": "npm run migrate -w apps/api",
