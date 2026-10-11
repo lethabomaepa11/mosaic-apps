@@ -7,7 +7,7 @@ services:
       POSTGRES_PASSWORD: mosaic
       POSTGRES_DB: __PROJECT_SLUG__
     ports:
-      - "__DB_PORT__:5432"
+      - "127.0.0.1:${MOSAIC_DB_PORT:-__DB_PORT__}:5432"
     volumes:
       - ./pgdata:/var/lib/postgresql/data
     healthcheck:

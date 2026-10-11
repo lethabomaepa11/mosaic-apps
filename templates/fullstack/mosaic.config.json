@@ -6,5 +6,6 @@
   "pwa": __PWA__,
   "demo": __DEMO__,
   "api": { "port": __API_PORT__ },
-  "web": { "port": __WEB_PORT__ }
+  "web": { "port": __WEB_PORT__ },
+  "studio": { "port": __STUDIO_PORT__ }
 }
