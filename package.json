@@ -10,7 +10,7 @@
   ],
   "scripts": {
     "build": "npm run build -w @mosaic-apps/core && npm run build -w @mosaic-apps/server && npm run build -w @mosaic-apps/cli && npm run build -w studio",
-    "typecheck": "npm run build -w @mosaic-apps/core && npm run typecheck -w @mosaic-apps/core && npm run typecheck -w @mosaic-apps/server && npm run typecheck -w @mosaic-apps/cli && npm run check -w @mosaic-apps/ui && npm run check -w studio",
+    "typecheck": "npm run build -w @mosaic-apps/core && npm run build -w @mosaic-apps/server && npm run typecheck -w @mosaic-apps/core && npm run typecheck -w @mosaic-apps/server && npm run typecheck -w @mosaic-apps/cli && npm run check -w @mosaic-apps/ui && npm run check -w studio",
     "test": "npm run test -w @mosaic-apps/core && npm run test -w @mosaic-apps/server && npm run test -w @mosaic-apps/ui",
     "release:check": "node scripts/check-packages.mjs",
     "release:consumer": "node scripts/validate-release-consumer.mjs",

@@ -54,6 +54,9 @@
   development startup and both web/Studio API proxies. Final consumer evidence is
   retained at `C:/Users/letha/AppData/Local/Temp/mosaic-release-consumer-gcfwg2`.
 - Delivery is organized as focused commits on `main`, targeting `origin/main`.
+  The initial push exposed a fresh-CI dependency-order issue: CLI typechecking
+  imports the server's generated declarations. Root `typecheck` now builds both
+  core and server before checking consumers; do not rely on leftover local dist.
   npm publication was attempted after validation and rejected with `EOTP`: the
   account requires two-factor authentication. All four 0.2.0 package versions
   still return registry 404. A current OTP or an authenticated publishing session

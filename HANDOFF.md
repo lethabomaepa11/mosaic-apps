@@ -23,6 +23,8 @@ and web Node/Netlify adapters. Browser verifies state updates, condition/script
 modals, runtime autocomplete, Apply/Cancel, and JSON validation without exceptions.
 Final packed consumer also passed generated startup and both API proxies. Evidence:
 `C:/Users/letha/AppData/Local/Temp/mosaic-release-consumer-gcfwg2`.
+The first CI push revealed missing server declarations in a clean checkout; root
+typecheck now builds core and server before checking CLI consumers.
 Delivery uses focused commits on main and targets origin/main. npm publishing was
 attempted after validation, but npm returned EOTP (account two-factor authentication).
 All four 0.2.0 registry versions remain unpublished. User authentication is pending;
