@@ -9,9 +9,9 @@
     "apps/*"
   ],
   "scripts": {
-    "build": "npm run build -w @mosaic/core && npm run build -w @mosaic/server && npm run build -w @mosaic/cli && npm run build -w studio",
-    "typecheck": "npm run typecheck -w @mosaic/core && npm run typecheck -w @mosaic/server && npm run typecheck -w @mosaic/cli && npm run check -w @mosaic/ui && npm run check -w studio",
-    "test": "npm run test -w @mosaic/core && npm run test -w @mosaic/server && npm run test -w @mosaic/ui",
+    "build": "npm run build -w @mosaic-apps/mosaic-core && npm run build -w @mosaic-apps/mosaic-server && npm run build -w @mosaic-apps/mosaic-cli && npm run build -w studio",
+    "typecheck": "npm run typecheck -w @mosaic-apps/mosaic-core && npm run typecheck -w @mosaic-apps/mosaic-server && npm run typecheck -w @mosaic-apps/mosaic-cli && npm run check -w @mosaic-apps/mosaic-ui && npm run check -w studio",
+    "test": "npm run test -w @mosaic-apps/mosaic-core && npm run test -w @mosaic-apps/mosaic-server && npm run test -w @mosaic-apps/mosaic-ui",
     "release:check": "node scripts/check-packages.mjs",
     "mosaic": "node --import tsx packages/mosaic-cli/src/index.ts",
     "create": "npm run mosaic -- create",

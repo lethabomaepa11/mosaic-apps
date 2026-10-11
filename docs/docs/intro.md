@@ -34,7 +34,7 @@ mosaic studio                        # design forms & pages, Save publishes form
 
 1. **Model** — `apps/api/src/entities/*.entity.ts` (or `.entity.json`)
 2. **Migrate** — `mosaic migrate` shows every statement; `--dry-run` previews
-3. **Design** — Studio renders the same JSON your PWA renders (shared `@mosaic/ui`)
+3. **Design** — Studio renders the same JSON your PWA renders (shared `@mosaic-apps/mosaic-ui`)
 4. **Deploy** — adapter-node API + PWA web; docs in [Deployment](./deployment.md)
 
 ## Project map

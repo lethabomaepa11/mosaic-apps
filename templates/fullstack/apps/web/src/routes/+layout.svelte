@@ -3,8 +3,8 @@
   import { page } from '$app/state';
   import { onNavigate } from '$app/navigation';
   import '../app.css';
-  import { applyThemeConfig, Icon, Toaster } from '@mosaic/ui';
-  import type { NavItemDef, ThemeConfig } from '@mosaic/core';
+  import { applyThemeConfig, Icon, Toaster } from '@mosaic-apps/mosaic-ui';
+  import type { NavItemDef, ThemeConfig } from '@mosaic-apps/mosaic-core';
   import { client } from '#lib/client';
 
   let { children } = $props();

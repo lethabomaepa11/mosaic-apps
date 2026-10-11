@@ -15,10 +15,10 @@ render.
 
 ```mermaid
 flowchart LR
-  core[@mosaic/core<br/>metadata and shared logic]
-  server[@mosaic/server<br/>Hono API and database]
-  ui[@mosaic/ui<br/>Svelte 5 components and renderers]
-  cli[@mosaic/cli<br/>mosaic binary]
+  core[@mosaic-apps/mosaic-core<br/>metadata and shared logic]
+  server[@mosaic-apps/mosaic-server<br/>Hono API and database]
+  ui[@mosaic-apps/mosaic-ui<br/>Svelte 5 components and renderers]
+  cli[@mosaic-apps/mosaic-cli<br/>mosaic binary]
   studio[apps/studio<br/>designer]
   template[templates/fullstack<br/>scaffold]
   core --> server
@@ -29,17 +29,17 @@ flowchart LR
   server --> template
 ```
 
-- **`@mosaic/core`** contains shared types, expression parsing, tree helpers,
+- **`@mosaic-apps/mosaic-core`** contains shared types, expression parsing, tree helpers,
   entity decorators, and entity loading. Server-side decorators use
   `reflect-metadata`; TypeScript entity loading can use `tsx`.
-- **`@mosaic/server`** exports a Hono app factory, PostgreSQL and PGlite
+- **`@mosaic-apps/mosaic-server`** exports a Hono app factory, PostgreSQL and PGlite
   drivers, platform tables, entity administration, CRUD, auth/RBAC, audit,
   settings, reference lists, form/page artifacts, and file endpoints.
-- **`@mosaic/ui`** is a source-first Svelte 5 library with the component
+- **`@mosaic-apps/mosaic-ui`** is a source-first Svelte 5 library with the component
   registry, FormRenderer/PageRenderer, API client, shadcn-svelte/Bits UI
   primitives, and an instance-scoped runtime state API. Consumers need Svelte 5
   and Tailwind CSS 4 in their build.
-- **`@mosaic/cli`** provides the `mosaic` executable and bundles the full-stack
+- **`@mosaic-apps/mosaic-cli`** provides the `mosaic` executable and bundles the full-stack
   project template into its npm tarball during `prepack`.
 - **Studio** consumes UI source directly. Run `npm run dev` from the repository
   root to start API and Studio together. The launcher waits for `/api/health`

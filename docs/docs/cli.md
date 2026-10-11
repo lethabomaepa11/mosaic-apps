@@ -18,7 +18,7 @@ mosaic create "Acme CRM" [--db URL] [--auth on|off] [--demo|--no-demo]
 
 Copies `templates/fullstack`, replaces tokens (`__PROJECT_NAME__`,
 `__PROJECT_SLUG__`, ports, flags), writes `.env` with a random JWT secret,
-rewrites `@mosaic/*` to `file:` links (when run from the monorepo), generates
+rewrites `@mosaic-apps/mosaic-*` to `file:` links (when run from the monorepo), generates
 PWA icons, optionally `git init` + install. Also runs `npm install-scripts
 approve esbuild` so `tsx` works under npm 11's script gate.
 
@@ -73,7 +73,7 @@ mosaic create my-app --link C:/path/to/mosaic-apps
 npx mosaic info
 ```
 
-`create` rewrites `@mosaic/*` to `file:` links pointing at `<repo>/packages/*`
+`create` rewrites `@mosaic-apps/mosaic-*` to `file:` links pointing at `<repo>/packages/*`
 (`--link` overrides the auto-detected checkout, `--npm-mode` keeps registry
 versions instead).
 

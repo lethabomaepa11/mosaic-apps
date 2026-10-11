@@ -1,5 +1,5 @@
 {
-  "name": "@mosaic/ui",
+  "name": "@mosaic-apps/mosaic-ui",
   "version": "0.1.0",
   "description": "Mosaic enterprise Svelte 5 component kit: 50+ components, drag & drop engine, JSON FormRenderer, API client",
   "publishConfig": {
@@ -29,7 +29,7 @@
     "@internationalized/date": "^3.12.4",
     "@jitl/quickjs-wasmfile-release-sync": "^0.32.0",
     "@lucide/svelte": "^1.55.0",
-    "@mosaic/core": "0.1.0",
+    "@mosaic-apps/mosaic-core": "0.1.0",
     "bits-ui": "^2.19.5",
     "clsx": "^2.1.1",
     "lucide-svelte": "^1.0.1",

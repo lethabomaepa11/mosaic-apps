@@ -12,8 +12,8 @@
     "check": "svelte-check --tsconfig ./tsconfig.json"
   },
   "dependencies": {
-    "@mosaic/core": "0.1.0",
-    "@mosaic/ui": "0.1.0"
+    "@mosaic-apps/mosaic-core": "0.1.0",
+    "@mosaic-apps/mosaic-ui": "0.1.0"
   },
   "imports": {
     "#lib": "./src/lib/index.js",

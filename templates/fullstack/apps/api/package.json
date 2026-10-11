@@ -11,8 +11,8 @@
   },
   "dependencies": {
     "@hono/node-server": "^1.0.0",
-    "@mosaic/core": "0.1.0",
-    "@mosaic/server": "0.1.0"
+    "@mosaic-apps/mosaic-core": "0.1.0",
+    "@mosaic-apps/mosaic-server": "0.1.0"
   },
   "devDependencies": {
     "@types/node": "^26.0.0",

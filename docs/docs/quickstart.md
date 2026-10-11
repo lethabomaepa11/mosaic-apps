@@ -15,13 +15,13 @@ sidebar_position: 2
 ## 1. Scaffold
 
 ```bash
-npx @mosaic/cli create my-crm
+npx @mosaic-apps/mosaic-cli create my-crm
 cd my-crm
 npm install
 ```
 
-This creates an API (`apps/api`, Hono + `@mosaic/server`) and a PWA web app
-(`apps/web`, SvelteKit). `@mosaic/*` dependencies are linked to your repo
+This creates an API (`apps/api`, Hono + `@mosaic-apps/mosaic-server`) and a PWA web app
+(`apps/web`, SvelteKit). `@mosaic-apps/mosaic-*` dependencies are linked to your repo
 checkout automatically when created from the monorepo — from a checkout run
 `npm run create -- my-crm` (source, no publish) or `npm run link-cli` once and
 then `mosaic create my-crm` from anywhere.

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { client } from '#lib/client';
-  import { toast } from '@mosaic/ui';
+  import { toast } from '@mosaic-apps/mosaic-ui';
 
   let email = $state('admin@mosaic.local');
   let password = $state('admin1234');

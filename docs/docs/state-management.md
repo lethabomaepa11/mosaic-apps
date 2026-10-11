@@ -8,7 +8,7 @@ Mosaic state belongs to a runtime instance. The UI package does not keep
 user-specific data in a module singleton.
 
 ```ts
-import { createMosaicState } from '@mosaic/ui';
+import { createMosaicState } from '@mosaic-apps/mosaic-ui';
 
 const state = createMosaicState({
   application: { userId: 'u_123' },

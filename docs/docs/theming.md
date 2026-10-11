@@ -4,7 +4,7 @@ sidebar_position: 11
 
 # Theming
 
-`@mosaic/ui` components use Mosaic CSS variables. Import the package styles,
+`@mosaic-apps/mosaic-ui` components use Mosaic CSS variables. Import the package styles,
 then override the tokens in your application:
 
 ```css

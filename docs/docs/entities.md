@@ -9,7 +9,7 @@ An entity is a **TypeScript class** decorated with `@Entity` / `@Field` / `@Rela
 validation, pickers and forms.
 
 ```ts
-import { Entity, Field, Relation } from '@mosaic/core';
+import { Entity, Field, Relation } from '@mosaic-apps/mosaic-core';
 
 @Entity({
   name: 'customer',

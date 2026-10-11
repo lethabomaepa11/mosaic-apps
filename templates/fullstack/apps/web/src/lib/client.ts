@@ -1,4 +1,4 @@
-import { createClient } from '@mosaic/ui';
+import { createClient } from '@mosaic-apps/mosaic-ui';
 
 /**
  * Keep PUBLIC_API_URL empty for same-origin hosting, or set it to the API's

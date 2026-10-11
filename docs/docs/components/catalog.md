@@ -81,7 +81,7 @@ static or `entity` live count, `trend, trendDir, icon`; + `client` for live),
 ## Using the registry in code
 
 ```ts
-import { COMPONENTS, getComponent, createNode, paletteCategories } from '@mosaic/ui';
+import { COMPONENTS, getComponent, createNode, paletteCategories } from '@mosaic-apps/mosaic-ui';
 
 const def = getComponent('textField');   // { component, defaults, inspector, … }
 const node = createNode('grid');         // { id, type, props: defaults, children: [] }

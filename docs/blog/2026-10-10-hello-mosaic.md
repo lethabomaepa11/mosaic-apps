@@ -12,7 +12,7 @@ installable PWA — from one model.
 <!-- truncate -->
 
 ```bash
-npx @mosaic/cli create my-app
+npx @mosaic-apps/mosaic-cli create my-app
 cd my-app && npm install && npm run dev
 ```
 
