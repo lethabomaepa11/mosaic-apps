@@ -1,12 +1,11 @@
 FROM node:22-bookworm-slim AS build
 ARG PUBLIC_API_URL
+ARG MOSAIC_APP_ORIGIN
 ENV PUBLIC_API_URL=$PUBLIC_API_URL
+ENV MOSAIC_APP_ORIGIN=$MOSAIC_APP_ORIGIN
 WORKDIR /app
-COPY package.json package-lock.json* ./
-COPY apps/api/package.json apps/api/package.json
-COPY apps/web/package.json apps/web/package.json
-RUN npm ci
 COPY . .
+RUN npm ci
 RUN npm run build -w @__PROJECT_SLUG__/web
 
 FROM node:22-bookworm-slim AS runtime
