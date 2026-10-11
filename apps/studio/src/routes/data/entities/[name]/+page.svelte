@@ -1,9 +1,9 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { page } from '$app/state';
-  import { EntityForm, EntityTable, Icon, Modal, toast } from '@mosaic-apps/mosaic-ui';
+  import { EntityForm, EntityTable, Icon, Modal, toast } from '@mosaic-apps/ui';
   import EntityFields from '../../../../components/EntityFields.svelte';
-  import type { EntityDef } from '@mosaic-apps/mosaic-core';
+  import type { EntityDef } from '@mosaic-apps/core';
   import { client as api } from '#lib/client';
 
   const name = $derived(page.params.name);

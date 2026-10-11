@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { TextField, toast } from '@mosaic-apps/mosaic-ui';
-  import type { FormDef } from '@mosaic-apps/mosaic-core';
+  import { TextField, toast } from '@mosaic-apps/ui';
+  import type { FormDef } from '@mosaic-apps/core';
   import { client } from '#lib/client';
 
   let forms = $state<FormDef[]>([]);

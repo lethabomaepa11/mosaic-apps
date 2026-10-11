@@ -1,7 +1,7 @@
 <script lang="ts">
   import { page } from '$app/state';
-  import { FormRenderer } from '@mosaic-apps/mosaic-ui';
-  import type { FormDef } from '@mosaic-apps/mosaic-core';
+  import { FormRenderer } from '@mosaic-apps/ui';
+  import type { FormDef } from '@mosaic-apps/core';
   import { client } from '#lib/client';
 
   const slug = $derived(page.params.slug ?? '');

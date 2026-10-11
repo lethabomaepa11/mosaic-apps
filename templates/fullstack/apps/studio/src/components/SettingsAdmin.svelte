@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { Icon, toast } from '@mosaic-apps/mosaic-ui';
-  import type { AuditEntry, RefList, SettingRecord } from '@mosaic-apps/mosaic-core';
+  import { Icon, toast } from '@mosaic-apps/ui';
+  import type { AuditEntry, RefList, SettingRecord } from '@mosaic-apps/core';
   import { client } from '#lib/client';
 
   async function removeRefList(name: string) {

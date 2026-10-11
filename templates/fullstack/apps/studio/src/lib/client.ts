@@ -1,5 +1,5 @@
-import { createClient } from '@mosaic-apps/mosaic-ui';
-import type { MosaicClient } from '@mosaic-apps/mosaic-ui';
+import { createClient } from '@mosaic-apps/ui';
+import type { MosaicClient } from '@mosaic-apps/ui';
 
 export const client: MosaicClient = createClient({
   baseUrl: '/api',

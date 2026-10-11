@@ -29,7 +29,7 @@ npm run dev
 Entities are TypeScript classes in `apps/api/src/entities/*.entity.ts`:
 
 ```ts
-import { Entity, Field, Relation } from '@mosaic/core';
+import { Entity, Field, Relation } from '@mosaic-apps/core';
 
 @Entity({ name: 'invoice', label: 'Invoice', softDelete: true })
 export class Invoice {

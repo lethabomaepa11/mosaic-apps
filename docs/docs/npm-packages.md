@@ -15,8 +15,8 @@ npm run release:check
 The check builds typed packages, runs the UI Svelte check, and invokes
 `npm pack --dry-run` for each package. The CLI template is copied only for the
 pack lifecycle and the check cleans that copy afterward. The command does not upload tarballs. Publish the
-packages in dependency order: `@mosaic-apps/mosaic-core`, `@mosaic-apps/mosaic-server`, `@mosaic-apps/mosaic-ui`,
-then `@mosaic-apps/mosaic-cli`. The packages currently share version `0.1.0`; bump and
+packages in dependency order: `@mosaic-apps/core`, `@mosaic-apps/server`, `@mosaic-apps/ui`,
+then `@mosaic-apps/cli`. The packages currently share version `0.1.0`; bump and
 review versions and changelogs together before the first release.
 
 ## Publishing manually
@@ -63,6 +63,6 @@ git push origin main --tags
 
 ## Package details
 
-- `@mosaic-apps/mosaic-ui` - Source-first Svelte package. Consumers need Svelte 5, Tailwind CSS 4, and the Tailwind Vite plugin. Import `@mosaic-apps/mosaic-ui/style.css` or the package entry from a Svelte-aware bundler.
-- `@mosaic-apps/mosaic-core`, `@mosaic-apps/mosaic-server`, `@mosaic-apps/mosaic-cli` - Publish compiled ESM and declaration files from `dist`.
-- `@mosaic-apps/mosaic-cli` - Includes the generated full-stack template in its tarball. The pack check confirms the template files are present. Review the generated template's dependency versions and test a scaffolded app before release.
+- `@mosaic-apps/ui` - Source-first Svelte package. Consumers need Svelte 5, Tailwind CSS 4, and the Tailwind Vite plugin. Import `@mosaic-apps/ui/style.css` or the package entry from a Svelte-aware bundler.
+- `@mosaic-apps/core`, `@mosaic-apps/server`, `@mosaic-apps/cli` - Publish compiled ESM and declaration files from `dist`.
+- `@mosaic-apps/cli` - Includes the generated full-stack template in its tarball. The pack check confirms the template files are present. Review the generated template's dependency versions and test a scaffolded app before release.

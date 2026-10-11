@@ -8,10 +8,10 @@ Postgres table, the REST API, validation, RBAC, audit trail and the UI scaffoldi
 Then compose UIs visually in the Studio and publish them as routes in your web app.
 
 ```
-@mosaic/core   entity/form/page metadata, expression engine, decorators
-@mosaic/server Hono API: registry, migration engine, auto CRUD, auth, files, audit
-@mosaic/cli    mosaic create / entity / migrate / seed / studio / dev
-@mosaic/ui     50+ Svelte components + drag & drop primitives (consumed as source)
+@mosaic-apps/core   entity/form/page metadata, expression engine, decorators
+@mosaic-apps/server Hono API: registry, migration engine, auto CRUD, auth, files, audit
+@mosaic-apps/cli    mosaic create / entity / migrate / seed / studio / dev
+@mosaic-apps/ui     50+ Svelte components + drag & drop primitives (consumed as source)
 ```
 
 ## Repository layout
@@ -82,7 +82,7 @@ Entity classes live in `apps/api/src/entities/*.entity.ts` and are synced into t
 registry at boot — edit, restart, `npm run migrate`:
 
 ```ts
-import { Entity, Field, Relation } from '@mosaic/core';
+import { Entity, Field, Relation } from '@mosaic-apps/core';
 
 @Entity({
   name: 'customer',

@@ -1,4 +1,4 @@
-﻿import { loadEntityDefs, extractEntityDef, getEntityClass, registerEntity, loadEntitiesFromDir } from '@mosaic/core';
+﻿import { loadEntityDefs, extractEntityDef, getEntityClass, registerEntity, loadEntitiesFromDir } from '@mosaic-apps/core';
 
 const dir = new URL('./entities/', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
 const classes = await loadEntitiesFromDir(dir);

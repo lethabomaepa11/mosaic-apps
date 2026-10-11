@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { client } from '#lib/client';
-  import type { FormDef, PageDef } from '@mosaic-apps/mosaic-core';
+  import type { FormDef, PageDef } from '@mosaic-apps/core';
 
   let forms = $state<FormDef[]>([]);
   let pages = $state<PageDef[]>([]);

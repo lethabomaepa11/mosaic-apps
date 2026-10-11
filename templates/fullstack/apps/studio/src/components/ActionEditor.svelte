@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { JsonEditor, Modal, SelectField, Switch, TextArea, TextField } from '@mosaic-apps/mosaic-ui';
-import type { ComponentAction, ScriptAction, ScriptLanguage, StateScope } from '@mosaic-apps/mosaic-core';
+  import { JsonEditor, Modal, SelectField, Switch, TextArea, TextField } from '@mosaic-apps/ui';
+import type { ComponentAction, ScriptAction, ScriptLanguage, StateScope } from '@mosaic-apps/core';
   import CodeEditor from './CodeEditor.svelte';
 
   interface ArtifactOption { value: string; label: string; kind: 'form' | 'page' }

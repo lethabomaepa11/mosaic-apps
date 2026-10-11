@@ -2,20 +2,20 @@ const fs = require('fs');
 const path = require('path');
 
 const packages = {
-  'packages/mosaic-core/package.json': {},
-  'packages/mosaic-server/package.json': {
-    '@mosaic-apps/mosaic-core': 'file:../mosaic-core'
+  'packages/core/package.json': {},
+  'packages/server/package.json': {
+    '@mosaic-apps/core': 'file:../mosaic-core'
   },
-  'packages/mosaic-ui/package.json': {
-    '@mosaic-apps/mosaic-core': 'file:../mosaic-core'
+  'packages/ui/package.json': {
+    '@mosaic-apps/core': 'file:../mosaic-core'
   },
-  'packages/mosaic-cli/package.json': {
-    '@mosaic-apps/mosaic-core': 'file:../mosaic-core',
-    '@mosaic-apps/mosaic-server': 'file:../mosaic-server'
+  'packages/cli/package.json': {
+    '@mosaic-apps/core': 'file:../mosaic-core',
+    '@mosaic-apps/server': 'file:../mosaic-server'
   },
   'apps/studio/package.json': {
-    '@mosaic-apps/mosaic-core': 'file:../../packages/mosaic-core',
-    '@mosaic-apps/mosaic-ui': 'file:../../packages/mosaic-ui'
+    '@mosaic-apps/core': 'file:../../packages/core',
+    '@mosaic-apps/ui': 'file:../../packages/ui'
   }
 };
 

@@ -34,17 +34,17 @@ mosaic studio                        # design forms & pages, Save publishes form
 
 1. **Model** — `apps/api/src/entities/*.entity.ts` (or `.entity.json`)
 2. **Migrate** — `mosaic migrate` shows every statement; `--dry-run` previews
-3. **Design** — Studio renders the same JSON your PWA renders (shared `@mosaic-apps/mosaic-ui`)
+3. **Design** — Studio renders the same JSON your PWA renders (shared `@mosaic-apps/ui`)
 4. **Deploy** — adapter-node API + PWA web; docs in [Deployment](./deployment.md)
 
 ## Project map
 
 | Area | Code | What it is |
 |---|---|---|
-| Core | `packages/mosaic-core` | Entity/form/page types, validation, expressions, query spec |
-| Server | `packages/mosaic-server` | Hono API: CRUD, auth, migrations, forms, files, admin |
-| UI kit | `packages/mosaic-ui` | Svelte 5 components, FormRenderer, DnD engine, client |
-| CLI | `packages/mosaic-cli` | `mosaic` binary |
+| Core | `packages/core` | Entity/form/page types, validation, expressions, query spec |
+| Server | `packages/server` | Hono API: CRUD, auth, migrations, forms, files, admin |
+| UI kit | `packages/ui` | Svelte 5 components, FormRenderer, DnD engine, client |
+| CLI | `packages/cli` | `mosaic` binary |
 | Studio | `apps/studio` | SvelteKit designer app |
 | Template | `templates/fullstack` | What `mosaic create` copies |
 | Docs | `docs` | This site |

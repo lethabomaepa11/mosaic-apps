@@ -57,7 +57,7 @@ the parent form's validation.
 
 ## State management
 
-`@mosaic-apps/mosaic-ui` exports `createMosaicState`, `MosaicState`, and `StateStore`.
+`@mosaic-apps/ui` exports `createMosaicState`, `MosaicState`, and `StateStore`.
 PageRenderer owns or accepts application/page scopes. FormRenderer creates a
 form scope; nested forms share application/page stores and isolate form stores.
 State is instance-owned and serializable. Component actions and custom code use

@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { Card, NumberField, SelectField, Switch, TextArea, TextField } from '@mosaic-apps/mosaic-ui';
-  import type { PageSettings } from '@mosaic-apps/mosaic-core';
+  import { Card, NumberField, SelectField, Switch, TextArea, TextField } from '@mosaic-apps/ui';
+  import type { PageSettings } from '@mosaic-apps/core';
   import { designer } from '#lib/designer.svelte';
 
   interface Props {

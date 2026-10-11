@@ -1,4 +1,4 @@
-import { createClient } from '@mosaic/ui';
+import { createClient } from '@mosaic-apps/ui';
 
 /**
  * The dev server proxies /api to the Hono API (see vite.config.ts),

@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { Card, JsonEditor, NumberField, SelectField, Switch, TextArea, TextField } from '@mosaic-apps/mosaic-ui';
-  import type { EntityDef, FormDataSource, FormSettings } from '@mosaic-apps/mosaic-core';
+  import { Card, JsonEditor, NumberField, SelectField, Switch, TextArea, TextField } from '@mosaic-apps/ui';
+  import type { EntityDef, FormDataSource, FormSettings } from '@mosaic-apps/core';
   import { designer } from '#lib/designer.svelte';
 
   interface Props {

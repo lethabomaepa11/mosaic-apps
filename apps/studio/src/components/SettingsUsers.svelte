@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { Icon, SelectField, TextField, toast } from '@mosaic-apps/mosaic-ui';
-  import type { UserRecord } from '@mosaic-apps/mosaic-core';
+  import { Icon, SelectField, TextField, toast } from '@mosaic-apps/ui';
+  import type { UserRecord } from '@mosaic-apps/core';
   import { client } from '#lib/client';
 
   interface Props {

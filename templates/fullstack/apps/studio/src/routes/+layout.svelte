@@ -1,7 +1,7 @@
 <script lang="ts">
   import '../app.css';
   import { page } from '$app/state';
-  import { applyThemeConfig, Toaster } from '@mosaic-apps/mosaic-ui';
+  import { applyThemeConfig, Toaster } from '@mosaic-apps/ui';
   import { client } from '#lib/client';
   import { auth } from '#lib/auth.svelte';
   import Sidebar from '../components/Sidebar.svelte';

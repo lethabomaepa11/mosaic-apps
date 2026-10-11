@@ -10,8 +10,8 @@
     "check": "svelte-check --tsconfig ./tsconfig.json"
   },
   "dependencies": {
-    "@mosaic-apps/mosaic-core": "0.1.0",
-    "@mosaic-apps/mosaic-ui": "0.1.0",
+    "@mosaic-apps/core": "0.2.0",
+    "@mosaic-apps/ui": "0.2.0",
     "monaco-editor": "^0.57.0"
   },
   "imports": {

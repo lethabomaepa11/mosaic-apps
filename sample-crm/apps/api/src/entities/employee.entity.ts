@@ -1,4 +1,4 @@
-import { Entity, Field } from '@mosaic/core';
+import { Entity, Field } from '@mosaic-apps/core';
 
 /** Employee — referenced by `Customer.owner`. */
 @Entity({

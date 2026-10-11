@@ -1,6 +1,6 @@
 <script lang="ts">
   import { getComponent, isContainerType, draggable, dropzone, dragState, targetIndexFor, type DragPayload } from '$ui';
-  import type { FormNode } from '@mosaic-apps/mosaic-core';
+  import type { FormNode } from '@mosaic-apps/core';
   import { designer } from '#lib/designer.svelte';
   import { Icon } from '$ui';
   import CanvasNode from './CanvasNode.svelte';

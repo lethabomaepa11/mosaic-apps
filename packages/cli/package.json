@@ -1,0 +1,39 @@
+{
+  "name": "@mosaic-apps/cli",
+  "version": "0.2.0",
+  "description": "Mosaic CLI: scaffold, migrate, seed and drive Mosaic full-stack apps",
+  "publishConfig": {
+    "access": "public"
+  },
+  "type": "module",
+  "bin": {
+    "mosaic": "dist/index.js"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "templates"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "prepack": "npm run build && node scripts/pack-template.mjs",
+    "postpack": "node scripts/clean-template.mjs",
+    "typecheck": "tsc -p tsconfig.test.json",
+    "dev": "node --import tsx src/index.ts"
+  },
+  "dependencies": {
+    "@mosaic-apps/core": "0.2.0",
+    "@mosaic-apps/server": "0.2.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.20.0",
+    "typescript": "^6.0.3"
+  }
+}

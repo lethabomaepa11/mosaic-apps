@@ -3,7 +3,7 @@
   import { page } from '$app/state';
   import { goto } from '$app/navigation';
   import { Icon, Menu, TextField, toast } from '$ui';
-  import type { FormDef, PageDef } from '@mosaic-apps/mosaic-core';
+  import type { FormDef, PageDef } from '@mosaic-apps/core';
   import { client } from '#lib/client';
   import ResizeHandle from './ResizeHandle.svelte';
 

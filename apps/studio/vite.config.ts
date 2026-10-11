@@ -12,9 +12,9 @@ export default defineConfig({
   resolve: {
     alias: {
       // consume the UI kit and browser-safe core from the monorepo
-      $ui: fileURLToPath(new URL('../../packages/mosaic-ui/src', import.meta.url)),
+      $ui: fileURLToPath(new URL('../../packages/ui/src', import.meta.url)),
       '#lib': fileURLToPath(new URL('./src/lib', import.meta.url)),
-      '@mosaic/core': fileURLToPath(new URL('../../packages/mosaic-core/src/browser.ts', import.meta.url)),
+      '@mosaic-apps/core': fileURLToPath(new URL('../../packages/core/src/browser.ts', import.meta.url)),
     },
   },
   server: {

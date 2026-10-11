@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { Icon, TextField, toast } from '@mosaic-apps/mosaic-ui';
-  import type { NavItemDef } from '@mosaic-apps/mosaic-core';
+  import { Icon, TextField, toast } from '@mosaic-apps/ui';
+  import type { NavItemDef } from '@mosaic-apps/core';
   import { client } from '#lib/client';
 
   const icons = ['home', 'layoutGrid', 'fileText', 'database', 'chartNoAxesCombined', 'settings', 'users', 'bookOpen', 'calendar', 'folder', 'briefcase', 'helpCircle'];

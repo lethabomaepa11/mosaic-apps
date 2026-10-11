@@ -1,12 +1,12 @@
 # Mosaic Platform — Full Execution Plan (Option B)
 
 ## Overview
-Migrate @mosaic/ui to Tailwind v4 + shadcn-svelte (bits-ui), fix encoding, build Studio file-tree explorer with deep-linked designer routes, add editable sidebar, Svelte transitions, theme/font configurability, entity dropdowns, context menus, keyboard shortcuts — all while keeping generated apps dependency-light via token bridge.
+Migrate @mosaic-apps/ui to Tailwind v4 + shadcn-svelte (bits-ui), fix encoding, build Studio file-tree explorer with deep-linked designer routes, add editable sidebar, Svelte transitions, theme/font configurability, entity dropdowns, context menus, keyboard shortcuts — all while keeping generated apps dependency-light via token bridge.
 
 ---
 
 ## Phase 0 — Encoding repair + finish lucide swap
-- Audit every `.svelte`/`.ts` in `apps/studio`, `packages/mosaic-ui`, `templates` for mojibake (CP1252-mangled UTF-8: `â†`, `đź`, `U+FFFD` sequences)
+- Audit every `.svelte`/`.ts` in `apps/studio`, `packages/ui`, `templates` for mojibake (CP1252-mangled UTF-8: `â†`, `đź`, `U+FFFD` sequences)
 - Fix damaged string literals; replace all remaining raw glyph icons with `<Icon name="…">`:
   - Palette item icons (`Palette.svelte`)
   - Studio Sidebar nav icons + "Sign out" (`Sidebar.svelte`)
@@ -19,9 +19,9 @@ Migrate @mosaic/ui to Tailwind v4 + shadcn-svelte (bits-ui), fix encoding, build
 ---
 
 ## Phase 1 — Tailwind v4 + shadcn-svelte foundation
-- `@mosaic/ui`: `@import 'tailwindcss'` as CSS entry; `@theme` mapping so `--m-*` tokens become Tailwind namespaces — one token set drives both systems
+- `@mosaic-apps/ui`: `@import 'tailwindcss'` as CSS entry; `@theme` mapping so `--m-*` tokens become Tailwind namespaces — one token set drives both systems
 - Deps: `bits-ui`, `tailwind-variants` (cva), `clsx`, `tailwind-merge`; add `cn()` util
-- Vendor shadcn-svelte components into `packages/mosaic-ui/src/shadcn/` (context-menu, dialog, dropdown-menu, sheet, popover, tooltip, sonner, input, select, switch, checkbox, slider, tabs, table, badge, card, skeleton, spinner, etc.)
+- Vendor shadcn-svelte components into `packages/ui/src/shadcn/` (context-menu, dialog, dropdown-menu, sheet, popover, tooltip, sonner, input, select, switch, checkbox, slider, tabs, table, badge, card, skeleton, spinner, etc.)
 - Token bridge: shadcn vars (`--background`, `--primary`, `--radius`…) derive from `--m-*` so existing apps work during migration
 - Studio + template web get `@tailwindcss/vite`; consume the new style entry
 
@@ -95,7 +95,7 @@ Execution authorized by project owner.
 
 Execution was authorized by the project owner. Phases 0, 1, 3, 4, and 5 are implemented in the working tree; Phase 6 validation passes (workspace typecheck: 0 errors, production build, 53 unit tests, and 21 integration checks). The 502 was caused by starting Studio without its API; `npm run dev` now starts both services and the Vite `/api` proxy responds successfully.
 
-Phase 2 is in progress: the Tailwind v4/shadcn-svelte foundation compiles cleanly. Modal, Drawer, Menu, SelectField, Switch, and Checkbox use Bits UI primitives. Mosaic Button, TextField, and TextArea render through vendored shadcn button/input/textarea wrappers, preserving Mosaic props and token styles; wrappers are exported from @mosaic/ui. Remaining legacy components are tracked in Phase E. Workspace typecheck and production build pass. Authenticated Button drag/save/publish browser smoke passed with no runtime exceptions.
+Phase 2 is in progress: the Tailwind v4/shadcn-svelte foundation compiles cleanly. Modal, Drawer, Menu, SelectField, Switch, and Checkbox use Bits UI primitives. Mosaic Button, TextField, and TextArea render through vendored shadcn button/input/textarea wrappers, preserving Mosaic props and token styles; wrappers are exported from @mosaic-apps/ui. Remaining legacy components are tracked in Phase E. Workspace typecheck and production build pass. Authenticated Button drag/save/publish browser smoke passed with no runtime exceptions.
 
 The explorer displays both Forms and Pages roots, with their respective folders and artifact actions. Integration coverage now exercises public nav/theme defaults and form folder create/rename/delete behavior.
 
@@ -189,7 +189,7 @@ The previous continuation notes are historical. Current changes in this pass:
 - **Studio 502** was reproduced as Vite remaining available on 4173 while the API was absent on 8787. `scripts/dev.mjs` now starts the API, waits for `/api/health`, then starts Vite. It also supports `PUBLIC_API_URL` for an already-running project API and fails visibly after a 120-second health timeout. Both root `dev:studio` and workspace `studio dev` use this launcher. Manual check: Studio root, proxied health, and proxied nav return 200.
 - **Page preview** now switches the page canvas inline; only page JSON remains a modal.
 - **Embedded form recursion** now checks ancestor form IDs. The previous implementation accidentally included the selected form itself in the ancestor check and rejected every selection; this is fixed. The root FormRenderer supplies its current form ID so direct and indirect cycles are stopped before loading the repeated form.
-- **State-management foundation** is now implemented and exported from `@mosaic/ui`: instance-owned application/page/form scopes, cloned serializable snapshots, set/update/reset, subscriptions and revision counters, forked page/form scopes, serialize/restore, FormRenderer/PageRenderer context integration, and nested form isolation. Unit tests cover immutable snapshots, notifications/revisions, scope sharing/isolation, and restore. This does **not** complete the state requirement: persistence adapters, cross-tab/server synchronization, history/undo integration, async action lifecycle, a typed script API, and component action wiring remain open.
+- **State-management foundation** is now implemented and exported from `@mosaic-apps/ui`: instance-owned application/page/form scopes, cloned serializable snapshots, set/update/reset, subscriptions and revision counters, forked page/form scopes, serialize/restore, FormRenderer/PageRenderer context integration, and nested form isolation. Unit tests cover immutable snapshots, notifications/revisions, scope sharing/isolation, and restore. This does **not** complete the state requirement: persistence adapters, cross-tab/server synchronization, history/undo integration, async action lifecycle, a typed script API, and component action wiring remain open.
 - **npm packaging** now has public scoped publish config, package READMEs, prepack build/check lifecycles, and `npm run release:check`. The CLI template is copied into the package for the pack lifecycle and cleaned afterward. `@types/pg` is a production dependency because published server declarations refer to pg types. No npm publication was performed.
 - Docs were refreshed for current Studio lifecycle, forms/pages, embedded forms, state scope/API and limitations, theme capabilities, CLI dev startup, catalog count, and npm package checks. Root docs scripts now correctly target the docs project, which is outside the npm workspace glob.
 

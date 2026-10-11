@@ -11,7 +11,7 @@ import {
   type FormDef,
   type FormNode,
   type PageDef,
-} from '@mosaic-apps/mosaic-core';
+} from '@mosaic-apps/core';
 import { createNode as createRegistryNode } from '$ui';
 
 function clone<T>(v: T): T {

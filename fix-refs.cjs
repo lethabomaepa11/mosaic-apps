@@ -6,7 +6,7 @@ const files = [
 files.forEach(f => {
   try {
     let c = fs.readFileSync(f, 'utf8');
-    c = c.replace(/"@mosaic\//g, '"@mosaic-apps/mosaic-');
+    c = c.replace(/"@mosaic\//g, '"@mosaic-apps/');
     fs.writeFileSync(f, c);
     console.log('Updated:', f);
   } catch (e) {

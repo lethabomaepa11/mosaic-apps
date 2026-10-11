@@ -1,4 +1,4 @@
-import { Entity, Field, Relation } from '@mosaic/core';
+import { Entity, Field, Relation } from '@mosaic-apps/core';
 import { Employee } from './employee.entity.js';
 
 /**

@@ -7,7 +7,7 @@
  */
 
 import { serve } from '@hono/node-server';
-import { createMosaicServer } from '@mosaic/server';
+import { createMosaicServer } from '@mosaic-apps/server';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 

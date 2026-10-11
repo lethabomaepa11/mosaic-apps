@@ -11,8 +11,8 @@
   },
   "dependencies": {
     "@hono/node-server": "^1.0.0",
-    "@mosaic-apps/mosaic-core": "file:C:/Users/letha/desktop/projects/experiment/mosaic-apps/packages/mosaic-core",
-    "@mosaic-apps/mosaic-server": "file:C:/Users/letha/desktop/projects/experiment/mosaic-apps/packages/mosaic-server"
+    "@mosaic-apps/core": "file:C:/Users/letha/desktop/projects/experiment/mosaic-apps/packages/core",
+    "@mosaic-apps/server": "file:C:/Users/letha/desktop/projects/experiment/mosaic-apps/packages/server"
   },
   "devDependencies": {
     "@types/node": "^26.0.0",

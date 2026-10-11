@@ -17,7 +17,7 @@ export default function Home() {
             </Link>
           </div>
           <pre style={{ marginTop: 24, background: 'rgba(0,0,0,.35)', color: '#fff', padding: '12px 18px', borderRadius: 10, display: 'inline-block' }}>
-            npx @mosaic-apps/mosaic-cli create my-app
+            npx @mosaic-apps/cli create my-app
           </pre>
         </div>
       </header>

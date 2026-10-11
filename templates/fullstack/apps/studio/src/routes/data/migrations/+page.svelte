@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { Badge, Button, toast } from '@mosaic-apps/mosaic-ui';
+  import { Badge, Button, toast } from '@mosaic-apps/ui';
   import { client } from '#lib/client';
 
   interface Statement {

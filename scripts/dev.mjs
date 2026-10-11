@@ -79,7 +79,7 @@ async function main() {
   const existingApi = await apiIsHealthy();
   const api = process.env.PUBLIC_API_URL || existingApi
     ? null
-    : start('API', ['--import', 'tsx', 'packages/mosaic-server/src/dev.ts'], root, { ...process.env, PORT: String(apiPort) });
+    : start('API', ['--import', 'tsx', 'packages/server/src/dev.ts'], root, { ...process.env, PORT: String(apiPort) });
   if (existingApi) console.log(`[mosaic] reusing healthy API at ${apiUrl}`);
   await waitForApi(api);
   if (await studioIsHealthy()) {

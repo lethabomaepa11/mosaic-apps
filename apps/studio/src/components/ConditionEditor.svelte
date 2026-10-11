@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { SelectField, TextField } from '@mosaic-apps/mosaic-ui';
-  import type { ScriptCondition, ScriptLanguage } from '@mosaic-apps/mosaic-core';
+  import { SelectField, TextField } from '@mosaic-apps/ui';
+  import type { ScriptCondition, ScriptLanguage } from '@mosaic-apps/core';
   import CodeEditor from './CodeEditor.svelte';
 
   interface Props { label: string; value: unknown; onchange: (value: unknown) => void }

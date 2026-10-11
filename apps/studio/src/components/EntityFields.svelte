@@ -1,6 +1,6 @@
 <script lang="ts">
-  import type { EntityDef, FieldDef, FieldType, EnumOption } from '@mosaic-apps/mosaic-core';
-  import { Icon, SelectField } from '@mosaic-apps/mosaic-ui';
+  import type { EntityDef, FieldDef, FieldType, EnumOption } from '@mosaic-apps/core';
+  import { Icon, SelectField } from '@mosaic-apps/ui';
   import { client } from '#lib/client';
 
   interface Props {

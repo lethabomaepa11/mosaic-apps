@@ -1,8 +1,8 @@
 <script lang="ts">
   import { page } from '$app/state';
   import { onMount } from 'svelte';
-  import { PageRenderer } from '@mosaic-apps/mosaic-ui';
-  import type { PageDef } from '@mosaic-apps/mosaic-core';
+  import { PageRenderer } from '@mosaic-apps/ui';
+  import type { PageDef } from '@mosaic-apps/core';
   import { client } from '#lib/client';
 
   const slug = $derived(page.params.slug ?? '');

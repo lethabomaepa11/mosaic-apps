@@ -2,8 +2,8 @@
   import { browser } from '$app/environment';
   import { page } from '$app/state';
   import '../app.css';
-  import '@mosaic/ui/style.css';
-  import { Toaster } from '@mosaic/ui';
+  import '@mosaic-apps/ui/style.css';
+  import { Toaster } from '@mosaic-apps/ui';
   import { client } from '#lib/client';
 
   let { children } = $props();

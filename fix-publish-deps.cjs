@@ -1,19 +1,19 @@
 const fs = require('fs');
 
 const packages = {
-  'packages/mosaic-server/package.json': {
-    '@mosaic-apps/mosaic-core': '0.1.0'
+  'packages/server/package.json': {
+    '@mosaic-apps/core': '0.1.0'
   },
-  'packages/mosaic-ui/package.json': {
-    '@mosaic-apps/mosaic-core': '0.1.0'
+  'packages/ui/package.json': {
+    '@mosaic-apps/core': '0.1.0'
   },
-  'packages/mosaic-cli/package.json': {
-    '@mosaic-apps/mosaic-core': '0.1.0',
-    '@mosaic-apps/mosaic-server': '0.1.0'
+  'packages/cli/package.json': {
+    '@mosaic-apps/core': '0.1.0',
+    '@mosaic-apps/server': '0.1.0'
   },
   'apps/studio/package.json': {
-    '@mosaic-apps/mosaic-core': '0.1.0',
-    '@mosaic-apps/mosaic-ui': '0.1.0'
+    '@mosaic-apps/core': '0.1.0',
+    '@mosaic-apps/ui': '0.1.0'
   }
 };
 
