@@ -167,7 +167,8 @@ export async function info(opts: { dir: string }): Promise<void> {
 
 export async function studio(opts: { dir: string; port?: number }): Promise<void> {
   const config = await loadProjectConfig(opts.dir);
-  const repo = findRepoRoot(opts.dir) ?? findRepoRoot(import.meta.url);
+  const localStudio = existsSync(join(opts.dir, 'apps', 'studio', 'package.json'));
+  const repo = localStudio ? opts.dir : findRepoRoot(opts.dir);
   if (!repo || !existsSync(join(repo, 'apps', 'studio'))) {
     console.error(
       'Mosaic Studio not found. It ships with the mosaic-apps monorepo:\n' +
@@ -177,11 +178,11 @@ export async function studio(opts: { dir: string; port?: number }): Promise<void
     process.exit(1);
   }
   console.log(`\n▦ Starting Mosaic Studio → http://localhost:${config.api.port}\n`);
-  const child = spawn('npm', ['run', 'dev', '-w', 'studio'], {
+  const child = spawn('npm', ['run', 'dev', '-w', localStudio ? 'apps/studio' : 'studio'], {
     cwd: repo,
     stdio: 'inherit',
     shell: process.platform === 'win32',
-    env: { ...process.env, PUBLIC_API_URL: `http://localhost:${config.api.port}/api`, PORT: String(opts.port ?? 3002) },
+    env: { ...process.env, MOSAIC_API_TARGET: `http://127.0.0.1:${config.api.port}`, PUBLIC_API_URL: `http://localhost:${config.api.port}/api`, MOSAIC_STUDIO_PORT: String(opts.port ?? config.studio?.port ?? 3002), PORT: String(opts.port ?? config.studio?.port ?? 3002) },
   });
   child.on('exit', (code) => process.exit(code ?? 0));
 }

@@ -2,11 +2,10 @@
 
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { createHash, randomBytes } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import {
   copyTemplate,
   ensureDir,
-  findRepoRoot,
   findTemplateDir,
   removeDir,
   rewriteMosaicDeps,
@@ -14,8 +13,6 @@ import {
   slugify,
   titleCase,
 } from './project.js';
-import { dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 export interface CreateOptions {
   name: string;
@@ -25,6 +22,7 @@ export interface CreateOptions {
   pwa: boolean;
   apiPort: number;
   webPort: number;
+  studioPort?: number;
   dbPort: number;
   pm: 'npm' | 'pnpm' | 'yarn';
   install: boolean;
@@ -39,7 +37,16 @@ export async function create(opts: CreateOptions): Promise<void> {
   const name = titleCase(opts.name);
   const slug = slugify(opts.name);
   const target = join(opts.cwd, slug);
-  const databaseUrl = opts.db ?? `postgres://mosaic:mosaic@localhost:${opts.dbPort}/${slug}`;
+  const databaseUrl = opts.db ?? 'pglite://./data';
+  const studioPort = opts.studioPort ?? 3002;
+  const ports = [opts.apiPort, opts.webPort, studioPort];
+  if (ports.some((port) => !Number.isInteger(port) || port < 1 || port > 65535) || new Set(ports).size !== ports.length) {
+    throw new Error('API, web and Studio ports must be different integers between 1 and 65535.');
+  }
+  if (opts.link && opts.npmMode) throw new Error('Choose either --link or --npm-mode.');
+  if (opts.link && !existsSync(join(opts.link, 'packages', 'server', 'package.json'))) {
+    throw new Error(`--link must point to a Mosaic source checkout: ${opts.link}`);
+  }
   const jwtSecret = randomBytes(24).toString('hex');
 
   const templateDir = findTemplateDir(import.meta.url);
@@ -62,7 +69,7 @@ export async function create(opts: CreateOptions): Promise<void> {
 
   console.log(`\n▦ Creating Mosaic project "${name}" in ${target}\n`);
 
-  const files = await copyTemplate(templateDir, target, {
+  await copyTemplate(templateDir, target, {
     __PROJECT_NAME__: name,
     __PROJECT_SLUG__: slug,
     __DB_URL__: databaseUrl,
@@ -71,23 +78,18 @@ export async function create(opts: CreateOptions): Promise<void> {
     __DEMO__: String(opts.demo),
     __API_PORT__: String(opts.apiPort),
     __WEB_PORT__: String(opts.webPort),
+    __STUDIO_PORT__: String(studioPort),
     __DB_PORT__: String(opts.dbPort),
     __JWT_SECRET__: jwtSecret,
   });
 
   // .env with generated secret
-  await writeEnv(target, databaseUrl, opts.apiPort, opts.webPort, jwtSecret, opts.auth);
+  await writeEnv(target, databaseUrl, opts.apiPort, opts.webPort, studioPort, jwtSecret, opts.auth, opts.demo);
 
-  // link @mosaic packages
-  let linkDir: string | null = null;
-  if (!opts.npmMode) {
-    linkDir = opts.link && existsSync(opts.link) ? opts.link : findRepoRoot(dirname(fileURLToPath(import.meta.url)));
-    if (linkDir) {
-      await rewriteMosaicDeps(target, linkDir);
-      console.log('🔗 Linked @mosaic-apps/* packages to the local repo checkout');
-    } else if (opts.link) {
-      console.warn(`⚠ --link path not found: ${opts.link}`);
-    }
+  // Published dependencies are the default; local links are explicit.
+  if (opts.link) {
+    await rewriteMosaicDeps(target, opts.link);
+    console.log('🔗 Linked @mosaic-apps/* packages to the local repo checkout');
   }
 
   if (opts.pwa) {
@@ -96,10 +98,14 @@ export async function create(opts: CreateOptions): Promise<void> {
   }
 
   if (opts.git) {
-    run('git', ['init', '-q'], target);
-    run('git', ['add', '-A'], target);
-    run('git', ['-c', 'user.name=mosaic', '-c', 'user.email=mosaic@local', 'commit', '-qm', 'chore: scaffold Mosaic project'], target);
-    console.log('🌱 Git repository initialised');
+    try {
+      run('git', ['init', '-q'], target);
+      run('git', ['-c', 'core.autocrlf=false', 'add', '-A'], target);
+      run('git', ['-c', 'user.name=mosaic', '-c', 'user.email=mosaic@local', 'commit', '-qm', 'chore: scaffold Mosaic project'], target);
+      console.log('🌱 Git repository initialised');
+    } catch (error) {
+      console.warn(`Git initialization failed: ${error instanceof Error ? error.message : error}. Project creation will continue.`);
+    }
   }
 
   if (opts.install) {
@@ -117,12 +123,12 @@ export async function create(opts: CreateOptions): Promise<void> {
 ✅ ${name} is ready!
 
   cd ${slug}
-  ${opts.install ? '' : `${opts.pm} install\n  `}${databaseUrl.startsWith('pglite') ? '# Embedded PostgreSQL: no database service needed' : 'docker compose up -d        # start PostgreSQL'}
-  npm run dev                   # API (:${opts.apiPort}) + web (:${opts.webPort}) + Studio (:3002)
+  ${opts.install ? '' : `${opts.pm} install\n  `}${databaseUrl.startsWith('pglite') ? '# Embedded PostgreSQL: no database service needed' : '# Start the PostgreSQL service configured in DATABASE_URL'}
+  npm run dev                   # API (:${opts.apiPort}) + web (:${opts.webPort}) + Studio (:${studioPort})
 
   API   → http://localhost:${opts.apiPort}
   Web   → http://localhost:${opts.webPort}
-  Studio → http://localhost:3002
+  Studio → http://localhost:${studioPort}
   Admin → admin@mosaic.local / admin1234${opts.demo ? '' : '\n\n  (demo seeding disabled)'}
 
 Next:
@@ -132,7 +138,7 @@ Next:
 `);
 }
 
-async function writeEnv(target: string, db: string, port: number, webPort: number, secret: string, auth: boolean): Promise<void> {
+async function writeEnv(target: string, db: string, port: number, webPort: number, studioPort: number, secret: string, auth: boolean, demo: boolean): Promise<void> {
   const env = `# Database
 DATABASE_URL=${db}
 
@@ -142,8 +148,10 @@ MOSAIC_JWT_SECRET=${secret}
 
 # Boot
 PORT=${port}
+MOSAIC_WEB_PORT=${webPort}
+MOSAIC_STUDIO_PORT=${studioPort}
 SEED=true
-SEED_DEMO=true
+SEED_DEMO=${demo}
 
 # Web/API topology
 PUBLIC_API_URL=

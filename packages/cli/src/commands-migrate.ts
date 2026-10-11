@@ -1,7 +1,7 @@
 /** Project commands: migrate + seed. */
 
 import { applyPlan, computePlan, createDb, ensurePlatformTables, seedPlatform, syncEntitiesDir } from '@mosaic-apps/server';
-import { entitiesDirsOf, loadProjectConfig } from './project.js';
+import { entitiesDirsOf, loadProjectConfig, loadProjectEnvironment } from './project.js';
 
 export async function migrate(opts: { dir: string; allowDestructive: boolean; dryRun: boolean }): Promise<void> {
   const config = await loadProjectConfig(opts.dir);
@@ -45,11 +45,12 @@ export async function migrate(opts: { dir: string; allowDestructive: boolean; dr
 
 export async function seed(opts: { dir: string; demo: boolean }): Promise<void> {
   const config = await loadProjectConfig(opts.dir);
+  const env = await loadProjectEnvironment(opts.dir);
   const db = await createDb(config.databaseUrl);
   try {
     await ensurePlatformTables(db);
     const result = await seedPlatform(db, {
-      admin: { email: 'admin@mosaic.local', password: 'admin1234', name: 'Administrator' },
+      admin: { email: env.ADMIN_EMAIL ?? 'admin@mosaic.local', password: env.ADMIN_PASSWORD ?? 'admin1234', name: env.ADMIN_NAME ?? 'Administrator' },
       demo: opts.demo,
     });
     console.log(

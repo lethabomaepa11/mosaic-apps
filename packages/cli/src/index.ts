@@ -25,18 +25,19 @@ Commands:
 
 create options:
   --db <url>             Postgres connection string
-                          (default postgres://mosaic:mosaic@localhost:5432/<name>)
+                          (default pglite://./data, persistent embedded PostgreSQL)
   --auth on|off          Enable authentication (default on)
   --demo | --no-demo     Seed demo entities/forms (default demo)
   --pwa | --no-pwa       PWA-enabled web app (default pwa)
   --port <n>             API port (default 3001)
   --web-port <n>         Web port (default 3000)
+  --studio-port <n>      Studio port (default 3002)
   --db-port <n>          Docker Postgres host port (default 5432)
   --pm npm|pnpm|yarn     Package manager (default npm)
   --install | --no-install   Run package install (default install)
   --git | --no-git       git init (default git)
   --link <path>          Link @mosaic-apps/* packages from a local repo checkout
-  --npm-mode             Use published @mosaic-apps/* versions instead of file: links
+  --npm-mode             Use published packages (the default; retained for compatibility)
   --force                Overwrite existing directory
 
 entity options:
@@ -54,7 +55,7 @@ async function main(): Promise<void> {
 
   if (command === 'help' || command === '--help' || command === '-h' || command === 'version' || command === '--version') {
     if (command === 'version' || command === '--version') {
-      console.log('mosaic 0.2.0');
+      console.log('mosaic 0.2.1');
       return;
     }
     console.log(HELP);
@@ -78,6 +79,7 @@ async function main(): Promise<void> {
           'no-pwa': { type: 'boolean', default: false },
           port: { type: 'string', default: '3001' },
           'web-port': { type: 'string', default: '3000' },
+          'studio-port': { type: 'string', default: '3002' },
           'db-port': { type: 'string', default: '5432' },
           pm: { type: 'string', default: 'npm' },
           install: { type: 'boolean', default: true },
@@ -104,6 +106,7 @@ async function main(): Promise<void> {
         pwa: Boolean(values.pwa) && !values['no-pwa'],
         apiPort: Number(values.port),
         webPort: Number(values['web-port']),
+        studioPort: Number(values['studio-port']),
         dbPort: Number(values['db-port']),
         pm: values.pm as 'npm' | 'pnpm' | 'yarn',
         install: Boolean(values.install) && !values['no-install'],

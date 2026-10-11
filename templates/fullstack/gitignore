@@ -3,6 +3,10 @@ dist/
 .svelte-kit/
 build/
 .env
+.env.*
+!.env.example
 uploads/
+data/
 pgdata/
+.mosaic-backups/
 *.log

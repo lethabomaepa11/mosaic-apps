@@ -1,6 +1,6 @@
 {
   "name": "@mosaic-apps/cli",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Mosaic CLI: scaffold, migrate, seed and drive Mosaic full-stack apps",
   "publishConfig": {
     "access": "public"
@@ -26,6 +26,7 @@
     "prepack": "npm run build && node scripts/pack-template.mjs",
     "postpack": "node scripts/clean-template.mjs",
     "typecheck": "tsc -p tsconfig.test.json",
+    "test": "node --import tsx --test \"src/**/*.test.ts\"",
     "dev": "node --import tsx src/index.ts"
   },
   "dependencies": {

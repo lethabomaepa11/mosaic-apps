@@ -5,6 +5,7 @@ import { existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
+import { parseEnv } from 'node:util';
 
 export function slugify(input: string): string {
   return input
@@ -23,11 +24,13 @@ export function titleCase(input: string): string {
     .join(' ');
 }
 
-/** Walk up from a start dir until `templates/fullstack/package.json` exists. */
+/** Find a source checkout, excluding a published CLI's bundled template. */
 export function findRepoRoot(start: string): string | null {
   let dir = resolve(start);
   for (let i = 0; i < 12; i++) {
-    if (existsSync(join(dir, 'templates', 'fullstack', 'package.json'))) return dir;
+    if (existsSync(join(dir, 'templates', 'fullstack', 'package.json')) &&
+        existsSync(join(dir, 'packages', 'cli', 'package.json')) &&
+        existsSync(join(dir, 'packages', 'server', 'package.json'))) return dir;
     const parent = dirname(dir);
     if (parent === dir) break;
     dir = parent;
@@ -72,6 +75,13 @@ export interface ProjectConfig {
   demo: boolean;
   api: { port: number };
   web: { port: number };
+  studio?: { port: number };
+}
+
+export async function loadProjectEnvironment(dir: string): Promise<Record<string, string | undefined>> {
+  const file = join(dir, '.env');
+  const values = existsSync(file) ? parseEnv(await readFile(file, 'utf8')) : {};
+  return { ...values, ...Object.fromEntries(Object.entries(process.env).filter(([, value]) => value !== undefined)) };
 }
 
 export async function loadProjectConfig(dir: string): Promise<ProjectConfig> {
@@ -80,17 +90,24 @@ export async function loadProjectConfig(dir: string): Promise<ProjectConfig> {
     throw new Error('No mosaic.config.json found — run this command inside a Mosaic project.');
   }
   const raw = JSON.parse(await readFile(file, 'utf8')) as Record<string, unknown>;
+  const env = await loadProjectEnvironment(dir);
   const api = (raw.api ?? {}) as { port?: number };
   const web = (raw.web ?? {}) as { port?: number };
+  const studio = (raw.studio ?? {}) as { port?: number };
+  let databaseUrl = process.env.DATABASE_URL ?? env.DATABASE_URL ?? String(raw.databaseUrl ?? 'pglite://./data');
+  if (databaseUrl.startsWith('pglite://') && databaseUrl !== 'pglite://memory') {
+    databaseUrl = `pglite://${resolve(dir, databaseUrl.slice('pglite://'.length))}`;
+  }
   return {
     name: String(raw.name ?? 'Mosaic app'),
     slug: String(raw.slug ?? slugify(String(raw.name ?? 'app'))),
-    databaseUrl: process.env.DATABASE_URL ?? String(raw.databaseUrl ?? 'postgres://mosaic:mosaic@localhost:5432/mosaic'),
+    databaseUrl,
     auth: raw.auth !== false,
     pwa: raw.pwa !== false,
     demo: raw.demo !== false,
-    api: { port: Number(process.env.PORT ?? api.port ?? 3001) },
-    web: { port: web.port ?? 3000 },
+    api: { port: Number(process.env.PORT ?? env.PORT ?? api.port ?? 3001) },
+    web: { port: Number(process.env.MOSAIC_WEB_PORT ?? env.MOSAIC_WEB_PORT ?? web.port ?? 3000) },
+    studio: { port: Number(process.env.MOSAIC_STUDIO_PORT ?? env.MOSAIC_STUDIO_PORT ?? studio.port ?? 3002) },
   };
 }
 
@@ -109,7 +126,8 @@ export async function copyTemplate(
     for (const entry of entries) {
       if (entry.name === 'node_modules' || entry.name === '.svelte-kit' || entry.name === 'dist' || entry.name === 'build' || entry.name === 'pgdata') continue;
       const rel = relative ? join(relative, entry.name) : entry.name;
-      const dest = join(targetDir, rel);
+      // npm omits/renames .gitignore files in tarballs; keep it as a normal template asset.
+      const dest = join(targetDir, relative, entry.name === 'gitignore' ? '.gitignore' : entry.name === 'gitattributes' ? '.gitattributes' : entry.name);
       if (entry.isDirectory()) {
         await mkdir(dest, { recursive: true });
         await walk(rel);
@@ -119,7 +137,7 @@ export async function copyTemplate(
         if (BINARY_EXT.has(ext)) {
           await writeFile(dest, buf);
         } else {
-          let text = buf.toString('utf8');
+          let text = buf.toString('utf8').replace(/\r\n/g, '\n');
           for (const [key, value] of Object.entries(tokens)) {
             text = text.split(key).join(value);
           }
@@ -172,8 +190,11 @@ export async function rewriteMosaicDeps(dir: string, linkDir: string): Promise<v
 }
 
 export function run(cmd: string, args: string[], cwd: string): void {
-  const cmdLine = process.platform === 'win32' && /\s/.test(cmd) ? `"${cmd}"` : cmd;
-  const res = spawnSync(cmdLine, args, { cwd, stdio: 'inherit', shell: process.platform === 'win32' });
+  // Native executables preserve argument boundaries without cmd.exe. Only package
+  // manager shims require a shell on Windows; their arguments here are fixed.
+  const packageManager = /^(npm|pnpm|yarn)(\.cmd)?$/i.test(cmd);
+  const res = spawnSync(cmd, args, { cwd, stdio: 'inherit', windowsHide: true, shell: process.platform === 'win32' && packageManager });
+  if (res.error) throw new Error(`Could not run ${cmd}: ${res.error.message}`);
   if (res.status !== 0) throw new Error(`${cmd} ${args.join(' ')} failed (exit ${res.status})`);
 }
 
