@@ -4,44 +4,62 @@ sidebar_position: 9
 
 # Builder guide (Studio)
 
-The Studio (`mosaic studio`, default http://localhost:4173) edits the same
-JSON your apps render. Design at `/design/forms/:id` and `/design/pages/:id`.
+Start Studio with its API from the repository root:
 
-## Layout
+```bash
+npm run dev
+```
 
-- **Palette** (left) — 57 types grouped by category; drag onto any container
-- **Canvas** (center) — live render; click selects, drag reorders; drop zones
-  show insertion hints; nodes have duplicate/delete handles
-- **Properties** (right) — controls generated from each type's registry
-  descriptor (text, number, switch, select, color, JSON)
-- **Layers** (right, below) — tree with `binding` badges for data fields
+The launcher waits for `http://127.0.0.1:8787/api/health` before it starts
+Studio at `http://localhost:4173`. This avoids proxy 502 responses while the API
+is initializing. The form and page designers are at `/studio/forms/:id` and
+`/studio/pages/:id`.
 
-Keyboard: `Ctrl/⌘+Z` undo, `Ctrl/⌘+Shift+Z` redo (60 snapshots).
+## Forms and pages
 
-## Editing flow
+- The **Palette** provides 59 components. Drag fields and containers onto the
+  canvas, then configure the selected node in **Properties**.
+- **Layers** shows the component tree and field bindings.
+- Preview is inline canvas mode with desktop, tablet, and mobile widths.
+  Returning to edit keeps the designer mounted.
+- Form identity, entity, layout, columns, motion, initial data source,
+  submission behavior, and SEO values belong in **Form settings**.
+- Page identity, route, access, application-shell layout, sidebar navigation,
+  motion, SEO, and social metadata belong in **Page settings**.
+- Save on a form persists and publishes its current definition.
+- `Ctrl/Cmd+S` saves from anywhere in Form Studio. If edits arrive while a
+  publish is in flight, Studio queues another version instead of marking those
+  edits as saved.
+- `EntityTable` supports configured columns, create/edit/delete, and optional
+  row drill-down to its inline detail view when connected to an API client.
+- Entity field suggestions assist bindings, and custom binding strings remain
+  allowed.
 
-1. Drop components; containers (grid, card, tabs, accordion, modal, drawer,
-   split pane…) accept children — nest freely.
-2. Select a field → set its **binding** (e.g. `email`) so it reads/writes form
-   data; use **visibleIf** for conditional fields.
-3. **Preview** renders the form for real (validation + submit work).
-4. **`{ }` JSON** shows the tree; paste edited JSON back with *Apply to canvas*.
-5. **Save** → draft; **Publish** → new version + snapshot, served at
-   `/f/<slug>` or `/p/<slug>` in generated apps.
+Every component has a common **Actions** editor. Actions can show a message,
+call the configured API, navigate to a searchable form/page target, update an
+application/page/form/component state path, or run custom JavaScript/TypeScript.
+The custom-code option opens Monaco inline and autocompletes the runtime state
+and action API.
 
-## Data pages
+`visibleIf` and `disabledIf` use Mosaic's restricted expression interpreter by
+default. Choose JavaScript/TypeScript and click **Code editor** when a condition
+needs custom logic. Script conditions run in the same isolated, limited browser
+sandbox as script actions. See [Runtime state management](./state-management.md).
 
-- **Entities** — field editor (types, required/unique/indexed, enum options,
-  ref targets), save, **Plan migration** (SQL preview modal) → **Apply**,
-  plus a live **data browser** (search, sort, paginate; click a row to edit in
-  an auto-generated `EntityForm`).
-- **Migrations** — global pending plan + full checksum history.
-- **API explorer** — pick an entity, method and path, send, inspect JSON.
-- **Settings** — users/roles, reference lists, settings KV, audit log.
+## Embedded forms
 
-## Tips
+Add **Embedded form**, search for a form, and select it. Configure JSON initial
+props and a parent data binding (default `childFormData`). Nested input changes
+are written to that object. The child omits submit controls and document
+metadata, inherits view mode, prevents recursive inclusion, and is limited to
+eight embedded levels. Nested required-field errors are not yet combined with
+the parent form's validation.
 
-- Bind the form header **entity** input to drive submit targets and ref
-  pickers (`RefSelect`) automatically.
-- Reuse option lists via **reference lists** instead of hard-coding options.
-- Grid `colSpan` on fields + `columns: 2` grids make dense data-entry layouts.
+## State management
+
+`@mosaic/ui` exports `createMosaicState`, `MosaicState`, and `StateStore`.
+PageRenderer owns or accepts application/page scopes. FormRenderer creates a
+form scope; nested forms share application/page stores and isolate form stores.
+State is instance-owned and serializable. Component actions and custom code use
+the same scopes. Persistence adapters remain opt in future work. See
+[Runtime state management](./state-management.md).

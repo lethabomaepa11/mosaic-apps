@@ -22,7 +22,9 @@ npm install
 
 This creates an API (`apps/api`, Hono + `@mosaic/server`) and a PWA web app
 (`apps/web`, SvelteKit). `@mosaic/*` dependencies are linked to your repo
-checkout automatically when created from the monorepo.
+checkout automatically when created from the monorepo — from a checkout run
+`npm run create -- my-crm` (source, no publish) or `npm run link-cli` once and
+then `mosaic create my-crm` from anywhere.
 
 ## 2. Run
 
@@ -41,8 +43,9 @@ mosaic entity Product --fields "name:string,sku:string,price:decimal,stock:int,a
 mosaic migrate
 ```
 
-`migrate` prints every SQL statement first (dry-run preview), then applies it.
-Your CRUD API exists immediately:
+`mosaic entity` scaffolds a **class** in `apps/api/src/entities/product.entity.ts`
+— edit it like any other TypeScript file. `migrate` prints every SQL statement
+first (dry-run preview), then applies it. Your CRUD API exists immediately:
 
 ```bash
 curl -X POST localhost:8787/api/entities/product \
@@ -57,8 +60,9 @@ mosaic studio
 ```
 
 Pick your entity's auto-suggested form (or drag components onto a blank
-canvas), press **Publish**, and open the generated `/f/<slug>` route in the
-web app. Install the PWA from your browser menu — the form works offline.
+canvas), then press **Save** to persist and publish the form. Open the generated
+`/f/<slug>` route in the web app. Install the PWA from your browser menu — the
+form works offline.
 
 ## Where to go next
 

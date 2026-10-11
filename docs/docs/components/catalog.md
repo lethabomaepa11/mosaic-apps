@@ -4,10 +4,10 @@ sidebar_position: 1
 
 # Component catalog
 
-All 57 registry types (`getComponent(type)`), grouped by palette category.
+All 59 registry types (`getComponent(type)`), grouped by palette category.
 Field components bind to form data via `binding`; containers render `children`.
 
-## Inputs (18)
+## Inputs (19)
 
 | type | renders | key props |
 |---|---|---|
@@ -33,12 +33,13 @@ Field components bind to form data via `binding`; containers render `children`.
 `options` shape: `[{ "value": "a", "label": "A", "color?": "#…" }]`.
 Framework props on any field: `binding, required, visibleIf, disabledIf, colSpan, helpText`.
 
-## Data (5)
+## Data (6)
 
 | type | renders | key props |
 |---|---|---|
 | `dataTable` | static table | `columns [{key,label,width?,sortable?}], rows` |
 | `entityTable` | live table + search + pagination | `entity, title, columns?, pageSize, sortable, searchable` (+ `client`) |
+| `subform` | nested form renderer | `formId, props, binding, mode` (+ `client`); child data is written to the parent binding |
 | `pagination` | pager | `page, pageSize, total` |
 | `toolbar` | action row (container) | — |
 | `filterBar` | filter chips (container) | `activeCount` |
@@ -52,9 +53,9 @@ container), `grid` (`columns 1–6, gap`, container), `stack` (`direction:
 column, gap`, container), `stepper` (`steps[], current`), `emptyState`
 (`icon, title, text`), `splitPane` (`initial %, direction`, container, max 2).
 
-## Display (10)
+## Display
 
-`heading` (`text, level 1–4, muted`), `divider`, `statCard` (`label, value`
+`image` (`src, alt, width, height, fit, href, caption`), `heading` (`text, level 1–4, muted`), `divider`, `statCard` (`label, value`
 static or `entity` live count, `trend, trendDir, icon`; + `client` for live),
 `statRow` (container: auto grid), `timeline` (`items [{title,text,time}]`),
 `avatar` (`name, color, size`), `descriptionList` (`items [{label,value}]`),

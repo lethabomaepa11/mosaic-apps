@@ -5,11 +5,13 @@ const sidebars = {
     'quickstart',
     'architecture',
     'cli',
+    'npm-packages',
     'entities',
     'migrations',
     'auto-crud',
     'form-json',
     'builder',
+    'state-management',
     {
       type: 'category',
       label: 'Components',

@@ -4,7 +4,7 @@ sidebar_position: 8
 
 # Form JSON spec
 
-Forms and pages are trees of **nodes**:
+Forms and pages are serializable trees of component nodes:
 
 ```json
 {
@@ -24,40 +24,70 @@ Forms and pages are trees of **nodes**:
       ]}
     ]
   },
-  "settings": { "layout": "vertical", "submitLabel": "Save", "showReset": true, "redirectAfterSubmit": "/thanks", "successMessage": "Saved!" },
+  "settings": { "layout": "vertical", "submitLabel": "Save", "showReset": true },
   "dataSource": { "kind": "entity", "entity": "customer" }
 }
 ```
 
 ## Node anatomy
 
-- `id` — stable client id (`c_*`); preserved across saves, used for selection
-  and DnD
-- `type` — registry key (see [Component catalog](./components/catalog.md))
-- `props` — component props; field nodes additionally carry framework props:
-- `children` — only for `container: true` types (grid, card, tabs, accordion…)
-- `meta` — free-form (designer badges, comments)
+- `id`: stable client id preserved across saves and used by selection and DnD.
+- `type`: component registry key (see [Component catalog](./components/catalog.md)).
+- `props`: serializable component settings. Field nodes also use framework props.
+- `children`: child nodes for container components.
+- `meta`: optional designer notes and flags.
 
-## Framework props (fields)
+Framework props include `visibleIf`, `disabledIf`, and ordered `actions`.
+Field props also include `binding`, `required`, `colSpan`, `helpText`, and
+validation constraints. Bindings are strings and can
+be custom; Studio suggests entity columns but does not require a catalog match.
+Conditions may be a restricted Mosaic expression string or an isolated script:
 
-| prop | meaning |
-|---|---|
-| `binding` | `data[binding]` path (create it or the field is display-only) |
-| `required`, `min/max`, `minLength/maxlength`, `pattern` | client-side validation (mirrors server zod) |
-| `visibleIf` / `disabledIf` | expressions over `{ data, ctx }`, e.g. `status === "active"` |
-| `colSpan` | grid columns spanned (1–4) |
-| `helpText`, `placeholder` | UX copy |
+```json
+{
+  "visibleIf": {
+    "kind": "script",
+    "language": "typescript",
+    "source": "return state.form.status === 'ready';"
+  }
+}
+```
 
-## Pages
+Script actions use `type: "script"` and return an array of supported actions.
+They execute in the browser worker sandbox described in
+[Runtime state](./state-management.md).
 
-Same tree, `root.type: "page"`, plus `route` (`/dashboard`), `settings.title`,
-and data components (`entityTable`, `statCard`, `chart`) that fetch through
-the injected client.
+## Embedded forms
 
-## Lifecycle
+An embedded form is a regular component node. For example:
 
-Drafts save with `published: false`; **Publish** bumps `version` and snapshots
-the tree into `mosaic_form_versions`. Consumers fetch by slug —
-`GET /api/forms/:slug` resolves the *published* revision. The
-[Builder guide](./builder.md) covers the Studio editing experience; the
-[Component catalog](./components/catalog.md) lists every type and its props.
+```json
+{
+  "id": "c_address",
+  "type": "subform",
+  "props": {
+    "formId": "frm_address",
+    "binding": "address",
+    "props": { "country": "ZA" },
+    "mode": "create"
+  }
+}
+```
+
+The child record is merged over the configured initial props and changes are
+written at the parent binding. Nested forms omit submit controls and head
+metadata, inherit view mode, reject cycles, and stop at eight levels. Parent
+submission does not yet collect nested required-field validation errors.
+
+## Pages and lifecycle
+
+Pages use `root.type: "page"`, a route, settings, and the same component tree.
+Page data components receive the configured API client.
+
+In Studio, **Save** updates and publishes a form or page in one database
+transaction. The loaded version is sent with the request, so a stale tab gets a
+409 conflict instead of overwriting newer work. Unchanged publication is
+idempotent. Preview renders the current local tree inline. Form settings contain
+submission and SEO options. Page settings contain route, access, navigation,
+layout, motion, SEO, and social options. See the [Builder guide](./builder.md) for Studio
+behavior and [Runtime state](./state-management.md) for actions.

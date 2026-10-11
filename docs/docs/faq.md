@@ -9,8 +9,9 @@ No. `DATABASE_URL=pglite://memory` boots real Postgres compiled to WASM.
 Use a server Postgres for teams/production.
 
 **Where is my data model stored?**
-`apps/api/entities/*.entity.json` in git (reviewable), synced into
-`mosaic_entities` at boot; the physical schema lives in Postgres.
+`apps/api/src/entities/*.entity.ts` classes (or `*.entity.json`) in git
+(reviewable), synced into `mosaic_entities` at boot; the physical schema lives
+in Postgres.
 
 **Can I write custom endpoints?**
 Yes — mount extra Hono routes in `apps/api/src/index.ts` next to

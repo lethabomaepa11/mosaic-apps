@@ -5,12 +5,13 @@ sidebar_position: 1
 # Introduction
 
 **Mosaic** is a metadata-driven full-stack platform. You describe your domain
-as JSON — entities, forms, pages — and Mosaic turns them into a running system:
+as entity classes (or JSON) plus forms and pages — and Mosaic turns them into a
+running system:
 
 - **PostgreSQL tables** via a diffing migration engine (plan SQL, review, apply)
 - **REST APIs** with filters, sorts, pagination, soft delete, audit and RBAC —
   auto-generated per entity, no hand-written controllers
-- **Drag & drop forms and pages** (57 component types) stored as JSON, with
+- **Drag & drop forms and pages** (59 component types) stored as JSON, with
   versioning, publish workflow and live preview
 - **An installable SvelteKit PWA** per project (offline shell + offline data)
 - **A CLI** (`mosaic create|migrate|seed|entity|studio|info`) that drives the loop
@@ -28,10 +29,10 @@ mosaic create crm                    # scaffold API + PWA web
 mosaic entity Customer \
   --fields "name:string,email:string,status:enum:prospect|active"   # model
 mosaic migrate                       # preview SQL → apply
-mosaic studio                        # design forms & pages, hit Publish
+mosaic studio                        # design forms & pages, Save publishes forms
 ```
 
-1. **Model** — `apps/api/entities/*.entity.json`
+1. **Model** — `apps/api/src/entities/*.entity.ts` (or `.entity.json`)
 2. **Migrate** — `mosaic migrate` shows every statement; `--dry-run` previews
 3. **Design** — Studio renders the same JSON your PWA renders (shared `@mosaic/ui`)
 4. **Deploy** — adapter-node API + PWA web; docs in [Deployment](./deployment.md)

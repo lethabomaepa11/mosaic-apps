@@ -6,28 +6,21 @@ sidebar_position: 3
 
 ## Metadata is the source of truth
 
-Everything Mosaic serves derives from three JSON families:
-
-```
-entities/*.entity.json      → tables, CRUD, validation, zod schemas
-mosaic_forms (DB row)       → component trees rendered by FormRenderer
-mosaic_pages (DB row)       → dashboards rendered by PageRenderer
-```
-
-There is no codegen step and no drift: the API introspects the same metadata
-the Studio edits.
+Mosaic stores entity definitions, form component trees, and page component trees
+as metadata. The API derives validation, migrations, CRUD, and runtime artifacts
+from those definitions; Studio edits the same form/page records applications
+render.
 
 ## Packages
 
 ```mermaid
 flowchart LR
-  core[@mosaic/core<br/>types · validation · query spec · expressions]
-  server[@mosaic/server<br/>Hono API · CRUD · auth · migrations]
-  ui[@mosaic/ui<br/>57 components · FormRenderer · DnD]
+  core[@mosaic/core<br/>metadata and shared logic]
+  server[@mosaic/server<br/>Hono API and database]
+  ui[@mosaic/ui<br/>Svelte 5 components and renderers]
   cli[@mosaic/cli<br/>mosaic binary]
   studio[apps/studio<br/>designer]
   template[templates/fullstack<br/>scaffold]
-
   core --> server
   core --> ui
   server --> cli
@@ -36,35 +29,44 @@ flowchart LR
   server --> template
 ```
 
-- **`@mosaic/core`** — pure TS, zero runtime deps: entity/form/page types,
-  `validateEntity`, zod schema builder input, `QuerySpec` (`buildQueryString`),
-  expression interpreter (`visibleIf`/`disabledIf`), tree helpers
-  (`insertNode/moveNode/removeNode/duplicateNode/walk/ensureRoot`).
-- **`@mosaic/server`** — Hono app factory `createMosaicServer()`. Pluggable `Db`
-  drivers (`pg` pool or PGlite WASM via `createDb(url)`). Platform tables
-  (`mosaic_*`), artifact stores (forms/pages with version snapshots),
-  entity admin, users/roles/RBAC, audit, settings, ref lists, files.
-- **`@mosaic/ui`** — Svelte 5 kit. Components consume one contract:
-  `value` + `oninput` + `error`; `NodeRenderer` bridges registry types to
-  components, strips `binding/visibleIf/disabledIf/colSpan`, and injects
-  `client` for live components (`EntityTable`, `StatCard`, `RefSelect`).
-- **`@mosaic/cli`** — zero interactive deps; `parseArgs`-based dispatcher.
-- **Studio** — a regular SvelteKit app consuming `@mosaic/ui` from source.
+- **`@mosaic/core`** contains shared types, expression parsing, tree helpers,
+  entity decorators, and entity loading. Server-side decorators use
+  `reflect-metadata`; TypeScript entity loading can use `tsx`.
+- **`@mosaic/server`** exports a Hono app factory, PostgreSQL and PGlite
+  drivers, platform tables, entity administration, CRUD, auth/RBAC, audit,
+  settings, reference lists, form/page artifacts, and file endpoints.
+- **`@mosaic/ui`** is a source-first Svelte 5 library with the component
+  registry, FormRenderer/PageRenderer, API client, shadcn-svelte/Bits UI
+  primitives, and an instance-scoped runtime state API. Consumers need Svelte 5
+  and Tailwind CSS 4 in their build.
+- **`@mosaic/cli`** provides the `mosaic` executable and bundles the full-stack
+  project template into its npm tarball during `prepack`.
+- **Studio** consumes UI source directly. Run `npm run dev` from the repository
+  root to start API and Studio together. The launcher waits for `/api/health`
+  before starting Vite, preventing startup-order proxy 502 responses.
+
+## Runtime state
+
+Each application session can own a `MosaicState` instance with application,
+page, and form stores. PageRenderer creates or accepts that instance;
+FormRenderer forks a form scope, and embedded forms share application/page
+scopes but get isolated form scopes. Updates are revisioned and observable;
+snapshots can be serialized and restored. State is in-memory only. Persistence,
+cross-tab synchronization, action execution, and Monaco scripts are not shipped
+yet; see [State management](./state-management.md).
 
 ## Request lifecycle (CRUD)
 
+```text
+fetch -> Hono route -> permission check -> Zod validation -> SQL builder
+      -> PostgreSQL/PGlite driver -> audit -> { success, data } envelope
 ```
-fetch → Hono route → requirePermission → validateEntity/zod → build*Sql
-→ driver.query (pg|pglite) → writeAudit → envelope { success, data }
-```
 
-Errors are normalised: validation → 422 `VALIDATION`, uniques → 409
-`UNIQUE`, missing rows → 404 `NOT_FOUND`, RBAC → 403 `FORBIDDEN`.
+Validation failures return 422, unique conflicts 409, missing records 404, and
+authorization failures 403.
 
-## Data model (platform tables)
+## Platform tables
 
-`mosaic_entities` (registry + JSON definition), `mosaic_entity_columns`
-(known columns — the "safe drop" allow-list), `mosaic_migrations`
-(checksum + statements + status), `mosaic_forms` + `mosaic_form_versions`,
-`mosaic_pages`, `mosaic_users` + `mosaic_roles`, `mosaic_settings`,
-`mosaic_ref_lists`, `mosaic_files`, `mosaic_audit`.
+The platform stores entities, known entity columns, migrations, forms and form
+versions, pages, users and roles, settings, reference lists, files, and audit
+records in `mosaic_*` tables.

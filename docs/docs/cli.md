@@ -47,12 +47,36 @@ mosaic entity Product --fields "name:string,sku:string,price:decimal,stock:int,a
 ```
 
 Field syntax: `name:type[:extra]` where extra is `refEntity` for `ref` or
-`a|b|c` options for `enum`. Writes `apps/api/entities/product.entity.json`,
-then run `mosaic migrate`.
+`a|b|c` options for `enum`. Writes a **class** to
+`apps/api/src/entities/product.entity.ts`, then run `mosaic migrate`.
 
 ## mosaic studio / dev / info
 
 - `mosaic studio [--port 4173]` — starts the repo Studio pointed at this
   project's API (`PUBLIC_API_URL`).
-- `mosaic dev` — reminder to run `npm run dev` in the project root.
+- `mosaic dev` — runs the project's `npm run dev` (API + web together).
 - `mosaic info` — config summary + live `/api/health` probe.
+
+## Running the CLI from a checkout (before npm publish)
+
+Nothing has to be published to scaffold an app:
+
+```bash
+# from the mosaic-apps checkout — runs the CLI straight from source
+npm run create -- my-app                      # npm run mosaic -- create my-app
+
+# or link the binary globally (builds first)
+npm run link-cli
+mosaic create my-app --link C:/path/to/mosaic-apps
+
+# inside a generated app the workspace script works too
+npx mosaic info
+```
+
+`create` rewrites `@mosaic/*` to `file:` links pointing at `<repo>/packages/*`
+(`--link` overrides the auto-detected checkout, `--npm-mode` keeps registry
+versions instead).
+
+Run `npm run release:check` in the repository to build and dry-pack all public
+workspace packages without publishing them. See [npm packages](./npm-packages.md)
+for package requirements and release order.
