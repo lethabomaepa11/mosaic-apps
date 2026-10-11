@@ -1,12 +1,79 @@
 # Mosaic Platform — Full Execution Plan (Option B)
 
+## Current continuation state (2026-10-11, read before historical progress)
+
+- The active workspace packages are `packages/core`, `packages/server`,
+  `packages/ui`, and `packages/cli`, with release names `@mosaic-apps/core`,
+  `@mosaic-apps/server`, `@mosaic-apps/ui`, and `@mosaic-apps/cli` at `0.2.0`.
+  The previous rename was incomplete. Imports, workspaces, scripts, templates,
+  package links, and docs have been aligned; nested CLI sources were recovered.
+- Every editable code/JSON field uses a Monaco **modal** with Apply/Cancel:
+  execute script, visibility/disabled conditions, safe expressions, request bodies,
+  state values, static records, component props/options, role permissions, settings,
+  code-block properties, and form/page JSON. API responses and migration SQL use
+  read-only Monaco modals. Invalid JSON is rejected before applying, including when
+  no additional schema validator is provided. Preview remains inline.
+  JS/TS switching changes the Monaco model. Cancel/close discards script edits;
+  Apply adds them to the designer, and Save publishes the form/page.
+- Fixed Svelte-proxy cloning during form Save and state writes. Form state
+  mutations now update bound inputs and notify parent bindings. Expression
+  visibility reacts to application/page/form state changes.
+- Script initialization has its own startup deadline; CPU limits start after
+  initialization/transpilation. Obsolete condition runs are cancelled on change
+  and unmount. A cancelled action cannot overwrite a newer action's status.
+- Browser investigation found Buttons receiving an empty child snippet and
+  losing their labels in preview. Leaf components now receive no child snippet.
+  Vite's serve allow list also blocked the source package script worker; Studio
+  and generated app configurations now explicitly allow the UI source directory.
+- Text, textarea, and number fields now associate labels and help/error text with
+  their inputs; datetime inputs have accessible names and required/error state.
+- Fresh generated app install exposed the old Netlify adapter peer range.
+  Template now uses adapter-netlify 7 for SvelteKit 3, declares Tailwind/plugin
+  dependencies, uses matching workspace names, and synchronizes Kit types before
+  checks. Generated API/web builds and Node/Netlify web builds have passed.
+- Architecture decisions and delivery priorities are in
+  `contributor-docs/enterprise-architecture.md`. The next business milestone is an
+  entity-to-table/detail/create/edit workflow generator with explicit state/data
+  ownership, publish validation, and recovery. It is planned, not yet implemented.
+- Public docs now teach application usage and include ten real interface screenshots,
+  a component gallery, and `docs/docs/roadmap.md` for v1. Comparisons were removed at
+  the user's request. Contributor architecture and npm release instructions live
+  under `contributor-docs`, outside the public sidebar. `npm run docs:screenshots`
+  regenerates fictional local-demo fixtures and verifies editor behavior.
+- Defaults: repository Studio/web 3000, API 3001, generated Studio 3002, docs 3003.
+  Generated startup waits for API health before starting web/Studio; frontend port
+  overrides are honored and frontend binds to 127.0.0.1. Repeat-start of repository
+  Studio reuses healthy processes and waits for an occupied, warming Studio port.
+- The generated PWA no longer caches private API records or uploads in a shared
+  cache. Offline synchronization is explicitly documented as future application work.
+- Verified so far: 60 unit tests, 22 API integrations, UI/Studio checks with no
+  diagnostics, production workspace/Studio and docs builds, and four pack lifecycles.
+  Browser checks pass for sandbox state-to-input updates, condition/script modals,
+  runtime autocomplete, Apply/Cancel, and JSON validation with no page exceptions.
+  Fresh tarballs passed isolated API/web/Studio and Netlify builds plus generated
+  development startup and both web/Studio API proxies. Final consumer evidence is
+  retained at `C:/Users/letha/AppData/Local/Temp/mosaic-release-consumer-gcfwg2`.
+- Delivery is organized as focused commits on `main`, targeting `origin/main`.
+  npm publication was attempted after validation and rejected with `EOTP`: the
+  account requires two-factor authentication. All four 0.2.0 package versions
+  still return registry 404. A current OTP or an authenticated publishing session
+  is needed; a question is pending. CI uses idempotent `npm run release:publish`
+  with the configured NPM_TOKEN. Do not claim npm publication succeeded without
+  verifying the registry. No application hosting destination was provided.
+
+Remaining enterprise work must retain explicit status: draft recovery/conflicts,
+metadata/action validation and migration, data-source loading and query lifecycle,
+nested aggregate validation, table row action context, runtime access enforcement,
+theme/branding completion, component accessibility audit, SSO/tenant requirements,
+and production operations evidence. Package publication does not complete these.
+
 ## Overview
-Migrate @mosaic-apps/ui to Tailwind v4 + shadcn-svelte (bits-ui), fix encoding, build Studio file-tree explorer with deep-linked designer routes, add editable sidebar, Svelte transitions, theme/font configurability, entity dropdowns, context menus, keyboard shortcuts — all while keeping generated apps dependency-light via token bridge.
+Migrate @mosaic/ui to Tailwind v4 + shadcn-svelte (bits-ui), fix encoding, build Studio file-tree explorer with deep-linked designer routes, add editable sidebar, Svelte transitions, theme/font configurability, entity dropdowns, context menus, keyboard shortcuts — all while keeping generated apps dependency-light via token bridge.
 
 ---
 
 ## Phase 0 — Encoding repair + finish lucide swap
-- Audit every `.svelte`/`.ts` in `apps/studio`, `packages/ui`, `templates` for mojibake (CP1252-mangled UTF-8: `â†`, `đź`, `U+FFFD` sequences)
+- Audit every `.svelte`/`.ts` in `apps/studio`, `packages/mosaic-ui`, `templates` for mojibake (CP1252-mangled UTF-8: `â†`, `đź`, `U+FFFD` sequences)
 - Fix damaged string literals; replace all remaining raw glyph icons with `<Icon name="…">`:
   - Palette item icons (`Palette.svelte`)
   - Studio Sidebar nav icons + "Sign out" (`Sidebar.svelte`)
@@ -19,9 +86,9 @@ Migrate @mosaic-apps/ui to Tailwind v4 + shadcn-svelte (bits-ui), fix encoding, 
 ---
 
 ## Phase 1 — Tailwind v4 + shadcn-svelte foundation
-- `@mosaic-apps/ui`: `@import 'tailwindcss'` as CSS entry; `@theme` mapping so `--m-*` tokens become Tailwind namespaces — one token set drives both systems
+- `@mosaic/ui`: `@import 'tailwindcss'` as CSS entry; `@theme` mapping so `--m-*` tokens become Tailwind namespaces — one token set drives both systems
 - Deps: `bits-ui`, `tailwind-variants` (cva), `clsx`, `tailwind-merge`; add `cn()` util
-- Vendor shadcn-svelte components into `packages/ui/src/shadcn/` (context-menu, dialog, dropdown-menu, sheet, popover, tooltip, sonner, input, select, switch, checkbox, slider, tabs, table, badge, card, skeleton, spinner, etc.)
+- Vendor shadcn-svelte components into `packages/mosaic-ui/src/shadcn/` (context-menu, dialog, dropdown-menu, sheet, popover, tooltip, sonner, input, select, switch, checkbox, slider, tabs, table, badge, card, skeleton, spinner, etc.)
 - Token bridge: shadcn vars (`--background`, `--primary`, `--radius`…) derive from `--m-*` so existing apps work during migration
 - Studio + template web get `@tailwindcss/vite`; consume the new style entry
 
@@ -95,7 +162,7 @@ Execution authorized by project owner.
 
 Execution was authorized by the project owner. Phases 0, 1, 3, 4, and 5 are implemented in the working tree; Phase 6 validation passes (workspace typecheck: 0 errors, production build, 53 unit tests, and 21 integration checks). The 502 was caused by starting Studio without its API; `npm run dev` now starts both services and the Vite `/api` proxy responds successfully.
 
-Phase 2 is in progress: the Tailwind v4/shadcn-svelte foundation compiles cleanly. Modal, Drawer, Menu, SelectField, Switch, and Checkbox use Bits UI primitives. Mosaic Button, TextField, and TextArea render through vendored shadcn button/input/textarea wrappers, preserving Mosaic props and token styles; wrappers are exported from @mosaic-apps/ui. Remaining legacy components are tracked in Phase E. Workspace typecheck and production build pass. Authenticated Button drag/save/publish browser smoke passed with no runtime exceptions.
+Phase 2 is in progress: the Tailwind v4/shadcn-svelte foundation compiles cleanly. Modal, Drawer, Menu, SelectField, Switch, and Checkbox use Bits UI primitives. Mosaic Button, TextField, and TextArea render through vendored shadcn button/input/textarea wrappers, preserving Mosaic props and token styles; wrappers are exported from @mosaic/ui. Remaining legacy components are tracked in Phase E. Workspace typecheck and production build pass. Authenticated Button drag/save/publish browser smoke passed with no runtime exceptions.
 
 The explorer displays both Forms and Pages roots, with their respective folders and artifact actions. Integration coverage now exercises public nav/theme defaults and form folder create/rename/delete behavior.
 
@@ -189,7 +256,7 @@ The previous continuation notes are historical. Current changes in this pass:
 - **Studio 502** was reproduced as Vite remaining available on 4173 while the API was absent on 8787. `scripts/dev.mjs` now starts the API, waits for `/api/health`, then starts Vite. It also supports `PUBLIC_API_URL` for an already-running project API and fails visibly after a 120-second health timeout. Both root `dev:studio` and workspace `studio dev` use this launcher. Manual check: Studio root, proxied health, and proxied nav return 200.
 - **Page preview** now switches the page canvas inline; only page JSON remains a modal.
 - **Embedded form recursion** now checks ancestor form IDs. The previous implementation accidentally included the selected form itself in the ancestor check and rejected every selection; this is fixed. The root FormRenderer supplies its current form ID so direct and indirect cycles are stopped before loading the repeated form.
-- **State-management foundation** is now implemented and exported from `@mosaic-apps/ui`: instance-owned application/page/form scopes, cloned serializable snapshots, set/update/reset, subscriptions and revision counters, forked page/form scopes, serialize/restore, FormRenderer/PageRenderer context integration, and nested form isolation. Unit tests cover immutable snapshots, notifications/revisions, scope sharing/isolation, and restore. This does **not** complete the state requirement: persistence adapters, cross-tab/server synchronization, history/undo integration, async action lifecycle, a typed script API, and component action wiring remain open.
+- **State-management foundation** is now implemented and exported from `@mosaic/ui`: instance-owned application/page/form scopes, cloned serializable snapshots, set/update/reset, subscriptions and revision counters, forked page/form scopes, serialize/restore, FormRenderer/PageRenderer context integration, and nested form isolation. Unit tests cover immutable snapshots, notifications/revisions, scope sharing/isolation, and restore. This does **not** complete the state requirement: persistence adapters, cross-tab/server synchronization, history/undo integration, async action lifecycle, a typed script API, and component action wiring remain open.
 - **npm packaging** now has public scoped publish config, package READMEs, prepack build/check lifecycles, and `npm run release:check`. The CLI template is copied into the package for the pack lifecycle and cleaned afterward. `@types/pg` is a production dependency because published server declarations refer to pg types. No npm publication was performed.
 - Docs were refreshed for current Studio lifecycle, forms/pages, embedded forms, state scope/API and limitations, theme capabilities, CLI dev startup, catalog count, and npm package checks. Root docs scripts now correctly target the docs project, which is outside the npm workspace glob.
 
