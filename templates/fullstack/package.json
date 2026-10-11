@@ -19,7 +19,7 @@
   },
   "devDependencies": {
     "@sveltejs/kit": "^3.0.1",
-    "@mosaic-apps/cli": "^0.2.2"
+    "@mosaic-apps/cli": "^0.2.3"
   },
   "overrides": {
     "@sveltejs/kit": "$@sveltejs/kit"

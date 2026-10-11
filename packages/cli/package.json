@@ -1,6 +1,6 @@
 {
   "name": "@mosaic-apps/cli",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Mosaic CLI: scaffold, migrate, seed and drive Mosaic full-stack apps",
   "publishConfig": {
     "access": "public"
