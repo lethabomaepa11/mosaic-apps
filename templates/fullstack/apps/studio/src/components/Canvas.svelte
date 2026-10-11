@@ -8,7 +8,7 @@
   }
 </script>
 
-<svelte:window onclick={clearCanvasSelection} onkeydown={(e) => { if (e.key === 'Escape') designer.select(null); }} />
+<svelte:window onclick={clearCanvasSelection} onkeydown={(e) => { if (e.key === 'Escape' && !(e.target instanceof Element && e.target.closest('[role="dialog"]'))) designer.select(null); }} />
 
 <div class="design-canvas">
   {#if designer.root}

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { TextField, TextArea, NumberField, Switch, SelectField, ColorPicker, JsonEditor, Checkbox } from '$ui';
+  import { CodeEditorField, TextField, TextArea, NumberField, Switch, SelectField, ColorPicker, JsonEditor, Checkbox } from '$ui';
   import type { PropDesc } from '$ui';
   import ActionEditor from './ActionEditor.svelte';
   import ConditionEditor from './ConditionEditor.svelte';
@@ -7,12 +7,13 @@
   interface Props {
     desc: PropDesc;
     value: unknown;
+    language?: string;
     options?: string[];
     artifacts?: { value: string; label: string; kind?: 'form' | 'page' }[];
     onChange: (v: unknown) => void;
   }
 
-  let { desc, value, options = [], artifacts = [], onChange }: Props = $props();
+  let { desc, value, language = 'typescript', options = [], artifacts = [], onChange }: Props = $props();
   let search = $state('');
   const matchingArtifacts = $derived(artifacts.filter((item) => item.label.toLocaleLowerCase().includes(search.toLocaleLowerCase())).slice(0, 10));
   $effect(() => {
@@ -71,6 +72,8 @@
   {:else}
   <JsonEditor label={desc.label} value={value ?? null} rows={6} oninput={(v) => onChange(v)} />
   {/if}
+{:else if desc.kind === 'code'}
+  <CodeEditorField label={desc.label} value={String(value ?? '')} language={language === 'json' ? 'json' : language === 'javascript' || language === 'js' ? 'javascript' : language === 'plaintext' ? 'plaintext' : 'typescript'} oninput={onChange} />
 {:else if desc.kind === 'text'}
   <TextArea label={desc.label} value={String(value ?? '')} rows={3} oninput={(v) => onChange(v)} />
 {:else if desc.kind === 'binding'}

@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { JsonEditor, Modal, SelectField, Switch, TextArea, TextField } from '@mosaic-apps/ui';
-import type { ComponentAction, ScriptAction, ScriptLanguage, StateScope } from '@mosaic-apps/core';
+  import { CodeEditorField, JsonEditor, Modal, SelectField, Switch, TextArea, TextField } from '@mosaic-apps/ui';
+  import type { ComponentAction, ScriptAction, ScriptLanguage, StateScope } from '@mosaic-apps/core';
   import CodeEditor from './CodeEditor.svelte';
 
   interface ArtifactOption { value: string; label: string; kind: 'form' | 'page' }
@@ -9,7 +9,7 @@ import type { ComponentAction, ScriptAction, ScriptLanguage, StateScope } from '
   const actions = $derived(Array.isArray(value) ? value as ComponentAction[] : []);
   let scriptOpen = $state(false);
   let scriptIndex = $state<number | null>(null);
-  const selectedScript = $derived(scriptIndex === null ? undefined : actions[scriptIndex]?.type === 'script' ? (actions[scriptIndex] as ScriptAction) : undefined);
+  let scriptDraft = $state<ScriptAction | null>(null);
   const scopes = [{ value: 'application', label: 'Application' }, { value: 'page', label: 'Page' }, { value: 'form', label: 'Form' }, { value: 'component', label: 'Component' }];
 
   function replace(index: number, action: ComponentAction) {
@@ -37,8 +37,18 @@ import type { ComponentAction, ScriptAction, ScriptLanguage, StateScope } from '
     if (scriptIndex === index) { scriptOpen = false; scriptIndex = null; }
     onchange(actions.filter((_, itemIndex) => itemIndex !== index));
   }
-  function editScript(index: number) { scriptIndex = index; scriptOpen = true; }
-  function patchSelectedScript(changes: Record<string, unknown>) { if (scriptIndex !== null) patch(scriptIndex, changes); }
+  function editScript(index: number) {
+    const action = actions[index];
+    if (action?.type !== 'script') return;
+    scriptIndex = index;
+    scriptDraft = { ...action };
+    scriptOpen = true;
+  }
+  function closeScript() { scriptOpen = false; scriptIndex = null; scriptDraft = null; }
+  function applyScript() {
+    if (scriptIndex !== null && scriptDraft && actions[scriptIndex]?.type === 'script') replace(scriptIndex, { ...scriptDraft });
+    closeScript();
+  }
 </script>
 
 <section class="action-editor">
@@ -50,7 +60,7 @@ import type { ComponentAction, ScriptAction, ScriptLanguage, StateScope } from '
         <strong>Action {index + 1}</strong>
         <button type="button" class="m-btn m-btn--ghost m-btn--sm" onclick={() => remove(index)}>Remove</button>
       </div>
-      <SelectField label="Type" value={action.type} options={[{value:'message',label:'Show message'},{value:'api',label:'Call API'},{value:'navigate',label:'Navigate'},{value:'state.set',label:'Set state'},{value:'script',label:'Run custom code'}]} oninput={(next) => changeType(index, next as ComponentAction['type'])} />
+      <SelectField label="Type" value={action.type} options={[{value:'message',label:'Show message'},{value:'api',label:'Call API'},{value:'navigate',label:'Navigate'},{value:'state.set',label:'Set state'},{value:'script',label:'Execute script'}]} oninput={(next) => changeType(index, next as ComponentAction['type'])} />
       {#if action.type === 'message'}
         <SelectField label="Style" value={action.variant ?? 'info'} options={[{value:'info',label:'Info'},{value:'success',label:'Success'},{value:'warning',label:'Warning'},{value:'error',label:'Error'}]} oninput={(variant) => patch(index, { variant })} />
         <TextField label="Title" value={action.title} oninput={(title) => patch(index, { title })} />
@@ -80,23 +90,26 @@ import type { ComponentAction, ScriptAction, ScriptLanguage, StateScope } from '
         <TextField label="State path" value={action.target.path} oninput={(path) => patch(index, { target: { ...action.target, path } })} />
         <JsonEditor label="Value" value={action.value} rows={3} oninput={(nextValue) => patch(index, { value: nextValue })} />
       {/if}
-      <TextField label="Run when (optional)" value={action.when ?? ''} placeholder="form.status === 'ready'" oninput={(when) => patch(index, { when: when || undefined })} />
+      <CodeEditorField label="Run when (optional)" value={action.when ?? ''} language="javascript" helpText="Optional safe expression, for example form.status === 'ready'." oninput={(when) => patch(index, { when: when || undefined })} />
     </article>
   {/each}
 </section>
 
-<Modal bind:open={scriptOpen} title="Execute script" size="lg" onclose={() => (scriptIndex = null)}>
-  {#if selectedScript && scriptIndex !== null}
+<Modal bind:open={scriptOpen} title="Execute script" size="lg" onclose={closeScript}>
+  {#if scriptDraft && scriptIndex !== null}
     <div class="script-modal">
       <div class="script-modal__toolbar">
-        <SelectField label="Language" value={selectedScript.language ?? 'typescript'} options={[{value:'typescript',label:'TypeScript'},{value:'javascript',label:'JavaScript'}]} oninput={(language) => patchSelectedScript({ language: language as ScriptLanguage })} />
-        <div class="m-alert m-alert--info"><strong>Sandboxed</strong><span>No DOM, cookies, browser storage, or direct network access. Return Mosaic actions to perform approved work.</span></div>
+        <SelectField label="Language" value={scriptDraft.language ?? 'typescript'} clearable={false} options={[{value:'typescript',label:'TypeScript'},{value:'javascript',label:'JavaScript'}]} oninput={(language) => { if (scriptDraft) scriptDraft.language = language as ScriptLanguage; }} />
+        <p class="m-field__help">Read current values from <code>state</code>. Return actions using the <code>api</code> helpers.</p>
       </div>
-      <CodeEditor label="Execute script code" value={selectedScript.source} language={selectedScript.language ?? 'typescript'} height={500} onchange={(source) => patchSelectedScript({ source })} />
-      <p class="m-field__help">Use <code>state</code> for current values and <code>api</code> for typed helpers. Return an array of actions. The default execution deadline is 500ms.</p>
+      <CodeEditor label="Execute script code" value={scriptDraft.source} language={scriptDraft.language ?? 'typescript'} height={500} onchange={(source) => { if (scriptDraft) scriptDraft.source = source; }} />
+      <p class="m-field__help">Scripts run in an isolated sandbox with a 500ms default execution limit. Apply changes, then save the form or page to publish.</p>
     </div>
   {/if}
-  {#snippet footer()}<button type="button" class="m-btn m-btn--primary" onclick={() => (scriptOpen = false)}>Done</button>{/snippet}
+  {#snippet footer()}
+    <button type="button" class="m-btn m-btn--secondary" onclick={closeScript}>Cancel</button>
+    <button type="button" class="m-btn m-btn--primary" onclick={applyScript} disabled={!scriptDraft}>Apply script</button>
+  {/snippet}
 </Modal>
 
 <style>
@@ -108,7 +121,6 @@ import type { ComponentAction, ScriptAction, ScriptLanguage, StateScope } from '
   .script-preview { display:block; padding:8px; overflow:hidden; color:var(--m-muted); background:var(--m-surface); border:1px solid var(--m-border); border-radius:var(--m-radius-sm); white-space:nowrap; text-overflow:ellipsis; }
   .script-modal { display:grid; gap:12px; min-height:560px; }
   .script-modal__toolbar { display:grid; grid-template-columns:180px 1fr; gap:12px; align-items:end; }
-  .script-modal__toolbar .m-alert { display:flex; gap:8px; align-items:center; min-height:40px; }
   @media(max-width:720px) { .script-modal__toolbar { grid-template-columns:1fr; } }
 </style>
 

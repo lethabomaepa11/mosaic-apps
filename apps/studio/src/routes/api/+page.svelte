@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { toast } from '@mosaic-apps/ui';
+  import { CodeEditorField, toast } from '@mosaic-apps/ui';
   import type { EntityDef } from '@mosaic-apps/core';
   import { client } from '#lib/client';
 
@@ -72,12 +72,12 @@
     <button class="m-btn m-btn--primary" disabled={busy} onclick={send}>{busy ? 'Sending…' : 'Send'}</button>
   </div>
   {#if method !== 'GET'}
-    <textarea class="m-textarea m-mono" rows="7" bind:value={body} spellcheck="false"></textarea>
+    <CodeEditorField label="Request body" bind:value={body} language="json" validate={(raw) => { try { JSON.parse(raw); } catch (error) { return error instanceof Error ? error.message : 'Enter valid JSON'; } }} />
   {/if}
   <div class="m-row" style="justify-content:space-between">
     <span class="m-small m-muted">Tip: add ?include=owner, ?page=2, ?sort=-createdAt, ?q=text</span>
     {#if status}<span class="m-badge" class:m-badge--success={status < 300} class:m-badge--danger={status >= 400}>HTTP {status}</span>{/if}
   </div>
-  {#if response}<pre class="m-code">{response}</pre>{/if}
+  {#if response}<CodeEditorField label="API response" value={response} language={status ? 'json' : 'plaintext'} readOnly />{/if}
 </section>
 

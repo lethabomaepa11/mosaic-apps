@@ -4,8 +4,7 @@
     "paths": {
       "#lib": ["./src/lib/client.ts"],
       "#lib/*": ["./src/lib/*"],
-      "$ui": ["../../packages/ui/src/index.ts"],
-      "@mosaic-apps/core": ["../../packages/core/src/browser.ts"]
+      "$ui": ["./node_modules/@mosaic-apps/ui/src/index.ts", "../../node_modules/@mosaic-apps/ui/src/index.ts"]
     }
   },
   "include": ["src", "test", "*"],

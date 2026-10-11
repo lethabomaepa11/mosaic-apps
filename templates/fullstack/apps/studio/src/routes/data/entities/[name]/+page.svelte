@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { page } from '$app/state';
-  import { EntityForm, EntityTable, Icon, Modal, toast } from '@mosaic-apps/ui';
+  import { CodeEditorField, EntityForm, EntityTable, Icon, Modal, toast } from '@mosaic-apps/ui';
   import EntityFields from '../../../../components/EntityFields.svelte';
   import type { EntityDef } from '@mosaic-apps/core';
   import { client as api } from '#lib/client';
@@ -122,7 +122,7 @@
       {#if plan.empty}
         <p class="m-muted">Schema is up to date.</p>
       {:else}
-        <div class="sql-preview">{plan.statements.map((s) => s.sql).join(';\n')};</div>
+        <CodeEditorField label="Migration SQL" value={plan.statements.map((s) => s.sql).join(';\n') + ';'} language="sql" readOnly />
         {#if plan.warnings.length}
           <div class="m-alert m-alert--warning" style="margin-top:10px">
             {#each plan.warnings as w (w)}<div>{w}</div>{/each}

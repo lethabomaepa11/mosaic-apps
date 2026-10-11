@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { Badge, Button, toast } from '@mosaic-apps/ui';
+  import { CodeEditorField, Badge, Button, toast } from '@mosaic-apps/ui';
   import { client } from '#lib/client';
 
   interface Statement {
@@ -77,7 +77,7 @@
   {:else}
     <section class="m-card" style="margin-bottom:18px">
       <header class="m-card__header"><strong>Pending plan</strong><span class="m-badge">{plan.statements.length} statement(s)</span></header>
-      <div class="sql-preview">{plan.statements.map((s) => s.sql).join(';\n')};</div>
+      <CodeEditorField label="Migration SQL" value={plan.statements.map((s) => s.sql).join(';\n') + ';'} language="sql" readOnly />
       {#if plan.warnings.length}
         <div class="m-alert m-alert--warning" style="margin-top:10px">
           {#each plan.warnings as w (w)}<div>{w}</div>{/each}

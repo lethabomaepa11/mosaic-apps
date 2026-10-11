@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { page } from '$app/state';
-  import { Icon, Modal, PageRenderer, toast } from '@mosaic-apps/ui';
+  import { CodeEditor, Icon, Modal, PageRenderer, toast } from '@mosaic-apps/ui';
   import type { PageDef, PageSettings } from '@mosaic-apps/core';
   import { client } from '#lib/client';
   import { designer } from '#lib/designer.svelte';
@@ -171,9 +171,9 @@
 {/if}
 
 <Modal bind:open={showJson} title="Page JSON" size="lg">
-  <textarea class="m-textarea m-mono" rows="18" bind:value={jsonText} spellcheck="false"></textarea>
+  <CodeEditor label="Page JSON" value={jsonText} language="json" height={500} onchange={(value) => (jsonText = value)} />
   {#snippet footer()}
-    <button class="m-btn m-btn--ghost" onclick={() => (showJson = false)}>Close</button>
+    <button class="m-btn m-btn--ghost" onclick={() => (showJson = false)}>Cancel</button>
     <button class="m-btn m-btn--primary" onclick={applyJson}>Apply to canvas</button>
   {/snippet}
 </Modal>

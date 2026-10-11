@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Icon, toast } from '@mosaic-apps/ui';
+  import { Icon, JsonEditor, toast } from '@mosaic-apps/ui';
   import type { AuditEntry, RefList, SettingRecord } from '@mosaic-apps/core';
   import { client } from '#lib/client';
 
@@ -59,17 +59,8 @@
         <tr>
           <td><code>{setting.key}</code><div class="m-small m-muted">{setting.description ?? ''}</div></td>
           <td>
-            <input
-              class="m-input m-mono"
-              value={typeof setting.value === 'string' ? setting.value : JSON.stringify(setting.value)}
-              onchange={(e) => {
-                const raw = (e.currentTarget as HTMLInputElement).value;
-                let value: unknown = raw;
-                try {
-                  value = JSON.parse(raw);
-                } catch {
-                  /* keep as string */
-                }
+            <JsonEditor label={setting.key} value={setting.value}
+              oninput={(value) => {
                 const next = [...settings];
                 next[i] = { ...setting, value };
                 onsettings(next);

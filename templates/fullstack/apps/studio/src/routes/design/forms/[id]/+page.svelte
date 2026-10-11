@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { page } from '$app/state';
-  import { FormRenderer, Modal, toast, Icon } from '@mosaic-apps/ui';
+  import { CodeEditor, FormRenderer, Modal, toast, Icon } from '@mosaic-apps/ui';
   import type { FormDataSource, FormDef, EntityDef, FormSettings } from '@mosaic-apps/core';
   import { client } from '#lib/client';
   import { designer } from '#lib/designer.svelte';
@@ -86,9 +86,9 @@
         description,
         folder: folder.trim() || undefined,
         entity: entity || undefined,
-        root: structuredClone(designer.form.root),
-        settings: structuredClone(settings),
-        dataSource: structuredClone(dataSource),
+        root: structuredClone($state.snapshot(designer.form.root)),
+        settings: structuredClone($state.snapshot(settings)),
+        dataSource: structuredClone($state.snapshot(dataSource)),
       };
       if (folder.trim()) await client.createFormFolder(folder.trim());
       const published = await client.saveAndPublishForm({ ...payload, expectedVersion: designer.form.version });
@@ -98,8 +98,8 @@
       designer.form.folder = folder.trim() || undefined;
       designer.form.entity = entity || undefined;
       designer.form.description = description;
-      designer.form.settings = structuredClone(settings);
-      designer.form.dataSource = structuredClone(dataSource);
+      designer.form.settings = structuredClone($state.snapshot(settings));
+      designer.form.dataSource = structuredClone($state.snapshot(dataSource));
       if (draftSignature() === submittedSignature) {
         designer.markSaved();
         toast.success(`Saved and published${published.version ? ` v${published.version}` : ''}`);
@@ -246,9 +246,9 @@
 {/if}
 
 <Modal bind:open={showJson} title="Form JSON" size="lg">
-  <textarea class="m-textarea m-mono" rows="18" bind:value={jsonText} spellcheck="false"></textarea>
+  <CodeEditor label="Form JSON" value={jsonText} language="json" height={500} onchange={(value) => (jsonText = value)} />
   {#snippet footer()}
-    <button class="m-btn m-btn--ghost" onclick={() => (showJson = false)}>Close</button>
+    <button class="m-btn m-btn--ghost" onclick={() => (showJson = false)}>Cancel</button>
     <button class="m-btn m-btn--primary" onclick={applyJson}>Apply to canvas</button>
   {/snippet}
 </Modal>

@@ -59,7 +59,7 @@
       {/if}
     </div>
     {#if dataSource.kind === 'static'}
-      <div class="settings-json"><JsonEditor label="Static record" value={dataSource.data} rows={8} oninput={(data) => ondatasource({ ...dataSource, data: (data && typeof data === 'object' && !Array.isArray(data) ? data : {}) as Record<string, unknown> })} /></div>
+      <div class="settings-json"><JsonEditor label="Static record" value={dataSource.data} validate={(data) => data && typeof data === 'object' && !Array.isArray(data) ? undefined : 'Enter a JSON object for the static record.'} oninput={(data) => ondatasource({ ...dataSource, data: data as Record<string, unknown> })} /></div>
     {/if}
   </Card>
 

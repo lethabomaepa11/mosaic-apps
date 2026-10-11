@@ -4,10 +4,11 @@ import { defineConfig } from 'vite';
 import tailwindcss from '@tailwindcss/vite';
 import { fileURLToPath } from 'node:url';
 
-const apiUrl = process.env.PUBLIC_API_URL ?? 'http://localhost:8787';
+const apiUrl = process.env.PUBLIC_API_URL ?? 'http://localhost:3001';
 
 /** SvelteKit 3: all config lives in vite.config.ts (svelte.config.js removed). */
 export default defineConfig({
+  optimizeDeps: { include: ['monaco-editor/editor/editor.main', '@jitl/quickjs-wasmfile-release-sync', 'quickjs-emscripten-core', 'typescript'] },
   plugins: [tailwindcss(), sveltekit({ adapter: adapter() })],
   resolve: {
     alias: {
@@ -18,14 +19,15 @@ export default defineConfig({
     },
   },
   server: {
-    port: Number(process.env.PORT ?? 4173),
+    fs: { allow: [fileURLToPath(new URL('../../packages/core/src', import.meta.url)), fileURLToPath(new URL('../../packages/ui/src', import.meta.url))] },
+    port: Number(process.env.PORT ?? 3000),
     proxy: {
       '/api': { target: apiUrl.replace(/\/api$/, ''), changeOrigin: true },
       '/files': { target: apiUrl.replace(/\/api$/, ''), changeOrigin: true },
     },
   },
   preview: {
-    port: Number(process.env.PORT ?? 4173),
+    port: Number(process.env.PORT ?? 3000),
     proxy: {
       '/api': { target: apiUrl.replace(/\/api$/, ''), changeOrigin: true },
       '/files': { target: apiUrl.replace(/\/api$/, ''), changeOrigin: true },

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { TextArea, toast } from '@mosaic-apps/ui';
+  import { JsonEditor, toast } from '@mosaic-apps/ui';
   import { client } from '#lib/client';
 
   interface Role {
@@ -43,19 +43,9 @@
         <strong>{role.displayName || role.name}</strong>
         <code class="m-badge">{role.name}</code>
       </div>
-      <TextArea
-        label="Permissions (one per line; `*` = admin, `entity:*:read`, `forms:manage`…)"
-        rows={6}
-        value={role.permissions.join('\n')}
-        oninput={(v) =>
-          setPermissions(
-            i,
-            String(v ?? '')
-              .split('\n')
-              .map((s) => s.trim())
-              .filter(Boolean),
-          )}
-      />
+      <JsonEditor label="Permissions" value={role.permissions} helpText="A JSON array of permission names: *, entity:*:read, forms:manage."
+        validate={(value) => Array.isArray(value) && value.every((permission) => typeof permission === 'string' && permission.trim()) ? undefined : 'Enter an array of nonempty permission strings.'}
+        oninput={(value) => setPermissions(i, (value as string[]).map((permission) => permission.trim()))} />
       <button class="m-btn m-btn--primary m-btn--sm" style="margin-top:10px" onclick={() => saveRole(roles[i]!)}>Save role</button>
     </section>
   {/each}
