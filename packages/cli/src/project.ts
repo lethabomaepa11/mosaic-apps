@@ -193,7 +193,11 @@ export function run(cmd: string, args: string[], cwd: string): void {
   // Native executables preserve argument boundaries without cmd.exe. Only package
   // manager shims require a shell on Windows; their arguments here are fixed.
   const packageManager = /^(npm|pnpm|yarn)(\.cmd)?$/i.test(cmd);
-  const res = spawnSync(cmd, args, { cwd, stdio: 'inherit', windowsHide: true, shell: process.platform === 'win32' && packageManager });
+  // A normal helper must not inherit node:test's binary child reporter protocol.
+  const env = { ...process.env };
+  delete env.NODE_TEST_CONTEXT;
+  delete env.NODE_TEST_WORKER_ID;
+  const res = spawnSync(cmd, args, { cwd, env, stdio: 'inherit', windowsHide: true, shell: process.platform === 'win32' && packageManager });
   if (res.error) throw new Error(`Could not run ${cmd}: ${res.error.message}`);
   if (res.status !== 0) throw new Error(`${cmd} ${args.join(' ')} failed (exit ${res.status})`);
 }
