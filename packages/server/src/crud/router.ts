@@ -93,6 +93,8 @@ export function crudRoutes(deps: CrudDeps): Hono<AuthEnv> {
     return ok(c, {
       entity,
       fields: allFields(entity),
+      capabilities: Object.fromEntries(['read', 'create', 'update', 'delete'].map((action) =>
+        [action, canAccessEntity(c.get('user'), entity, action as 'read' | 'create' | 'update' | 'delete')])),
       endpoints: {
         list: `GET /api/entities/${entity.name}`,
         get: `GET /api/entities/${entity.name}/:id`,

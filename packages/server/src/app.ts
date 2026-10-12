@@ -24,6 +24,7 @@ import { seedPlatform, type SeedOptions } from './seed.js';
 import { HttpError, fail, mapDbError } from './modules/http.js';
 import { QueryError } from './crud/sql.js';
 import { endpointRegistryRoutes } from './endpoints/registry.js';
+import { workflowRoutes } from './modules/workflows.js';
 
 export interface MosaicServerConfig {
   databaseUrl: string;
@@ -127,6 +128,7 @@ export async function createMosaicServer(config: MosaicServerConfig): Promise<Mo
 
   // ---- modules ----
   app.route('/api/auth', authRoutes({ db, secret: jwtSecret, enabled: authEnabled, tokenTtl, allowRegistration }));
+  app.route('/api/workflows', workflowRoutes(db));
   app.route('/api/entities', crudRoutes({ db, authEnabled, resolveEntity }));
   app.route('/api/entities', entityAdminRoutes(db, reloadRegistry));
   app.route('/api/forms', artifactRoutes({ db, kind: 'form', managePerm: 'forms:manage' }));

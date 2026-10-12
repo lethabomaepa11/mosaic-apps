@@ -1,7 +1,7 @@
 /** Key/value application settings (mosaic_settings). */
 
 import { Hono } from 'hono';
-import type { SettingRecord } from '@mosaic-apps/core';
+import type { PageSettings, SettingRecord, NavItemDef } from '@mosaic-apps/core';
 import type { Db } from '../db/driver.js';
 import { HttpError, fail, ok, readJson } from './http.js';
 import { requirePermission } from './rbac.js';
@@ -15,9 +15,16 @@ export function navRoutes(db: Db): Hono<AuthEnv> {
   app.get('/', async (c) => {
     const res = await db.query<{ value: unknown }>("SELECT value FROM mosaic_settings WHERE key = 'app.nav'");
     const value = res.rows[0]?.value;
-    const items = Array.isArray(value) && value.every((item) => item && typeof item.label === 'string' && typeof item.href === 'string')
-      ? value
+    const items: NavItemDef[] = Array.isArray(value) && value.every((item) => item && typeof item.label === 'string' && typeof item.href === 'string')
+      ? [...value]
       : DEFAULT_NAV;
+    const pages = await db.query<{ name: string; slug: string; route: string; settings: PageSettings }>('SELECT name, slug, route, settings FROM mosaic_pages WHERE published = true ORDER BY name');
+    const menuPages = pages.rows.filter(page => page.settings?.menu?.show === true && (!page.settings.requiresAuth || !!c.get('user')))
+      .sort((a, b) => (a.settings.menu?.order ?? 0) - (b.settings.menu?.order ?? 0));
+    for (const page of menuPages) {
+      const href = page.route || `/p/${page.slug}`;
+      if (!items.some(item => item.href === href)) items.push({ label: page.settings.title ?? page.name, href, icon: page.settings.menu?.icon, section: page.settings.menu?.group });
+    }
     return ok(c, { items });
   });
   return app;

@@ -110,6 +110,10 @@ function requireManage(user: AuthUser | null, perm: string, action: string): Aut
   return user;
 }
 
+function requiresAuthentication(row: ArtifactRow, kind: ArtifactKind): boolean {
+  return !row.published || (kind === 'page' && !!(row.settings as { requiresAuth?: boolean } | null)?.requiresAuth);
+}
+
 function canonical(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
   if (value && typeof value === 'object') {
@@ -231,19 +235,21 @@ export function artifactRoutes(deps: ArtifactDeps): Hono<AuthEnv> {
       `SELECT ${returnCols(deps.kind)} FROM ${table} ${where} ORDER BY updated_at DESC LIMIT 500`,
       params,
     );
-    return ok(c, res.rows.map((r) => toRecord(r, deps.kind)));
+    return ok(c, res.rows.filter((r) => r.published ? !!user || !requiresAuthentication(r, deps.kind) : requirePermission(user, deps.managePerm)).map((r) => toRecord(r, deps.kind)));
   });
 
   // get by id or slug (published artifacts are readable anonymously)
   app.get('/:idOrSlug', async (c) => {
     const row = await rowOr404(c.req.param('idOrSlug'));
-    if (!row.published && !c.get('user')) throw new HttpError(401, 'Authentication required', 'UNAUTHENTICATED');
+    if (requiresAuthentication(row, deps.kind) && !c.get('user')) throw new HttpError(401, 'Authentication required', 'UNAUTHENTICATED');
+    if (!row.published) requireManage(c.get('user'), deps.managePerm, 'read draft');
     return ok(c, toRecord(row, deps.kind));
   });
 
   // versions (forms only)
   if (deps.kind === 'form') {
     app.get('/:idOrSlug/versions', async (c) => {
+      requireManage(c.get('user'), deps.managePerm, 'read history');
       const row = await rowOr404(c.req.param('idOrSlug'));
       const res = await deps.db.query<{ version: number; snapshot: unknown; published_at: string }>(
         'SELECT version, snapshot, published_at FROM mosaic_form_versions WHERE form_id = $1 ORDER BY version DESC',
@@ -259,6 +265,7 @@ export function artifactRoutes(deps: ArtifactDeps): Hono<AuthEnv> {
       );
     });
     app.get('/:idOrSlug/versions/:version', async (c) => {
+      requireManage(c.get('user'), deps.managePerm, 'read history');
       const row = await rowOr404(c.req.param('idOrSlug'));
       const version = Number(c.req.param('version'));
       const res = await deps.db.query<{ version: number; snapshot: unknown; published_at: string }>(
