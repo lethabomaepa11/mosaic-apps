@@ -41,8 +41,9 @@ export function workflowRoutes(db: Db): Hono<AuthEnv> {
         await tx.query('INSERT INTO mosaic_form_versions (id, form_id, version, snapshot) VALUES ($1,$2,1,$3::jsonb)', [newId('fv'), form.id, JSON.stringify(result.rows[0])]);
       }
       const page = workflow.page;
-      await tx.query(`INSERT INTO mosaic_pages (id, slug, name, folder, route, version, published, schema, settings)
-        VALUES ($1,$2,$3,$4,$5,1,true,$6::jsonb,$7::jsonb)`, [page.id, page.slug, page.name, page.folder, page.route, JSON.stringify(page.root), JSON.stringify(page.settings)]);
+      const insertedPage = await tx.query(`INSERT INTO mosaic_pages (id, slug, name, folder, route, version, published, schema, settings)
+        VALUES ($1,$2,$3,$4,$5,1,true,$6::jsonb,$7::jsonb) RETURNING *`, [page.id, page.slug, page.name, page.folder, page.route, JSON.stringify(page.root), JSON.stringify(page.settings)]);
+      await tx.query('INSERT INTO mosaic_page_versions (id, page_id, version, snapshot) VALUES ($1,$2,1,$3::jsonb)', [newId('pv'), page.id, JSON.stringify(insertedPage.rows[0])]);
       await tx.query(`INSERT INTO mosaic_audit_log (action, entity, record_id, changes, user_id, user_email)
         VALUES ('generate', 'workflow', $1, $2::jsonb, $3, $4)`, [page.id, JSON.stringify({ entity: { from: null, to: body.entity }, views: { from: null, to: slugs } }), user.id, user.email]);
     });

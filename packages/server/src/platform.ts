@@ -70,6 +70,15 @@ CREATE TABLE IF NOT EXISTS mosaic_pages (
   updated_at  timestamptz NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS mosaic_page_versions (
+  id text PRIMARY KEY,
+  page_id text NOT NULL,
+  version integer NOT NULL,
+  snapshot jsonb NOT NULL,
+  published_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (page_id, version)
+);
+
 CREATE TABLE IF NOT EXISTS mosaic_users (
   id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   email         text NOT NULL UNIQUE,

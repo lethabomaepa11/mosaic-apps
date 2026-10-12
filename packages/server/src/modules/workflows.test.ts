@@ -38,5 +38,14 @@ test('entity views are authorized, linked, published atomically and protected ag
     assert.equal(resolved.status, 200);
     assert.deepEqual(((await resolved.json()) as { data: { params: unknown } }).data.params, { id: '123' });
     assert.equal((await server.app.request('/api/pages/resolve?path=%2Fclients%2F123')).status, 401);
+    const history = await server.app.request(`/api/pages/${workflow.page.id}/versions`, { headers: { Authorization: `Bearer ${token}` } });
+    assert.equal(history.status, 200);
+    assert.equal(((await history.json()) as { data: unknown[] }).data.length, 2);
+    const restore = () => server.app.request(`/api/pages/${workflow.page.id}/versions/1/restore`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ expectedVersion: 2 }) });
+    const restored = await restore();
+    assert.equal(restored.status, 200);
+    const restoredPage = ((await restored.json()) as { data: { route: string; version: number } }).data;
+    assert.equal(restoredPage.route, workflow.page.route); assert.equal(restoredPage.version, 3);
+    assert.equal((await restore()).status, 409, 'Stale restoration must preserve the newer definition.');
   } finally { await server.close(); }
 });

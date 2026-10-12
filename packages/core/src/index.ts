@@ -10,6 +10,7 @@ export * from './ids.js';
 export * from './query.js';
 export * from './form/tree.js';
 export * from './form/workflow.js';
+export * from './form/validation.js';
 export * from './page/routing.js';
 export * from './expression/index.js';
 export * from './entity/defaults.js';

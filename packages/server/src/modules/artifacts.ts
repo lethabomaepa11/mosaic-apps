@@ -1,7 +1,7 @@
 /** Form & page artifacts: JSON schemas stored in postgres, with publish-versioning. */
 
 import { Hono } from 'hono';
-import { ensureRoot, matchPageRoute, pageRouteSpecificity, validatePageRoute, slugify, type FormDef, type PageDef } from '@mosaic-apps/core';
+import { ensureRoot, matchPageRoute, pageRouteSpecificity, validateDefinitionTree, validatePageRoute, slugify, type FormDef, type PageDef } from '@mosaic-apps/core';
 import type { Db } from '../db/driver.js';
 import { HttpError, fail, ok, readJson } from './http.js';
 import { requirePermission } from './rbac.js';
@@ -98,6 +98,8 @@ function assertUsableSchema(schema: unknown, kind: ArtifactKind): { type: string
     throw new HttpError(422, 'schema.children must be an array', 'BAD_SCHEMA');
   }
   const root = { ...s, type: kind === 'form' ? 'form' : 'page', children: Array.isArray(s.children) ? s.children : [] };
+  if (typeof (root as { id?: unknown }).id !== 'string' || !(root as { id?: string }).id?.trim()) (root as { id?: string }).id = `${prefixFor(kind)}_root_${Math.random().toString(36).slice(2)}`;
+  try { validateDefinitionTree(root); } catch (error) { throw new HttpError(422, error instanceof Error ? error.message : 'Invalid component tree.', 'BAD_SCHEMA'); }
   ensureRoot(root as never);
   return root as { type: string; children: unknown[] };
 }
@@ -148,6 +150,13 @@ function sameArtifactContent(left: ArtifactRow, right: ArtifactRow): boolean {
 export function artifactRoutes(deps: ArtifactDeps): Hono<AuthEnv> {
   const app = new Hono<AuthEnv>();
   const table = tableFor(deps.kind);
+  const historyTable = deps.kind === 'form' ? 'mosaic_form_versions' : 'mosaic_page_versions';
+  const historyKey = deps.kind === 'form' ? 'form_id' : 'page_id';
+  async function snapshotPublished(tx: Db, row: ArtifactRow) {
+    if (!row.published) return;
+    const existing = await tx.query(`SELECT 1 FROM ${historyTable} WHERE ${historyKey} = $1 AND version = $2`, [row.id, row.version]);
+    if (!existing.rows.length) await tx.query(`INSERT INTO ${historyTable} (id, ${historyKey}, version, snapshot) VALUES ($1,$2,$3,$4::jsonb)`, [`av_${Math.random().toString(36).slice(2)}`, row.id, row.version, JSON.stringify(row)]);
+  }
 
   const rowOr404 = async (idOrSlug: string): Promise<ArtifactRow> => {
     const res = await deps.db.query<ArtifactRow>(`SELECT ${returnCols(deps.kind)} FROM ${table} WHERE id = $1 OR slug = $1`, [
@@ -269,13 +278,13 @@ export function artifactRoutes(deps: ArtifactDeps): Hono<AuthEnv> {
     return ok(c, toRecord(row, deps.kind));
   });
 
-  // versions (forms only)
-  if (deps.kind === 'form') {
+  // Published history is management-only for both artifact kinds.
+  {
     app.get('/:idOrSlug/versions', async (c) => {
       requireManage(c.get('user'), deps.managePerm, 'read history');
       const row = await rowOr404(c.req.param('idOrSlug'));
       const res = await deps.db.query<{ version: number; snapshot: unknown; published_at: string }>(
-        'SELECT version, snapshot, published_at FROM mosaic_form_versions WHERE form_id = $1 ORDER BY version DESC',
+        `SELECT version, snapshot, published_at FROM ${historyTable} WHERE ${historyKey} = $1 ORDER BY version DESC LIMIT 100`,
         [row.id],
       );
       return ok(
@@ -292,7 +301,7 @@ export function artifactRoutes(deps: ArtifactDeps): Hono<AuthEnv> {
       const row = await rowOr404(c.req.param('idOrSlug'));
       const version = Number(c.req.param('version'));
       const res = await deps.db.query<{ version: number; snapshot: unknown; published_at: string }>(
-        'SELECT version, snapshot, published_at FROM mosaic_form_versions WHERE form_id = $1 AND version = $2',
+        `SELECT version, snapshot, published_at FROM ${historyTable} WHERE ${historyKey} = $1 AND version = $2`,
         [row.id, version],
       );
       const found = res.rows[0];
@@ -304,6 +313,34 @@ export function artifactRoutes(deps: ArtifactDeps): Hono<AuthEnv> {
       });
     });
   }
+
+  app.post('/:idOrSlug/versions/:version/restore', async (c) => {
+    const user = requireManage(c.get('user'), deps.managePerm, 'restore');
+    const body = await readJson<{ expectedVersion?: number }>(c);
+    const version = Number(c.req.param('version'));
+    if (!Number.isInteger(version) || version < 1 || !Number.isInteger(body?.expectedVersion)) throw new HttpError(422, 'Choose a published version and supply expectedVersion.', 'BAD_VERSION');
+    const restored = await deps.db.tx(async tx => {
+      const selected = await tx.query<ArtifactRow>(`SELECT ${returnCols(deps.kind)} FROM ${table} WHERE id = $1 OR slug = $1 FOR UPDATE`, [c.req.param('idOrSlug')]);
+      const current = selected.rows[0];
+      if (!current) throw new HttpError(404, 'Artifact not found.', 'NOT_FOUND');
+      if (current.version !== body.expectedVersion) throw new HttpError(409, 'This definition changed after it was loaded.', 'STALE_VERSION', { expectedVersion: body.expectedVersion, actualVersion: current.version });
+      const result = await tx.query<{ snapshot: ArtifactRow }>(`SELECT snapshot FROM ${historyTable} WHERE ${historyKey} = $1 AND version = $2`, [current.id, version]);
+      const saved = result.rows[0]?.snapshot;
+      if (!saved) throw new HttpError(404, 'Published version not found.', 'NOT_FOUND');
+      const root = assertUsableSchema(saved.schema, deps.kind);
+      validateArtifactInput({ settings: saved.settings ?? {}, ...(deps.kind === 'page' ? { route: saved.route } : {}) }, deps.kind);
+      await snapshotPublished(tx, current);
+      const fields = deps.kind === 'page' ? ['name', 'description', 'folder', 'route', 'schema', 'settings'] : ['name', 'description', 'folder', 'entity', 'schema', 'data_source', 'settings'];
+      const values = fields.map(key => ['schema', 'settings', 'data_source'].includes(key) ? JSON.stringify(key === 'schema' ? root : saved[key as keyof ArtifactRow] ?? null) : saved[key as keyof ArtifactRow] ?? null);
+      const assignments = fields.map((key, index) => `${key} = $${index + 2}${['schema', 'settings', 'data_source'].includes(key) ? '::jsonb' : ''}`).join(', ');
+      const updated = await tx.query<ArtifactRow>(`UPDATE ${table} SET ${assignments}, published = true, version = version + 1, updated_at = now() WHERE id = $1 RETURNING ${returnCols(deps.kind)}`, [current.id, ...values]);
+      const row = updated.rows[0]!;
+      await tx.query(`INSERT INTO ${historyTable} (id, ${historyKey}, version, snapshot) VALUES ($1,$2,$3,$4::jsonb)`, [`av_${Math.random().toString(36).slice(2)}`, row.id, row.version, JSON.stringify(row)]);
+      await tx.query('INSERT INTO mosaic_audit_log (action, entity, record_id, changes, user_id, user_email) VALUES ($1,$2,$3,$4::jsonb,$5,$6)', ['restore', deps.kind, row.id, JSON.stringify({ version: { from: current.version, to: row.version }, restoredFrom: { from: null, to: version } }), user.id, user.email]);
+      return row;
+    });
+    return ok(c, toRecord(restored, deps.kind));
+  });
 
   // create
   app.post('/', async (c) => {
@@ -365,6 +402,7 @@ export function artifactRoutes(deps: ArtifactDeps): Hono<AuthEnv> {
       if (expectedVersion !== undefined && (!Number.isInteger(expectedVersion) || expectedVersion !== row.version)) {
         throw new HttpError(409, `This ${deps.kind} changed after it was loaded`, 'STALE_VERSION', { expectedVersion, actualVersion: row.version });
       }
+      await snapshotPublished(tx, row);
       const schemaInput = body.root ?? body.schema;
       const root = schemaInput !== undefined ? assertUsableSchema(schemaInput, deps.kind) : row.schema;
       let updated: ArtifactRow;
@@ -406,9 +444,9 @@ export function artifactRoutes(deps: ArtifactDeps): Hono<AuthEnv> {
         [row.id, nextVersion],
       );
       updated = final.rows[0]!;
-      if (deps.kind === 'form' && changed) {
+      if (changed) {
         await tx.query(
-          'INSERT INTO mosaic_form_versions (id, form_id, version, snapshot) VALUES ($1, $2, $3, $4::jsonb)',
+          `INSERT INTO ${historyTable} (id, ${historyKey}, version, snapshot) VALUES ($1, $2, $3, $4::jsonb)`,
           [`fv_${Math.random().toString(36).slice(2, 12)}`, row.id, nextVersion, JSON.stringify(updated)],
         );
       }
@@ -489,18 +527,19 @@ export function artifactRoutes(deps: ArtifactDeps): Hono<AuthEnv> {
       const selected = await tx.query<ArtifactRow>(`SELECT ${returnCols(deps.kind)} FROM ${table} WHERE id = $1 OR slug = $1 FOR UPDATE`, [idOrSlug]);
       const row = selected.rows[0];
       if (!row) throw new HttpError(404, `${deps.kind} not found`, 'NOT_FOUND');
-      if (deps.kind === 'form' && row.published) {
+      await snapshotPublished(tx, row);
+      if (row.published) {
         const previous = await tx.query<{ snapshot: unknown }>(
-          'SELECT snapshot FROM mosaic_form_versions WHERE form_id = $1 ORDER BY version DESC LIMIT 1', [row.id],
+          `SELECT snapshot FROM ${historyTable} WHERE ${historyKey} = $1 ORDER BY version DESC LIMIT 1`, [row.id],
         );
         if (previous.rows[0] && samePublishedContent(row, previous.rows[0].snapshot)) return { row, changed: false };
       }
       const nextVersion = row.version + 1;
       await tx.query(`UPDATE ${table} SET published = true, version = $2, updated_at = now() WHERE id = $1`, [row.id, nextVersion]);
-      if (deps.kind === 'form') {
+      {
         const snapshot = { ...row, version: nextVersion, published: true };
         await tx.query(
-          'INSERT INTO mosaic_form_versions (id, form_id, version, snapshot) VALUES ($1, $2, $3, $4::jsonb)',
+          `INSERT INTO ${historyTable} (id, ${historyKey}, version, snapshot) VALUES ($1, $2, $3, $4::jsonb)`,
           [`fv_${Math.random().toString(36).slice(2, 12)}`, row.id, nextVersion, JSON.stringify(snapshot)],
         );
       }
@@ -526,9 +565,7 @@ export function artifactRoutes(deps: ArtifactDeps): Hono<AuthEnv> {
     const user = requireManage(c.get('user'), deps.managePerm, 'delete');
     const row = await rowOr404(c.req.param('idOrSlug'));
     await deps.db.query(`DELETE FROM ${table} WHERE id = $1`, [row.id]);
-    if (deps.kind === 'form') {
-      await deps.db.query('DELETE FROM mosaic_form_versions WHERE form_id = $1', [row.id]);
-    }
+    await deps.db.query(`DELETE FROM ${historyTable} WHERE ${historyKey} = $1`, [row.id]);
     writeAudit(deps.db, { action: 'delete', entity: deps.kind, recordId: row.id, user });
     return ok(c, { id: row.id, deleted: true });
   });

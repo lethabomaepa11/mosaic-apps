@@ -62,6 +62,7 @@ export async function createMosaicServer(config: MosaicServerConfig): Promise<Mo
   const db = isPgliteUrl(config.databaseUrl)
     ? await createPgliteDriver(config.databaseUrl)
     : createPgDriver(config.databaseUrl);
+  try {
   await ensurePlatformTables(db);
 
   const authEnabled = config.auth?.enabled ?? true;
@@ -171,6 +172,10 @@ export async function createMosaicServer(config: MosaicServerConfig): Promise<Mo
     authEnabled,
     close: () => db.close(),
   };
+  } catch (error) {
+    await db.close().catch(() => undefined);
+    throw error;
+  }
 }
 
 /** Convenience: app only (caller owns the db lifecycle). */

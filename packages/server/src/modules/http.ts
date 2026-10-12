@@ -54,10 +54,13 @@ export function mapDbError(err: unknown): HttpError | null {
 }
 
 export async function readJson<T = Record<string, unknown>>(c: Context): Promise<T> {
+  let value: unknown;
   try {
-    return (await c.req.json()) as T;
+    value = await c.req.json();
   } catch {
     throw new HttpError(400, 'Request body must be valid JSON', 'BAD_JSON');
   }
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new HttpError(422, 'Request body must be a JSON object', 'BAD_INPUT');
+  return value as T;
 }
 
