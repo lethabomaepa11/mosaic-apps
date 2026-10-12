@@ -17,7 +17,7 @@ export function navRoutes(db: Db): Hono<AuthEnv> {
     const value = res.rows[0]?.value;
     const items: NavItemDef[] = Array.isArray(value) && value.every((item) => item && typeof item.label === 'string' && typeof item.href === 'string')
       ? [...value]
-      : DEFAULT_NAV;
+      : [...DEFAULT_NAV];
     const pages = await db.query<{ name: string; slug: string; route: string; settings: PageSettings }>('SELECT name, slug, route, settings FROM mosaic_pages WHERE published = true ORDER BY name');
     const menuPages = pages.rows.filter(page => page.settings?.menu?.show === true && (!page.settings.requiresAuth || !!c.get('user')))
       .sort((a, b) => (a.settings.menu?.order ?? 0) - (b.settings.menu?.order ?? 0));

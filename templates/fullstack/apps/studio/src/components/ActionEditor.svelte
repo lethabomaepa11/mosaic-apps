@@ -73,6 +73,7 @@
           <label class="m-field"><span class="m-field__label">{action.target === 'form' ? 'Form' : 'Page'}</span><input class="m-input" list={`artifact-${index}`} value={action.to} placeholder={`Search ${action.target}s`} oninput={(event) => patch(index, { to: event.currentTarget.value })} /><datalist id={`artifact-${index}`}>{#each artifacts.filter((item) => item.kind === action.target) as item}<option value={item.value}>{item.label}</option>{/each}</datalist></label>
         {/if}
         <Switch label="Open in new tab" value={action.newTab ?? false} oninput={(newTab) => patch(index, { newTab })} />
+        {#if action.target === 'page'}<JsonEditor label="Route parameters" value={action.params ?? {}} oninput={(params) => patch(index, { params })} />{/if}
       {:else if action.type === 'api'}
         <SelectField label="Method" value={action.method ?? 'GET'} options={['GET','POST','PUT','PATCH','DELETE'].map((method) => ({value:method,label:method}))} oninput={(method) => patch(index, { method })} />
         <TextField label="API path" value={action.path} placeholder="/entities/customer" oninput={(path) => patch(index, { path })} />

@@ -35,7 +35,7 @@
 </script>
 
 <div class="m-field">
-  {#if label}<label for={inputId} class="m-field__label">{label}{#if required}<span class="m-field__req">*</span>{/if}</label>{/if}
+  {#if label}<label for={inputId} class="m-field__label">{label}{#if required}<span class="m-field__req" aria-hidden="true">*</span>{/if}</label>{/if}
   <ShadcnInput class={`m-input${error ? ' m-input--invalid' : ''}`}
     id={inputId} {required} aria-invalid={!!error} ariaDescribedBy={error || helpText ? messageId : undefined}
     type="number" inputmode="decimal" {placeholder} {min} {max} {step} {disabled}

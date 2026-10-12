@@ -34,6 +34,7 @@
       <TextField label="Folder" value={folder} oninput={onfolder} placeholder="Optional folder path" />
       <TextArea label="Description" value={description} oninput={ondescription} rows={3} />
       <SelectField label="Entity" value={entity || null} placeholder="No entity" options={entities.map((item) => ({ value: item.name, label: item.label ?? item.name }))} oninput={(value) => onentity(value ?? '')} />
+      <SelectField label="Runtime mode" value={settings.mode ?? 'create'} clearable={false} options={[{value:'create',label:'Create record'},{value:'edit',label:'Edit record'},{value:'view',label:'Read-only detail view'}]} oninput={(mode) => update({ mode: mode as FormSettings['mode'] })} />
       <SelectField label="Layout" value={settings.layout ?? 'vertical'} options={[{value:'vertical',label:'Vertical'},{value:'horizontal',label:'Horizontal'},{value:'inline',label:'Inline'}]} oninput={(layout) => update({ layout: layout as FormSettings['layout'] })} />
       <NumberField label="Layout columns" value={settings.columns ?? 1} min={1} max={4} step={1} oninput={(columns) => update({ columns: Math.max(1, Math.min(4, columns ?? 1)) })} />
       <SelectField label="Entrance animation" value={settings.transition?.kind ?? 'fade'} options={[{value:'fade',label:'Fade'},{value:'slide',label:'Slide'},{value:'scale',label:'Scale'},{value:'blur',label:'Blur'},{value:'none',label:'None'}]} oninput={(kind) => update({ transition: { ...settings.transition, kind: kind as NonNullable<FormSettings['transition']>['kind'] } })} />
@@ -51,11 +52,12 @@
       }} />
       {#if dataSource.kind === 'entity'}
         <SelectField label="Entity" value={dataSource.entity || null} placeholder="Choose entity" options={entities.map((item) => ({ value: item.name, label: item.label ?? item.name }))} oninput={(sourceEntity) => ondatasource({ ...dataSource, entity: sourceEntity ?? '' })} />
-        <TextField label="Record ID or state template" value={dataSource.recordId ?? ''} placeholder={'{{page.recordId}}'} oninput={(recordId) => ondatasource({ ...dataSource, recordId })} />
+        <TextField label="Record ID or state template" value={dataSource.recordId ?? ''} placeholder={'$query.id or {{page.recordId}}'} oninput={(recordId) => ondatasource({ ...dataSource, recordId })} />
       {:else if dataSource.kind === 'endpoint'}
         <TextField label="Endpoint path" value={dataSource.url} placeholder={'/api/orders/{{page.id}}'} oninput={(url) => ondatasource({ ...dataSource, url })} />
         <SelectField label="Method" value={dataSource.method ?? 'GET'} options={[{value:'GET',label:'GET'},{value:'POST',label:'POST'}]} oninput={(method) => ondatasource({ ...dataSource, method: method as 'GET' | 'POST' })} />
         <TextField label="Record path" value={dataSource.recordPath ?? ''} placeholder="data.record" oninput={(recordPath) => ondatasource({ ...dataSource, recordPath })} />
+        {#if dataSource.method === 'POST'}<JsonEditor label="Request body" value={dataSource.body ?? {}} oninput={(body) => ondatasource({ ...dataSource, body })} />{/if}
       {/if}
     </div>
     {#if dataSource.kind === 'static'}

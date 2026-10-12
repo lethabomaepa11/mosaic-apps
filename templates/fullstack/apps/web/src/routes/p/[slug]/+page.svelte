@@ -1,6 +1,5 @@
 <script lang="ts">
   import { page } from '$app/state';
-  import { onMount } from 'svelte';
   import { PageRenderer } from '@mosaic-apps/ui';
   import type { PageDef } from '@mosaic-apps/core';
   import { client } from '#lib/client';
@@ -10,12 +9,14 @@
   let pageDef = $state<PageDef | null>(null);
   let error = $state('');
 
-  onMount(async () => {
-    try {
-      pageDef = await client.getPage(slug);
-    } catch (err) {
-      error = err instanceof Error ? err.message : String(err);
-    }
+  let request = 0;
+  $effect(() => {
+    const current = ++request;
+    const selected = slug;
+    pageDef = null; error = '';
+    void client.getPage(selected).then((result) => { if (current === request) pageDef = result; })
+      .catch((reason) => { if (current === request) error = reason instanceof Error ? reason.message : String(reason); });
+    return () => { request += 1; };
   });
 </script>
 

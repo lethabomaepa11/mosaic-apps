@@ -36,7 +36,7 @@
 </script>
 
 <div class="m-field">
-  {#if label}<span class="m-field__label">{label}{#if required}<span class="m-field__req">*</span>{/if}</span>{/if}
+  {#if label}<span class="m-field__label">{label}{#if required}<span class="m-field__req" aria-hidden="true">*</span>{/if}</span>{/if}
   <BitsSelect.Root type="single" value={selectedValue} items={selectItems} {onValueChange} {disabled} {required}>
     <BitsSelect.Trigger class={error ? 'm-select m-select--invalid' : 'm-select'} aria-label={label ?? placeholder} aria-invalid={!!error}>
       <BitsSelect.Value placeholder={placeholder} />

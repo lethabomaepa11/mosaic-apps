@@ -24,7 +24,7 @@
     <BitsCheckbox.Root class="m-checkbox" checked={value} {disabled} {onCheckedChange} aria-label={label ?? helpText ?? 'Checkbox'}>
       {#if value}<Check size={12} />{/if}
     </BitsCheckbox.Root>
-    <span>{label ?? 'Checkbox'}{#if required}<span class="m-field__req">*</span>{/if}</span>
+    <span>{label ?? 'Checkbox'}{#if required}<span class="m-field__req" aria-hidden="true">*</span>{/if}</span>
   </label>
   {#if helpText}<span class="m-field__help">{helpText}</span>{/if}
 </div>

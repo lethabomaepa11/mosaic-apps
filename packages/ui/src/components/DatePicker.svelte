@@ -54,7 +54,7 @@
 </script>
 
 <div class="m-field">
-  {#if label}<span class="m-field__label">{label}{#if required}<span class="m-field__req">*</span>{/if}</span>{/if}
+  {#if label}<span class="m-field__label">{label}{#if required}<span class="m-field__req" aria-hidden="true">*</span>{/if}</span>{/if}
   {#if withTime}
     <ShadcnInput class={`m-input${error ? ' m-input--invalid' : ''}`} type="datetime-local" ariaLabel={label ?? 'Choose date and time'} aria-invalid={!!error} {required} {min} {max} {disabled} value={value ?? ''} oninput={onInput} />
   {:else}

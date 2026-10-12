@@ -18,6 +18,7 @@
   let showPreview = $state(false);
   let showSettings = $state(false);
   let saving = $state(false);
+  let saveAgain = false;
   let jsonText = $state('');
   let name = $state('');
   let description = $state('');
@@ -51,9 +52,13 @@
     }
   });
 
+  function draftSignature() { return JSON.stringify({ name, description, route, folder: folder.trim(), settings, root: designer.page?.root }); }
+
   async function save(): Promise<boolean> {
-    if (!designer.page || saving) return false;
+    if (!designer.page) return false;
+    if (saving) { saveAgain = true; return false; }
     saving = true;
+    const submittedSignature = draftSignature();
     try {
       if (folder.trim()) await client.createPageFolder(folder.trim());
       const published = await client.saveAndPublishPage({
@@ -62,25 +67,29 @@
         description,
         route,
         folder: folder.trim() || undefined,
-        root: designer.page.root,
+        root: structuredClone($state.snapshot(designer.page.root)),
         expectedVersion: designer.page.version,
-        settings,
+        settings: structuredClone($state.snapshot(settings)),
       });
       designer.page.version = published.version;
       designer.page.published = published.published;
-      designer.page.name = published.name;
-      designer.page.description = published.description;
-      designer.page.route = published.route;
-      designer.page.folder = published.folder;
-      designer.page.settings = published.settings;
-      designer.markSaved();
-      toast.success(`Saved and published${published.version ? ` v${published.version}` : ''}`);
+      designer.page.name = name;
+      designer.page.description = description;
+      designer.page.route = route;
+      designer.page.folder = folder.trim() || undefined;
+      designer.page.settings = structuredClone($state.snapshot(settings));
+      if (draftSignature() === submittedSignature) {
+        designer.markSaved();
+        toast.success(`Saved and published${published.version ? ` v${published.version}` : ''}`);
+      } else saveAgain = true;
       return true;
     } catch (err) {
+      saveAgain = false;
       toast.error('Save failed', err instanceof Error ? err.message : String(err));
       return false;
     } finally {
       saving = false;
+      if (saveAgain) { saveAgain = false; queueMicrotask(() => void save()); }
     }
   }
 
@@ -111,6 +120,7 @@
   }
 
   function onKey(event: KeyboardEvent) {
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') { event.preventDefault(); void save(); return; }
     const target = event.target;
     if (target instanceof HTMLElement && (target.isContentEditable || target.closest('input, textarea, select, [contenteditable="true"]'))) return;
     if ((event.metaKey || event.ctrlKey) && event.key === 'z') { event.preventDefault(); event.shiftKey ? designer.redo() : designer.undo(); }

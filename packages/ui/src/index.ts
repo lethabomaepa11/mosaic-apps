@@ -39,6 +39,7 @@ export { toast } from './stores/toast.svelte.js';
 export type { Toast, ToastVariant } from './stores/toast.svelte.js';
 export { createMosaicState, MosaicState, StateStore, MOSAIC_STATE_CONTEXT } from './state/store.js';
 export type { MosaicStateInitials, StateListener } from './state/store.js';
+export { persistState, browserStateStorage, type StateStorageAdapter, type StatePersistenceOptions } from './state/persistence.js';
 export { ActionRunner, createActionRunner, type ActionContext } from './actions/runner.js';
 export { runActionScript, runBooleanScript, type SandboxOptions } from './actions/sandbox.js';
 
@@ -109,4 +110,6 @@ export { default as LegacyButton } from './components/Button.svelte';
 export { default as Menu } from './components/Menu.svelte';
 export { default as Chart } from './components/Chart.svelte';
 export { default as PanelCard } from './components/Card.svelte';
+export * from './state/navigation.js';
+export * from './state/data-source.js';
 

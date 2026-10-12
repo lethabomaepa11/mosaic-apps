@@ -1,4 +1,4 @@
-import { evaluateBoolean, type ActionExecutionState, type ComponentAction, type StateScope } from '@mosaic-apps/core';
+import { buildPageRoute, evaluateBoolean, type ActionExecutionState, type ComponentAction, type StateScope } from '@mosaic-apps/core';
 import type { MosaicClient } from '../client/api.js';
 import type { MosaicState, StateStore } from '../state/store.js';
 import { runActionScript } from './sandbox.js';
@@ -8,7 +8,7 @@ export interface ActionContext {
   client?: MosaicClient;
   state: MosaicState;
   data?: Record<string, unknown>;
-  navigate?: (href: string, newTab: boolean) => void;
+  navigate?: (href: string, newTab: boolean) => void | Promise<void>;
   notify?: (variant: 'info' | 'success' | 'warning' | 'error', title: string, description?: string) => void;
 }
 
@@ -114,8 +114,12 @@ export class ActionRunner {
         this.context.notify?.(action.variant ?? 'info', title, description || undefined);
         result = undefined;
       } else if (action.type === 'navigate') {
-        const href = navigationHref(action, scope);
-        (this.context.navigate ?? defaultNavigate)(href, action.newTab ?? false);
+        const href = action.target === 'page' && this.context.client
+          ? buildPageRoute((await this.context.client.getPage(String(resolveValue(action.to, scope) ?? ''))).route,
+            resolveValue(action.params ?? readPath(scope, 'page.params') ?? {}, scope) as Record<string, unknown>)
+          : navigationHref(action, scope);
+        if (controller.signal.aborted) throw new DOMException('Action cancelled', 'AbortError');
+        await (this.context.navigate ?? defaultNavigate)(href, action.newTab ?? false);
         result = href;
       } else if (action.type === 'state.set') {
         result = resolveValue(action.value, scope);

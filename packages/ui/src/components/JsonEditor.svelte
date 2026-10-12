@@ -7,10 +7,11 @@
     oninput?: (value: unknown) => void;
     rows?: number;
     disabled?: boolean;
+    readOnly?: boolean;
     helpText?: string;
     validate?: (value: unknown) => string | undefined;
   }
-  let { label = 'JSON', value = $bindable<unknown>(null), oninput, disabled, helpText, validate }: Props = $props();
+  let { label = 'JSON', value = $bindable<unknown>(null), oninput, disabled, readOnly = false, helpText, validate }: Props = $props();
   const text = $derived(JSON.stringify(value ?? null, null, 2));
   function validateJson(raw: string): string | undefined {
     try { const parsed: unknown = JSON.parse(raw); return validate?.(parsed); }
@@ -19,4 +20,4 @@
   function apply(raw: string) { value = JSON.parse(raw); oninput?.(value); }
 </script>
 
-<CodeEditorField {label} value={text} language="json" {disabled} {helpText} validate={validateJson} oninput={apply} />
+<CodeEditorField {label} value={text} language="json" disabled={!!disabled && !readOnly} {readOnly} {helpText} validate={validateJson} oninput={apply} />

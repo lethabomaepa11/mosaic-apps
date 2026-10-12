@@ -27,7 +27,7 @@
 </script>
 
 <div class="m-field">
-  {#if label}<span class="m-field__label">{label}{#if required}<span class="m-field__req">*</span>{/if}</span>{/if}
+  {#if label}<span class="m-field__label">{label}{#if required}<span class="m-field__req" aria-hidden="true">*</span>{/if}</span>{/if}
   <div class="m-choice m-choice--row">
     {#each opts as o (o.value)}
       <label class="m-check">

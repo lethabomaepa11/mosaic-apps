@@ -1,7 +1,7 @@
 /** Form & page artifacts: JSON schemas stored in postgres, with publish-versioning. */
 
 import { Hono } from 'hono';
-import { ensureRoot, slugify, type FormDef, type PageDef } from '@mosaic-apps/core';
+import { ensureRoot, matchPageRoute, pageRouteSpecificity, validatePageRoute, slugify, type FormDef, type PageDef } from '@mosaic-apps/core';
 import type { Db } from '../db/driver.js';
 import { HttpError, fail, ok, readJson } from './http.js';
 import { requirePermission } from './rbac.js';
@@ -114,6 +114,17 @@ function requiresAuthentication(row: ArtifactRow, kind: ArtifactKind): boolean {
   return !row.published || (kind === 'page' && !!(row.settings as { requiresAuth?: boolean } | null)?.requiresAuth);
 }
 
+function validateArtifactInput(body: Record<string, unknown>, kind: ArtifactKind): void {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) throw new HttpError(422, 'An artifact object is required.', 'BAD_INPUT');
+  if (kind === 'page' && body.route !== undefined) {
+    try { validatePageRoute(body.route as string); } catch (error) { throw new HttpError(422, error instanceof Error ? error.message : 'Invalid page route.', 'BAD_ROUTE'); }
+  }
+  if (body.settings !== undefined && (!body.settings || typeof body.settings !== 'object' || Array.isArray(body.settings))) throw new HttpError(422, 'Settings must be an object.', 'BAD_SETTINGS');
+  const settings = body.settings as { requiresAuth?: unknown; mode?: unknown } | undefined;
+  if (kind === 'page' && settings?.requiresAuth !== undefined && typeof settings.requiresAuth !== 'boolean') throw new HttpError(422, 'Require authentication must be a boolean.', 'BAD_SETTINGS');
+  if (kind === 'form' && settings?.mode !== undefined && !['create', 'edit', 'view'].includes(String(settings.mode))) throw new HttpError(422, 'Form mode must be create, edit or view.', 'BAD_SETTINGS');
+}
+
 function canonical(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
   if (value && typeof value === 'object') {
@@ -146,6 +157,18 @@ export function artifactRoutes(deps: ArtifactDeps): Hono<AuthEnv> {
     if (!row) throw new HttpError(404, `${deps.kind} not found`, 'NOT_FOUND');
     return row;
   };
+
+  if (deps.kind === 'page') app.get('/resolve', async (c) => {
+    const path = c.req.query('path') ?? '';
+    if (!path.startsWith('/') || path.length > 2000) throw new HttpError(422, 'A local page path is required.', 'BAD_ROUTE');
+    const result = await deps.db.query<ArtifactRow>(`SELECT ${returnCols('page')} FROM ${table} WHERE published = true ORDER BY route, id`);
+    const matches = result.rows.map(row => ({ row, params: matchPageRoute(row.route ?? `/${row.slug}`, path) }))
+      .filter(match => match.params !== null).sort((a, b) => pageRouteSpecificity(b.row.route!) - pageRouteSpecificity(a.row.route!));
+    const selected = matches[0];
+    if (!selected) throw new HttpError(404, 'Page not found.', 'NOT_FOUND');
+    if (requiresAuthentication(selected.row, 'page') && !c.get('user')) throw new HttpError(401, 'Authentication required', 'UNAUTHENTICATED');
+    return ok(c, { page: toRecord(selected.row, 'page'), params: selected.params });
+  });
 
   app.get('/folders', async (c) => {
     if (!c.get('user')) throw new HttpError(401, 'Authentication required', 'UNAUTHENTICATED');
@@ -286,6 +309,7 @@ export function artifactRoutes(deps: ArtifactDeps): Hono<AuthEnv> {
   app.post('/', async (c) => {
     const user = requireManage(c.get('user'), deps.managePerm, 'create');
     const body = await readJson<Record<string, unknown>>(c);
+    validateArtifactInput(body, deps.kind);
     const name = String(body.name ?? '').trim();
     if (!name) throw new HttpError(422, 'name is required', 'BAD_INPUT');
     const root = assertUsableSchema(body.schema ?? { type: deps.kind, children: [] }, deps.kind);
@@ -332,6 +356,7 @@ export function artifactRoutes(deps: ArtifactDeps): Hono<AuthEnv> {
     const user = requireManage(c.get('user'), deps.managePerm, 'publish');
     const idOrSlug = c.req.param('idOrSlug');
     const body = await readJson<Record<string, unknown>>(c);
+    validateArtifactInput(body, deps.kind);
     const expectedVersion = body.expectedVersion === undefined ? undefined : Number(body.expectedVersion);
     const result = await deps.db.tx(async (tx) => {
       const selected = await tx.query<ArtifactRow>(`SELECT ${returnCols(deps.kind)} FROM ${table} WHERE id = $1 OR slug = $1 FOR UPDATE`, [idOrSlug]);
@@ -399,6 +424,7 @@ export function artifactRoutes(deps: ArtifactDeps): Hono<AuthEnv> {
     const user = requireManage(c.get('user'), deps.managePerm, 'update');
     const row = await rowOr404(c.req.param('idOrSlug'));
     const body = await readJson<Record<string, unknown>>(c);
+    validateArtifactInput(body, deps.kind);
     const schemaInput = body.root ?? body.schema;
     const root = schemaInput !== undefined ? assertUsableSchema(schemaInput, deps.kind) : (row.schema as never);
     if (deps.kind === 'page') {

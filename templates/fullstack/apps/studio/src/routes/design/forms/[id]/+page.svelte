@@ -108,6 +108,7 @@
       }
       return true;
     } catch (err) {
+      saveAgain = false;
       toast.error('Save failed', err instanceof Error ? err.message : String(err));
       return false;
     } finally {

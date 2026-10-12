@@ -3,6 +3,7 @@
   import { page } from '$app/state';
   import { CodeEditorField, EntityForm, EntityTable, Icon, Modal, toast } from '@mosaic-apps/ui';
   import EntityFields from '../../../../components/EntityFields.svelte';
+  import WorkflowGenerator from '../../../../components/WorkflowGenerator.svelte';
   import type { EntityDef } from '@mosaic-apps/core';
   import { client as api } from '#lib/client';
 
@@ -17,6 +18,7 @@
   let recordModal = $state(false);
   let editRecord = $state<Record<string, unknown> | undefined>(undefined);
   let browseKey = $state(0);
+  let generateOpen = $state(false);
 
   onMount(async () => {
     try {
@@ -92,12 +94,14 @@
       {#if entity.softDelete}<span class="m-badge m-badge--warning">soft delete</span>{/if}
     </div>
     <div class="m-row">
+      <button class="m-btn m-btn--secondary" onclick={() => generateOpen = true}><Icon name="layers" size={16} /> Create application views</button>
       <button class="m-btn m-btn--secondary" onclick={planMigration}><Icon name="gitBranch" size={16} /> Plan migration</button>
       <button class="m-btn m-btn--primary" disabled={saving} onclick={saveEntity}>Save entity</button>
       <button class="m-btn m-btn--danger" onclick={deleteEntity}>Unregister</button>
     </div>
   </header>
 
+  <WorkflowGenerator bind:open={generateOpen} {entity} />
   <EntityFields {entity} onchange={(next) => (entity = next)} />
 
   <section class="m-card">

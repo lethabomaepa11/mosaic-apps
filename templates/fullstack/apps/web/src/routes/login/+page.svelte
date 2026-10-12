@@ -1,5 +1,6 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
+  import { page } from '$app/state';
   import { client } from '#lib/client';
   import { toast } from '@mosaic-apps/ui';
 
@@ -16,7 +17,8 @@
       const res = await client.login(email, password);
       client.setToken(res.token);
       toast.success(`Signed in as ${res.user.name}`);
-      await goto('/');
+      const next = page.url.searchParams.get('next') ?? '/';
+      await goto(next.startsWith('/') && !next.startsWith('//') && !next.includes('\\') ? next : '/');
     } catch (err) {
       error = err instanceof Error ? err.message : String(err);
     } finally {

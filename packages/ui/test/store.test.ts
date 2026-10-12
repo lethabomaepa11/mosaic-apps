@@ -61,3 +61,14 @@ test('reactive proxy values can be stored and isolated from later mutations', ()
   address.city = 'Durban';
   assert.equal(state.form.getPath('address.city'), 'Johannesburg');
 });
+
+test('nested array paths preserve arrays and cannot create unsafe sparse state', () => {
+  const store = new StateStore<Record<string, unknown>>({ items: [{ name: 'First' }] });
+  store.setPath('items.0.name', 'Changed');
+  store.setPath('items.1.name', 'Second');
+  assert.deepEqual(store.get('items'), [{ name: 'Changed' }, { name: 'Second' }]);
+  assert.throws(() => store.setPath('items.100000000.name', 'Too large'), /Invalid state path/);
+  assert.throws(() => store.setPath('items..name', 'Malformed'), /Invalid state path/);
+  assert.throws(() => store.setPath('items.named', 'Not serializable'), /Invalid state path/);
+  assert.equal(new StateStore({}).getPath('toString'), undefined);
+});

@@ -52,10 +52,9 @@
     <thead>
       <tr>
         {#each columns as col (col.key)}
-          <th class:sortable={col.sortable && !!onsort} style={col.width ? `width:${col.width}` : ''}
-            style:text-align={col.align ?? 'left'}
-            onclick={() => col.sortable && onsort?.(col.key)}>
-            {col.label}{#if sortBy === col.key}<span style="opacity:.6">{sortDir === 'desc' ? ' ↓' : ' ↑'}</span>{/if}
+          <th scope="col" aria-sort={sortBy === col.key ? sortDir === 'desc' ? 'descending' : 'ascending' : col.sortable ? 'none' : undefined} class:sortable={col.sortable && !!onsort} style={col.width ? `width:${col.width}` : ''}
+            style:text-align={col.align ?? 'left'}>
+            {#if col.sortable && onsort}<button type="button" class="m-table__sort" onclick={() => onsort?.(col.key)}>{col.label}{#if sortBy === col.key}<span style="opacity:.6">{sortDir === 'desc' ? ' ↓' : ' ↑'}</span>{/if}</button>{:else}{col.label}{/if}
           </th>
         {/each}
         {#if actions}<th style="width:1%"></th>{/if}
@@ -73,6 +72,8 @@
               <td style:text-align={col.align ?? 'left'}>
                 {#if typeof row[col.key] === 'boolean'}
                   {#if row[col.key]}<Icon name="check" size={14} />{:else}—{/if}
+                {:else if onrowclick && col.key === columns[0]?.key}
+                  <button type="button" class="m-table__record-link" onclick={() => onrowclick?.(row)}>{cellValue(row, col)}</button>
                 {:else}
                   {cellValue(row, col)}
                 {/if}
@@ -88,4 +89,6 @@
 
 <style>
   .clickable { cursor: pointer; }
+  .m-table__sort, .m-table__record-link { font:inherit; color:inherit; background:none; border:0; padding:0; cursor:pointer; text-align:inherit; }
+  .m-table__record-link { color:var(--m-primary); text-decoration:underline; text-underline-offset:3px; }
 </style>

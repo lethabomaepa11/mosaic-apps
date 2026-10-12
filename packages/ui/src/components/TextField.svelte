@@ -62,7 +62,7 @@
 
 <div class="m-field">
   {#if label}
-    <label for={inputId} class="m-field__label">{label}{#if required}<span class="m-field__req">*</span>{/if}</label>
+    <label for={inputId} class="m-field__label">{label}{#if required}<span class="m-field__req" aria-hidden="true">*</span>{/if}</label>
   {/if}
   {#if format === 'money'}
     <div class="m-search" style="position:relative">

@@ -18,8 +18,8 @@ function clone<T>(value: T): T {
 const unsafePathParts = new Set(['__proto__', 'prototype', 'constructor']);
 
 function pathParts(path: string): string[] {
-  const parts = path.split('.').map((part) => part.trim()).filter(Boolean);
-  if (!parts.length || parts.some((part) => unsafePathParts.has(part))) throw new Error(`Invalid state path: ${path}`);
+  const parts = path.split('.').map((part) => part.trim());
+  if (!parts.length || parts.some((part) => !part || unsafePathParts.has(part) || (/^\d+$/.test(part) && Number(part) > 10000))) throw new Error(`Invalid state path: ${path}`);
   return parts;
 }
 
@@ -49,7 +49,7 @@ export class StateStore<T extends object> {
   getPath(path: string): unknown {
     let value: unknown = this.current;
     for (const part of pathParts(path)) {
-      if (!value || typeof value !== 'object') return undefined;
+      if (!value || typeof value !== 'object' || !Object.hasOwn(value, part)) return undefined;
       value = (value as Record<string, unknown>)[part];
     }
     return clone(value);
@@ -65,13 +65,15 @@ export class StateStore<T extends object> {
     const parts = pathParts(path);
     const next = clone(this.current) as Record<string, unknown>;
     let cursor = next;
-    for (const part of parts.slice(0, -1)) {
+    for (const [index, part] of parts.slice(0, -1).entries()) {
+      if (Array.isArray(cursor) && !/^\d+$/.test(part)) throw new Error(`Invalid state path: ${path}`);
       const existing = cursor[part];
-      cursor[part] = existing && typeof existing === 'object' && !Array.isArray(existing)
+      cursor[part] = Array.isArray(existing) ? [...existing] : existing && typeof existing === 'object'
         ? { ...(existing as Record<string, unknown>) }
-        : {};
+        : /^\d+$/.test(parts[index + 1]!) ? [] : {};
       cursor = cursor[part] as Record<string, unknown>;
     }
+    if (Array.isArray(cursor) && !/^\d+$/.test(parts.at(-1)!)) throw new Error(`Invalid state path: ${path}`);
     cursor[parts.at(-1)!] = clone(value);
     this.update(() => next as T);
   }

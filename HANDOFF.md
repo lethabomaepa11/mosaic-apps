@@ -1,5 +1,29 @@
 # MOSAIC — HANDOFF / PROGRESS LOG (read this first)
 
+## Active continuation — 2026-10-12
+
+Read the first section of `.opencode/plan.md` before historical notes below.
+CLI **0.2.3 is now published**; main `f611ba1` passed both CI verification jobs
+and publish: https://github.com/lethabomaepa11/mosaic-apps/actions/runs/38188015905.
+Clean Windows consumer also passed locally in isolated main worktree
+`.tmp-generated/cli-release`. Its earlier logs retain failed attempts for diagnosis.
+
+V1 code is on **work/v1-app-workflows**, deliberately separated from immutable
+0.2.0 runtime releases. Entity generator/API commits are pushed. Runtime and Studio
+changes remain in verification before committing/releasing. Browser CRUD workflow
+passed in `.tmp-generated/v1-smoke`: generated views, create, readonly detail, edit,
+SPA navigation, zero browser exceptions. Source checks and 78 initial workspace
+tests passed; persistence/routing additions need the next full sweep.
+Session/local state persistence is opt-in and only stores selected keys. Private
+pages/drafts/history are server-enforced. New route resolution and navigation,
+menu integration, capability-aware CRUD and serialized page saves are implemented.
+
+User is sleeping and requested autonomous progress to v1. Finish recovery/conflict
+UX, metadata history/validation, row actions, branding/themes/storage, docs and
+isolated consumer acceptance before declaring v1. Do not infer that remaining SSO,
+tenant governance or durable business jobs exist. No cloud hosting credentials or
+application deployment target were supplied; provider build support is verified.
+
 ## Current state — 2026-10-11 (takes precedence over historical notes)
 
 Latest continuation: CLI 0.2.1 patch and three public deployment guides now cover

@@ -1,13 +1,21 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, setContext } from 'svelte';
   import { page } from '$app/state';
-  import { onNavigate } from '$app/navigation';
+  import { goto, onNavigate } from '$app/navigation';
   import '../app.css';
-  import { applyThemeConfig, Icon, Toaster } from '@mosaic-apps/ui';
+  import { applyThemeConfig, createMosaicState, Icon, MOSAIC_NAVIGATION_CONTEXT, MOSAIC_STATE_CONTEXT, Toaster } from '@mosaic-apps/ui';
   import type { NavItemDef, ThemeConfig } from '@mosaic-apps/core';
   import { client } from '#lib/client';
 
   let { children } = $props();
+  const runtime = createMosaicState();
+  setContext(MOSAIC_STATE_CONTEXT, runtime);
+  setContext(MOSAIC_NAVIGATION_CONTEXT, (href: string, newTab = false) => {
+    if (newTab) { window.open(href, '_blank', 'noopener,noreferrer'); return; }
+    if (href.startsWith('/') && !href.startsWith('//')) return goto(href);
+    window.location.assign(href);
+  });
+  $effect(() => { runtime.page.update(() => ({ params: page.params, query: Object.fromEntries(page.url.searchParams) })); });
   let user = $state<{ email: string; name: string; roles: string[] } | null>(null);
   let navItems = $state<NavItemDef[]>([{ label: 'Home', href: '/', icon: 'home' }]);
 
@@ -29,17 +37,27 @@
     return groups;
   }, new Map<string, NavItemDef[]>())].map(([section, items]) => ({ section, items })));
 
-  onMount(async () => {
+  onMount(() => {
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
-    const [me, nav, theme] = await Promise.allSettled([client.me(), client.getNav(), client.getTheme()]);
-    if (me.status === 'fulfilled') user = me.value;
-    if (nav.status === 'fulfilled' && nav.value.items.length) navItems = nav.value.items;
-    if (theme.status === 'fulfilled') applyThemeConfig(theme.value);
+    let request = 0;
+    async function refresh() {
+      const current = ++request;
+      const [me, nav, theme] = await Promise.allSettled([client.me(), client.getNav(), client.getTheme()]);
+      if (current !== request) return;
+      if (me.status === 'fulfilled') { user = me.value; runtime.application.set('user', { id: me.value.id, name: me.value.name, roles: me.value.roles }); }
+      else { user = null; runtime.application.set('user', null); }
+      if (nav.status === 'fulfilled') navItems = nav.value.items.length ? nav.value.items : [{ label: 'Home', href: '/', icon: 'home' }];
+      if (theme.status === 'fulfilled') applyThemeConfig(theme.value);
+    }
+    const unsubscribe = client.subscribeSession(() => { runtime.application.reset(); void refresh(); });
+    void refresh();
+    return () => { request += 1; unsubscribe(); };
   });
 
   function logout() {
     client.logout().finally(() => {
       client.setToken(null);
+      runtime.application.reset(); runtime.page.reset(); runtime.form.reset(); runtime.component.reset();
       user = null;
       window.location.href = '/login';
     });

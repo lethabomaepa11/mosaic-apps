@@ -3,6 +3,7 @@
   import type { FormDef } from '@mosaic-apps/core';
   import type { MosaicClient } from '../client/api';
   import FormRenderer from '../render/FormRenderer.svelte';
+  import { FORM_VALIDATION_CONTEXT, type FormValidationRegistry } from '../state/validation';
 
   interface Props {
     formId?: string;
@@ -23,6 +24,9 @@
   const repeatedForm = $derived(formId !== '' && ancestors.includes(formId));
   const tooDeep = $derived(ancestors.length >= 8);
   const initialData = $derived({ ...props, ...(value ?? {}) });
+  const parentValidation = getContext<FormValidationRegistry | undefined>(FORM_VALIDATION_CONTEXT);
+  let renderer = $state<{ validateForm: () => boolean }>();
+  $effect(() => parentValidation?.register(form?.name ?? 'the embedded form', () => !formId.trim() || (!repeatedForm && !tooDeep && !!renderer && renderer.validateForm())));
 
   $effect(() => {
     const id = formId.trim();
@@ -54,7 +58,7 @@
 
 {#if form}
   <section class="m-subform" aria-label={form.name}>
-    <FormRenderer {form} record={initialData} {mode} {client} showActions={false} includeMetadata={false} onchange={update} />
+    <FormRenderer bind:this={renderer} {form} record={initialData} {mode} {client} showActions={false} includeMetadata={false} onchange={update} />
   </section>
 {:else if repeatedForm}
   <div class="m-alert m-alert--warning" role="status">This form is already embedded above. Recursive form embedding is not allowed.</div>

@@ -1,6 +1,6 @@
 /** MosaicClient - typed fetch wrapper for the Mosaic API (part 1: core/auth/meta/entities). */
 
-import type { AuditEntry, EntityDef, FormDef, PageDef, QuerySpec, RefList, SettingRecord, UserRecord } from '@mosaic-apps/core';
+import type { AuditEntry, EntityDef, EntityWorkflow, EntityWorkflowOptions, FormDef, PageDef, QuerySpec, RefList, SettingRecord, UserRecord } from '@mosaic-apps/core';
 import { buildQueryString } from '@mosaic-apps/core';
 
 export interface ClientOptions {
@@ -29,6 +29,7 @@ export class MosaicClient {
   token: string | null;
   private readonly baseUrl: string;
   private readonly onUnauthorized?: () => void;
+  private readonly sessionListeners = new Set<() => void>();
 
   constructor(opts: ClientOptions) {
     this.baseUrl = opts.baseUrl.replace(/\/+$/, '');
@@ -41,14 +42,22 @@ export class MosaicClient {
   }
 
   setToken(token: string | null): void {
+    const changed = this.token !== token;
     this.token = token;
     if (typeof localStorage !== 'undefined') {
       if (token) localStorage.setItem('mosaic_token', token);
       else localStorage.removeItem('mosaic_token');
     }
+    if (changed) for (const listener of this.sessionListeners) listener();
   }
 
-  private async request<T>(method: string, path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
+  /** Refresh application session state when signing in or signing out. */
+  subscribeSession(listener: () => void): () => void {
+    this.sessionListeners.add(listener);
+    return () => { this.sessionListeners.delete(listener); };
+  }
+
+  private async request<T>(method: string, path: string, body?: unknown, signal?: AbortSignal, redirectUnauthorized = true): Promise<T> {
     const headers: Record<string, string> = {};
     if (this.token) headers['Authorization'] = `Bearer ${this.token}`;
     let payload: BodyInit | undefined;
@@ -66,7 +75,7 @@ export class MosaicClient {
       return undefined as T;
     }
     const parsed = json as Ok<T> | Err;
-    if (res.status === 401) this.onUnauthorized?.();
+    if (res.status === 401 && redirectUnauthorized) this.onUnauthorized?.();
     if (!res.ok || (parsed && typeof parsed === 'object' && 'success' in parsed && parsed.success === false)) {
       const error = (parsed as Err).error;
       throw new ApiError(error?.message ?? `HTTP ${res.status}`, res.status, error?.code, error?.details);
@@ -88,7 +97,7 @@ export class MosaicClient {
   }
 
   me(): Promise<{ id: string; email: string; name: string; roles: string[]; permissions: string[]; isAdmin: boolean }> {
-    return this.request('GET', '/auth/me');
+    return this.request('GET', '/auth/me', undefined, undefined, false);
   }
 
   logout(): Promise<void> {
@@ -109,14 +118,20 @@ export class MosaicClient {
   }
 
   // ---- entities ----
+  resolvePage(path: string): Promise<{ page: PageDef; params: Record<string, string> }> {
+    return this.request('GET', `/pages/resolve?path=${encodeURIComponent(path)}`);
+  }
+  generateEntityWorkflow(entity: string, options: EntityWorkflowOptions = {}): Promise<EntityWorkflow> {
+    return this.request('POST', '/workflows/entity', { ...options, entity });
+  }
   listEntities(): Promise<
     { name: string; definition: EntityDef; label: string; labelPlural: string; version: number; updatedAt: string; rowCount: number }[]
   > {
     return this.request('GET', '/entities');
   }
 
-  entityMeta(name: string): Promise<{ entity: EntityDef; fields: EntityDef['fields']; endpoints: Record<string, string>; query: Record<string, unknown> }> {
-    return this.request('GET', `/entities/${name}/meta`);
+  entityMeta(name: string): Promise<{ entity: EntityDef; fields: EntityDef['fields']; capabilities?: Record<'read' | 'create' | 'update' | 'delete', boolean>; endpoints: Record<string, string>; query: Record<string, unknown> }> {
+    return this.request('GET', `/entities/${encodeURIComponent(name)}/meta`);
   }
 
   entityOptions(name: string, q?: string, limit = 50): Promise<{ value: string; label: string }[]> {
@@ -127,15 +142,15 @@ export class MosaicClient {
   listRecords<T = Record<string, unknown>>(
     entity: string,
     spec: Partial<QuerySpec> = {},
-    extra?: { withDeleted?: boolean },
+    extra?: { withDeleted?: boolean; signal?: AbortSignal },
   ): Promise<{ data: T[]; total: number; page: number; pageSize: number; pageCount: number }> {
     const base = buildQueryString(spec);
     const qs = extra?.withDeleted ? (base ? `${base}&withDeleted=true` : '?withDeleted=true') : base;
-    return this.request('GET', `/entities/${entity}${qs}`);
+    return this.request('GET', `/entities/${entity}${qs}`, undefined, extra?.signal);
   }
 
-  getRecord<T = Record<string, unknown>>(entity: string, id: string, include?: string[]): Promise<T> {
-    return this.request('GET', `/entities/${entity}/${id}${include?.length ? `?include=${include.join(',')}` : ''}`);
+  getRecord<T = Record<string, unknown>>(entity: string, id: string, include?: string[], signal?: AbortSignal): Promise<T> {
+    return this.request('GET', `/entities/${entity}/${encodeURIComponent(id)}${include?.length ? `?include=${include.join(',')}` : ''}`, undefined, signal);
   }
 
   createRecord<T = Record<string, unknown>>(entity: string, data: Record<string, unknown>): Promise<T> {
@@ -307,6 +322,6 @@ export interface MigrationStatement {
 
 /** Create a client (SvelteKit apps proxy /api; studio uses PUBLIC_API_URL). */
 export function createClient(opts?: Partial<ClientOptions>): MosaicClient {
-  return new MosaicClient({ baseUrl: opts?.baseUrl ?? '/api', onUnauthorized: opts?.onUnauthorized });
+  return new MosaicClient({ baseUrl: opts?.baseUrl ?? '/api', token: opts?.token, onUnauthorized: opts?.onUnauthorized });
 }
 

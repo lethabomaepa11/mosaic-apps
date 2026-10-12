@@ -23,7 +23,7 @@
     "prepack": "npm run check",
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --import tsx --test \"test/**/*.test.ts\""
+    "test": "node --import tsx --test \"test/**/*.test.ts\" \"src/**/*.test.ts\""
   },
   "dependencies": {
     "@internationalized/date": "^3.12.4",

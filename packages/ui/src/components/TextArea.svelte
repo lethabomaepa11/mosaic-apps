@@ -26,7 +26,7 @@
 </script>
 
 <div class="m-field">
-  {#if label}<label for={inputId} class="m-field__label">{label}{#if required}<span class="m-field__req">*</span>{/if}</label>{/if}
+  {#if label}<label for={inputId} class="m-field__label">{label}{#if required}<span class="m-field__req" aria-hidden="true">*</span>{/if}</label>{/if}
   <ShadcnTextarea class={`m-textarea${error ? ' m-textarea--invalid' : ''}`} {rows} {placeholder} {disabled} {maxlength}
     id={inputId} {required} aria-invalid={!!error} aria-describedby={error || helpText ? messageId : undefined}
     value={value ?? ''} oninput={onInput}></ShadcnTextarea>

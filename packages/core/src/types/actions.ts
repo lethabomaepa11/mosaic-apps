@@ -44,6 +44,8 @@ export interface NavigateAction extends ActionBase {
   target: 'form' | 'page' | 'url';
   to: string;
   newTab?: boolean;
+  /** Values for named custom page route parameters, with scoped templates. */
+  params?: Record<string, unknown>;
 }
 
 export interface ApiAction extends ActionBase {

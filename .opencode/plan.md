@@ -1,5 +1,45 @@
 # Mosaic Platform — Full Execution Plan (Option B)
 
+## Active v1 continuation — 2026-10-12 (supersedes older status)
+
+- Main commit `f611ba1` passed Linux build/tests and the full Windows packed
+  consumer, including Node/Netlify/Vercel builds for web and Studio, browser
+  hydration/Monaco, production cross-origin wiring and native Hono entry.
+  CI: https://github.com/lethabomaepa11/mosaic-apps/actions/runs/38188015905.
+  **CLI 0.2.3 is published and verified through npm.** Core/server/UI remain 0.2.0.
+- Main deployment documentation is public-facing and covers database → API → web
+  → Studio, including Vercel + Neon, Netlify, Render/Railway and containers.
+- Active feature branch: `work/v1-app-workflows`. Core generator and transactional
+  API are pushed in focused commits. Remaining runtime/Studio work is being
+  verified before release; never publish changed 0.2.0 runtime packages.
+- Implemented linked entity table/create/edit/detail generation; editable columns
+  and fields; required-field/default validation; published snapshots; atomic
+  duplicate protection; authenticated generation. Wizard is on the entity detail
+  screen. Real generated-app browser passed wizard → table → create → view
+  (read-only) → edit → table, including SPA returns and zero runtime exceptions.
+  Evidence: `.tmp-generated/v1-browser-final.log`, `v1-workflow-table.png`.
+- Runtime sources load static/entity/endpoint records with scoped parameters,
+  cancellation, loading/error/retry, safe same-origin credentials and record-path
+  extraction. Nested bindings preserve arrays; embedded forms aggregate validation
+  and avoid nested HTML forms. Application state survives internal navigation.
+- Explicit selected-key state persistence now supports session/local adapters,
+  versions, TTL, optional cross-tab coordination, disposal and storage errors.
+  No state is persisted by default. Page saves serialize changes like form saves.
+- Private page definitions are enforced server-side, including catalog filtering;
+  draft/history access requires management permissions. Metadata includes CRUD
+  capabilities and tables hide denied mutations. Configured page menus feed app
+  navigation. Custom route matching/navigation is implemented and under regression
+  verification, including named parameters and static-route precedence.
+- Next gates: encrypted draft recovery/conflict UX and full definition validation;
+  page history/restore; table row action context/confirmation; branding and complete
+  theme editor; durable upload adapters; remaining component and browser audit;
+  clean generated consumer and provider builds; public docs/screenshots updated.
+- SSO, tenant isolation, durable server workflow jobs, promotion environments and
+  operational restore/rollback remain explicit enterprise roadmap work. Do not
+  label the entire platform production-ready v1 until its acceptance is evidenced.
+- The original external `my-crm` repair preserved database data and private backup
+  files. CLI 0.2.3 deployment settings still need syncing into that existing app.
+
 ## Current continuation state (2026-10-11, read before historical progress)
 
 ### Latest: Windows scaffold repair and hosted Studio guides

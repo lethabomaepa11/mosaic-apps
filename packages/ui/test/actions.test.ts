@@ -39,3 +39,13 @@ test('starting an action again cancels its previous request', async () => {
   assert.equal(aborted, 1);
   assert.equal((state.component.getPath('actions.load') as { status: string }).status, 'succeeded');
 });
+
+test('page navigation resolves configured custom routes with record parameters', async () => {
+  const state = createMosaicState({ form: { customerId: 'first order' } });
+  const client = { getPage: async () => ({ route: '/customers/:id' }) } as unknown as MosaicClient;
+  let selected = '';
+  const runner = createActionRunner({ state, client, navigate: href => { selected = href; } });
+  await runner.execute('detail', [{ type: 'navigate', target: 'page', to: 'detail-page', params: { id: '{{form.customerId}}' } }]);
+  assert.equal(selected, '/customers/first%20order');
+  await assert.rejects(runner.execute('missing', [{ type: 'navigate', target: 'page', to: 'detail-page' }]), /route parameter id/);
+});

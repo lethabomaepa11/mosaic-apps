@@ -27,5 +27,16 @@ test('entity views are authorized, linked, published atomically and protected ag
     assert.equal(failed.rows.length, 0);
     const snapshots = await server.db.query('SELECT version FROM mosaic_form_versions WHERE form_id = $1', [workflow.forms.detail.id]);
     assert.equal(snapshots.rows.length, 1);
+    const nav = ((await (await server.app.request('/api/nav', { headers: { Authorization: `Bearer ${token}` } })).json()) as { data: { items: { href: string }[] } }).data.items;
+    assert.ok(nav.some(item => item.href === workflow.page.route));
+    const publicNav = ((await (await server.app.request('/api/nav')).json()) as { data: { items: { href: string }[] } }).data.items;
+    assert.ok(!publicNav.some(item => item.href === workflow.page.route));
+    const route = `/clients/:id`;
+    const saved = await server.app.request(`/api/pages/${workflow.page.id}/save-and-publish`, { method: 'PUT', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ route, expectedVersion: 1 }) });
+    assert.equal(saved.status, 200);
+    const resolved = await server.app.request('/api/pages/resolve?path=%2Fclients%2F123', { headers: { Authorization: `Bearer ${token}` } });
+    assert.equal(resolved.status, 200);
+    assert.deepEqual(((await resolved.json()) as { data: { params: unknown } }).data.params, { id: '123' });
+    assert.equal((await server.app.request('/api/pages/resolve?path=%2Fclients%2F123')).status, 401);
   } finally { await server.close(); }
 });

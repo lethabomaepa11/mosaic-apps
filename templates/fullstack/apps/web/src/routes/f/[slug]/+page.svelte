@@ -8,30 +8,19 @@
   const recordId = $derived(page.url.searchParams.get('id') ?? undefined);
 
   let form = $state<FormDef | null>(null);
-  let record = $state<Record<string, unknown> | undefined>(undefined);
   let error = $state('');
-  let mode = $state<'create' | 'edit'>('create');
-
-  function afterSave() {
-    const redirect = form?.settings?.redirectAfterSubmit;
-    if (redirect) window.location.href = redirect;
-  }
+  let request = 0;
+  const runtimeForm = $derived(form && recordId && form.entity ? { ...form, dataSource: { kind: 'entity' as const, entity: form.entity, recordId } } : form);
 
   $effect(() => {
     form = null;
     error = '';
+    const current = ++request;
     client
       .getForm(slug)
-      .then((f) => {
-        form = f;
-        if (recordId) {
-          mode = 'edit';
-          return client.getRecord(f.entity ?? '', recordId);
-        }
-        return undefined;
-      })
-      .then((r) => { record = r; })
-      .catch((err) => { error = err instanceof Error ? err.message : String(err); });
+      .then((f) => { if (current === request) form = f; })
+      .catch((err) => { if (current === request) error = err instanceof Error ? err.message : String(err); });
+    return () => { request += 1; };
   });
 </script>
 
@@ -39,7 +28,7 @@
 
 {#if error}
   <div class="m-alert m-alert--warning" style="max-width:640px">{error}</div>
-{:else if form}
+{:else if form && runtimeForm}
   <div class="m-card" style="max-width:820px">
     <header class="m-card__header">
       <div>
@@ -49,11 +38,8 @@
       <span class="m-badge">v{form.version}</span>
     </header>
     <FormRenderer
-      {form}
-      {record}
-      {mode}
+      form={runtimeForm}
       {client}
-      onsaved={afterSave}
     />
   </div>
 {:else}

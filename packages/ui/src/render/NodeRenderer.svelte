@@ -8,6 +8,8 @@
   import { runBooleanScript } from '../actions/sandbox';
   import { createMosaicState, MOSAIC_STATE_CONTEXT, type MosaicState } from '../state/store';
   import { toast } from '../stores/toast.svelte';
+  import { readDataPath } from '../state/data-source';
+  import { MOSAIC_NAVIGATION_CONTEXT, type MosaicNavigate } from '../state/navigation';
 
   const input: {
     node: FormNode;
@@ -33,7 +35,7 @@
   const inheritedState = getContext<MosaicState | undefined>(MOSAIC_STATE_CONTEXT) ?? createMosaicState();
   const componentState = inheritedState.forkComponent();
   setContext(MOSAIC_STATE_CONTEXT, componentState);
-  const actionContext: ActionContext = { state: componentState, notify: (variant, title, description) => toast[variant](title, description) };
+  const actionContext: ActionContext = { state: componentState, navigate: getContext<MosaicNavigate | undefined>(MOSAIC_NAVIGATION_CONTEXT), notify: (variant, title, description) => toast[variant](title, description) };
   const actionRunner = createActionRunner(actionContext);
   let actionRunning = $state(false);
   let scriptVisible = $state(true);
@@ -51,10 +53,10 @@
   const delay = $derived(transition?.delay ?? 0);
 
   const def = $derived(getComponent(node.type));
-  const nodeProps = $derived(node.props ?? {});
+  const nodeProps = $derived({ ...(def?.defaults ?? {}), ...(node.props ?? {}) });
   const componentMode = $derived(mode === 'view' ? 'view' : nodeProps.mode === 'edit' ? 'edit' : 'create');
   const binding = $derived(typeof nodeProps.binding === 'string' ? nodeProps.binding : undefined);
-  const value = $derived(binding && data ? data[binding] : nodeProps.value);
+  const value = $derived(binding && data ? readDataPath(data, binding) : nodeProps.value);
   const error = $derived(binding && errors ? errors[binding] : undefined);
   const actions = $derived(Array.isArray(nodeProps.actions) ? nodeProps.actions as ComponentAction[] : []);
 
@@ -125,10 +127,11 @@
     <Comp
       {...rest}
       {client}
-      mode={componentMode}
+      mode={node.type === 'subform' ? componentMode : nodeProps.mode}
       {value}
       {error}
       disabled={actionRunning || scriptDisabled || nodeProps.disabled === true || disabled?.(node) === true}
+      readOnly={mode === 'view' || nodeProps.readOnly === true}
       oninput={oninput}
       onclick={actions.length ? runActions : undefined}
       children={isContainerType(node.type) ? renderChildren : undefined}
