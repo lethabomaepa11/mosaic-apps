@@ -28,9 +28,11 @@ export type FormDataSource =
   | { kind: 'none' }
   | { kind: 'entity'; entity: string; recordId?: string; where?: Record<string, unknown> }
   | { kind: 'static'; data: Record<string, unknown> }
-  | { kind: 'endpoint'; url: string; method?: 'GET' | 'POST'; recordPath?: string };
+  | { kind: 'endpoint'; url: string; method?: 'GET' | 'POST'; body?: unknown; recordPath?: string };
 
 export interface FormSettings {
+  /** Default runtime behavior; a caller can explicitly override it. */
+  mode?: 'create' | 'edit' | 'view';
   layout?: 'vertical' | 'horizontal' | 'inline';
   /** grid columns at form level (1..4) */
   columns?: number;
