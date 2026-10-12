@@ -10,7 +10,9 @@ import assert from 'node:assert/strict';
 
 const repository = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const artifacts = resolve(process.argv[2] ?? join(repository, '.tmp-generated/browser-smoke'));
-const directory = await mkdtemp(join(tmpdir(), 'mosaic-release-consumer-'));
+// GitHub Windows TMP can contain an 8.3 username alias. Vite and Kit disagree
+// about manifest paths under that alias; the runner's dedicated temp is stable.
+const directory = await mkdtemp(join(process.env.RUNNER_TEMP ?? tmpdir(), 'mosaic-release-consumer-'));
 const npm = process.env.npm_execpath;
 if (!npm) throw new Error('Run through npm run release:consumer so npm_execpath is available.');
 const packages = ['core', 'server', 'ui', 'cli'];
