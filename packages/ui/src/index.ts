@@ -40,6 +40,7 @@ export type { Toast, ToastVariant } from './stores/toast.svelte.js';
 export { createMosaicState, MosaicState, StateStore, MOSAIC_STATE_CONTEXT } from './state/store.js';
 export type { MosaicStateInitials, StateListener } from './state/store.js';
 export { persistState, browserStateStorage, type StateStorageAdapter, type StatePersistenceOptions } from './state/persistence.js';
+export { encryptedDraftStore, browserDraftStorage, type DraftStorageAdapter, type RecoveredDraft } from './state/drafts.js';
 export { ActionRunner, createActionRunner, type ActionContext } from './actions/runner.js';
 export { runActionScript, runBooleanScript, type SandboxOptions } from './actions/sandbox.js';
 

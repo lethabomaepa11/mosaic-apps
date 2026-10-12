@@ -1,8 +1,8 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
   import { page } from '$app/state';
   import { CodeEditor, FormRenderer, Modal, toast, Icon } from '@mosaic-apps/ui';
   import type { FormDataSource, FormDef, EntityDef, FormSettings } from '@mosaic-apps/core';
+  import { validateDefinitionTree } from '@mosaic-apps/core';
   import { client } from '#lib/client';
   import { designer } from '#lib/designer.svelte';
   import Palette from '../../../../components/Palette.svelte';
@@ -11,6 +11,9 @@
   import LayersTree from '../../../../components/LayersTree.svelte';
   import ResizeHandle from '../../../../components/ResizeHandle.svelte';
   import FormSettingsEditor from '../../../../components/FormSettingsEditor.svelte';
+  import AuthoringRecovery from '../../../../components/AuthoringRecovery.svelte';
+  import DefinitionConflict from '../../../../components/DefinitionConflict.svelte';
+  import VersionHistory from '../../../../components/VersionHistory.svelte';
 
   const id = $derived(page.params.id ?? '');
   let loading = $state(true);
@@ -19,6 +22,8 @@
   let showSettings = $state(false);
   let saving = $state(false);
   let saveAgain = false;
+  let showConflict = $state(false);
+  let showHistory = $state(false);
   let jsonText = $state('');
   let name = $state('');
   let description = $state('');
@@ -43,7 +48,19 @@
     } catch { /* ignore */ }
   }
 
-  onMount(async () => {
+  function applyDefinition(form: FormDef, dirty = false) {
+    designer.loadForm(form);
+    name = form.name; description = form.description ?? ''; folder = form.folder ?? '';
+    settings = form.settings ?? {}; dataSource = form.dataSource ?? { kind: 'none' }; entity = form.entity ?? '';
+    if (dirty) designer.markChanged();
+  }
+  const currentDraft = $derived(designer.form ? { ...designer.form, name, description, folder, entity, settings, dataSource } : null);
+  let loadRun = 0;
+  $effect(() => {
+    const selectedId = id;
+    const current = ++loadRun;
+    loading = true;
+    void (async () => {
     try {
       await loadEntities();
       const [forms, pages] = await Promise.all([client.listForms(), client.listPages()]);
@@ -52,19 +69,15 @@
         ...forms.map((item) => ({ value: item.id, label: `${item.name} · /${item.slug}`, kind: 'form' as const })),
         ...pages.map((item) => ({ value: item.id, label: `${item.name} · ${item.route}`, kind: 'page' as const })),
       ];
-      const form = await client.getForm(id);
-      designer.loadForm(form);
-      name = form.name;
-      description = form.description ?? '';
-      folder = form.folder ?? '';
-      settings = form.settings ?? {};
-      dataSource = form.dataSource ?? { kind: 'none' };
-      entity = form.entity ?? '';
+      const form = await client.getForm(selectedId);
+      if (current === loadRun) applyDefinition(form);
     } catch (err) {
       toast.error('Could not load form', err instanceof Error ? err.message : String(err));
     } finally {
-      loading = false;
+      if (current === loadRun) loading = false;
     }
+    })();
+    return () => { loadRun += 1; };
   });
 
   function draftSignature(): string {
@@ -109,7 +122,8 @@
       return true;
     } catch (err) {
       saveAgain = false;
-      toast.error('Save failed', err instanceof Error ? err.message : String(err));
+      if ((err as { code?: string })?.code === 'STALE_VERSION') showConflict = true;
+      else toast.error('Save failed', err instanceof Error ? err.message : String(err));
       return false;
     } finally {
       saving = false;
@@ -140,6 +154,7 @@
   function applyJson() {
     try {
       const parsed = JSON.parse(jsonText) as FormDef;
+      validateDefinitionTree(parsed.root);
       designer.loadForm({ ...parsed, id: designer.form?.id ?? parsed.id, slug: designer.form?.slug ?? parsed.slug });
       name = parsed.name;
       description = parsed.description ?? '';
@@ -201,9 +216,15 @@
       <button class="m-btn m-btn--secondary m-btn--sm" aria-pressed={showPreview} onclick={() => { showPreview = !showPreview; showSettings = false; }} title="Preview"><Icon name={showPreview ? 'pencil' : 'play'} size={14} /> {showPreview ? 'Edit' : 'Preview'}</button>
       <button class="m-btn m-btn--secondary m-btn--sm" aria-pressed={showSettings} onclick={() => { showSettings = !showSettings; showPreview = false; }}><Icon name="settings" size={14} /> Form settings</button>
       <button class="m-btn m-btn--primary m-btn--sm" disabled={saving} onclick={save}>{saving ? 'Saving…' : 'Save'}</button>
+      <button class="m-btn m-btn--secondary m-btn--sm" disabled={saving || designer.isDirty} onclick={() => showHistory = true}>History</button>
       <button class="m-btn m-btn--danger m-btn--sm" onclick={remove}>Delete</button>
     </div>
   </header>
+  {#if currentDraft}
+    <AuthoringRecovery kind="form" definition={currentDraft} dirty={designer.isDirty} onrecover={definition => applyDefinition(definition as FormDef, true)} />
+    <DefinitionConflict bind:open={showConflict} kind="form" definition={currentDraft} onresolve={(definition, keepLocal) => applyDefinition(definition as FormDef, keepLocal)} />
+    <VersionHistory bind:open={showHistory} kind="form" id={currentDraft.id} version={currentDraft.version} onrestore={definition => applyDefinition(definition as FormDef)} />
+  {/if}
 
   {#if showSettings}
     <FormSettingsEditor {name} {description} {folder} {entity} {settings} {dataSource} {entities}

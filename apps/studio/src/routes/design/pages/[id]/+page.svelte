@@ -1,8 +1,8 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
   import { page } from '$app/state';
   import { CodeEditor, Icon, Modal, PageRenderer, toast } from '@mosaic-apps/ui';
   import type { PageDef, PageSettings } from '@mosaic-apps/core';
+  import { validateDefinitionTree } from '@mosaic-apps/core';
   import { client } from '#lib/client';
   import { designer } from '#lib/designer.svelte';
   import Palette from '../../../../components/Palette.svelte';
@@ -11,6 +11,9 @@
   import LayersTree from '../../../../components/LayersTree.svelte';
   import ResizeHandle from '../../../../components/ResizeHandle.svelte';
   import PageSettingsEditor from '../../../../components/PageSettingsEditor.svelte';
+  import AuthoringRecovery from '../../../../components/AuthoringRecovery.svelte';
+  import DefinitionConflict from '../../../../components/DefinitionConflict.svelte';
+  import VersionHistory from '../../../../components/VersionHistory.svelte';
 
   const id = $derived(page.params.id ?? '');
   let loading = $state(true);
@@ -19,6 +22,8 @@
   let showSettings = $state(false);
   let saving = $state(false);
   let saveAgain = false;
+  let showConflict = $state(false);
+  let showHistory = $state(false);
   let jsonText = $state('');
   let name = $state('');
   let description = $state('');
@@ -28,7 +33,17 @@
   let paletteWidth = $state(232);
   let inspectorWidth = $state(300);
 
-  onMount(async () => {
+  function applyDefinition(definition: PageDef, dirty = false) {
+    designer.loadPage(definition);
+    name = definition.name; description = definition.description ?? ''; route = definition.route;
+    folder = definition.folder ?? ''; settings = definition.settings ?? {};
+    if (dirty) designer.markChanged();
+  }
+  const currentDraft = $derived(designer.page ? { ...designer.page, name, description, route, folder, settings } : null);
+  let loadRun = 0;
+  $effect(() => {
+    const selectedId = id; const current = ++loadRun; loading = true;
+    void (async () => {
     try {
       const entityList = await client.listEntities();
       designer.entityOptionsByName = Object.fromEntries(entityList.map((entry) => [entry.name, entry.definition.fields.map((field) => field.name)]));
@@ -38,18 +53,15 @@
         ...forms.map((item) => ({ value: item.id, label: `${item.name} · /${item.slug}`, kind: 'form' as const })),
         ...pages.map((item) => ({ value: item.id, label: `${item.name} · ${item.route}`, kind: 'page' as const })),
       ];
-      const pageDef = await client.getPage(id);
-      designer.loadPage(pageDef);
-      name = pageDef.name;
-      description = pageDef.description ?? '';
-      route = pageDef.route;
-      folder = pageDef.folder ?? '';
-      settings = pageDef.settings ?? {};
+      const pageDef = await client.getPage(selectedId);
+      if (current === loadRun) applyDefinition(pageDef);
     } catch (err) {
       toast.error('Could not load page', err instanceof Error ? err.message : String(err));
     } finally {
-      loading = false;
+      if (current === loadRun) loading = false;
     }
+    })();
+    return () => { loadRun += 1; };
   });
 
   function draftSignature() { return JSON.stringify({ name, description, route, folder: folder.trim(), settings, root: designer.page?.root }); }
@@ -85,7 +97,8 @@
       return true;
     } catch (err) {
       saveAgain = false;
-      toast.error('Save failed', err instanceof Error ? err.message : String(err));
+      if ((err as { code?: string })?.code === 'STALE_VERSION') showConflict = true;
+      else toast.error('Save failed', err instanceof Error ? err.message : String(err));
       return false;
     } finally {
       saving = false;
@@ -108,6 +121,7 @@
   function applyJson() {
     try {
       const parsed = JSON.parse(jsonText) as PageDef;
+      validateDefinitionTree(parsed.root);
       designer.loadPage({ ...parsed, id: designer.page?.id ?? parsed.id, slug: designer.page?.slug ?? parsed.slug });
       name = parsed.name;
       description = parsed.description ?? '';
@@ -153,9 +167,15 @@
       <button class="m-btn m-btn--secondary m-btn--sm" aria-pressed={showPreview} onclick={() => { showPreview = !showPreview; showSettings = false; }}><Icon name={showPreview ? 'pencil' : 'play'} size={14} /> {showPreview ? 'Edit' : 'Preview'}</button>
       <button class="m-btn m-btn--secondary m-btn--sm" aria-pressed={showSettings} onclick={() => { showSettings = !showSettings; showPreview = false; }}><Icon name="settings" size={14} /> Page settings</button>
       <button class="m-btn m-btn--primary m-btn--sm" disabled={saving} onclick={save}>{saving ? 'Saving…' : 'Save'}</button>
+      <button class="m-btn m-btn--secondary m-btn--sm" disabled={saving || designer.isDirty} onclick={() => showHistory = true}>History</button>
       <button class="m-btn m-btn--danger m-btn--sm" onclick={remove}>Delete</button>
     </div>
   </header>
+  {#if currentDraft}
+    <AuthoringRecovery kind="page" definition={currentDraft} dirty={designer.isDirty} onrecover={definition => applyDefinition(definition as PageDef, true)} />
+    <DefinitionConflict bind:open={showConflict} kind="page" definition={currentDraft} onresolve={(definition, keepLocal) => applyDefinition(definition as PageDef, keepLocal)} />
+    <VersionHistory bind:open={showHistory} kind="page" id={currentDraft.id} version={currentDraft.version} onrestore={definition => applyDefinition(definition as PageDef)} />
+  {/if}
 
   {#if showSettings}
     <PageSettingsEditor {name} {description} {route} {folder} {settings}

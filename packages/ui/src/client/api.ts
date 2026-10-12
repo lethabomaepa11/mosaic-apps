@@ -118,6 +118,12 @@ export class MosaicClient {
   }
 
   // ---- entities ----
+  artifactVersions(kind: 'form' | 'page', id: string): Promise<{ version: number; snapshot: Record<string, unknown>; publishedAt: string }[]> {
+    return this.request('GET', `/${kind}s/${encodeURIComponent(id)}/versions`);
+  }
+  restoreArtifact(kind: 'form' | 'page', id: string, version: number, expectedVersion: number): Promise<FormDef | PageDef> {
+    return this.request('POST', `/${kind}s/${encodeURIComponent(id)}/versions/${version}/restore`, { expectedVersion });
+  }
   resolvePage(path: string): Promise<{ page: PageDef; params: Record<string, string> }> {
     return this.request('GET', `/pages/resolve?path=${encodeURIComponent(path)}`);
   }
