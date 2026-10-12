@@ -10,6 +10,7 @@
   import { toast } from '../stores/toast.svelte';
   import { readDataPath } from '../state/data-source';
   import { MOSAIC_NAVIGATION_CONTEXT, type MosaicNavigate } from '../state/navigation';
+  import { ACTION_CONFIRMATION_CONTEXT, type MosaicConfirm } from '../actions/confirmation';
 
   const input: {
     node: FormNode;
@@ -35,7 +36,7 @@
   const inheritedState = getContext<MosaicState | undefined>(MOSAIC_STATE_CONTEXT) ?? createMosaicState();
   const componentState = inheritedState.forkComponent();
   setContext(MOSAIC_STATE_CONTEXT, componentState);
-  const actionContext: ActionContext = { state: componentState, navigate: getContext<MosaicNavigate | undefined>(MOSAIC_NAVIGATION_CONTEXT), notify: (variant, title, description) => toast[variant](title, description) };
+  const actionContext: ActionContext = { state: componentState, confirm: getContext<MosaicConfirm | undefined>(ACTION_CONFIRMATION_CONTEXT), navigate: getContext<MosaicNavigate | undefined>(MOSAIC_NAVIGATION_CONTEXT), notify: (variant, title, description) => toast[variant](title, description) };
   const actionRunner = createActionRunner(actionContext);
   let actionRunning = $state(false);
   let scriptVisible = $state(true);

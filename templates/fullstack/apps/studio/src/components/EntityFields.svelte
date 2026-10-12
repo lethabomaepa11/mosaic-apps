@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { EntityDef, FieldDef, FieldType, EnumOption } from '@mosaic-apps/core';
-  import { Icon, SelectField } from '@mosaic-apps/ui';
+  import { Checkbox, Icon, SelectField, ShadcnInput } from '@mosaic-apps/ui';
   import { client } from '#lib/client';
 
   interface Props {
@@ -59,20 +59,19 @@
     <tbody>
       {#each entity.fields as field, i (i)}
         <tr>
-          <td><input class="m-input" value={field.name} onchange={(e) => updateField(i, { name: (e.currentTarget as HTMLInputElement).value })} /></td>
-          <td><input class="m-input" value={field.label ?? ''} onchange={(e) => updateField(i, { label: (e.currentTarget as HTMLInputElement).value })} /></td>
+          <td><ShadcnInput class="m-input" ariaLabel={`Field ${i + 1} name`} value={field.name} onchange={(e) => updateField(i, { name: (e.currentTarget as HTMLInputElement).value })} /></td>
+          <td><ShadcnInput class="m-input" ariaLabel={`Field ${i + 1} label`} value={field.label ?? ''} onchange={(e) => updateField(i, { label: (e.currentTarget as HTMLInputElement).value })} /></td>
           <td>
-            <select class="m-select" value={field.type} onchange={(e) => updateField(i, { type: (e.currentTarget as HTMLSelectElement).value as FieldType })}>
-              {#each FIELD_TYPES as t (t)}<option value={t}>{t}</option>{/each}
-            </select>
+            <SelectField label={`Field ${i + 1} type`} value={field.type} clearable={false} options={FIELD_TYPES.map(type => ({ value:type, label:type }))} oninput={type => updateField(i, { type: type as FieldType })} />
           </td>
           <td>
             {#if field.type === 'enum'}
-              <input class="m-input" placeholder="a,b,c" value={optionsOf(field).map((o) => o.value).join(',')}
+              <ShadcnInput class="m-input" ariaLabel={`Field ${i + 1} options`} placeholder="a,b,c" value={optionsOf(field).map((o) => o.value).join(',')}
                 onchange={(e) => updateField(i, { options: (e.currentTarget as HTMLInputElement).value.split(',').map((s) => s.trim()).filter(Boolean) })} />
             {:else if field.type === 'ref'}
               <SelectField
-                bind:value={field.refEntity}
+                value={field.refEntity}
+                oninput={refEntity => updateField(i, { refEntity: refEntity ?? undefined })}
                 placeholder="entity name"
                 options={[{ value: '', label: '— select entity —' }, ...entities.map(e => ({ value: e.name, label: e.label }))]}
               />
@@ -81,9 +80,9 @@
             {/if}
           </td>
           <td style="white-space:nowrap">
-            <label class="m-check"><input type="checkbox" checked={field.required ?? false} onchange={(e) => updateField(i, { required: (e.currentTarget as HTMLInputElement).checked })} /> req</label>
-            <label class="m-check"><input type="checkbox" checked={field.unique ?? false} onchange={(e) => updateField(i, { unique: (e.currentTarget as HTMLInputElement).checked })} /> uniq</label>
-            <label class="m-check"><input type="checkbox" checked={field.indexed ?? false} onchange={(e) => updateField(i, { indexed: (e.currentTarget as HTMLInputElement).checked })} /> idx</label>
+            <Checkbox label="Required" value={field.required ?? false} oninput={required => updateField(i, { required })} />
+            <Checkbox label="Unique" value={field.unique ?? false} oninput={unique => updateField(i, { unique })} />
+            <Checkbox label="Indexed" value={field.indexed ?? false} oninput={indexed => updateField(i, { indexed })} />
           </td>
           <td><button class="m-btn m-btn--ghost m-btn--icon" aria-label="Remove field" onclick={() => removeField(i)}><Icon name="x" size={14} /></button></td>
         </tr>
@@ -91,8 +90,8 @@
     </tbody>
   </table>
   <div class="m-row" style="margin-top:12px">
-    <label class="m-check"><input type="checkbox" checked={entity.softDelete ?? false} onchange={(e) => emit({ ...entity, softDelete: (e.currentTarget as HTMLInputElement).checked })} /> soft delete (deletedAt)</label>
-    <label class="m-check"><input type="checkbox" checked={entity.audit ?? true} onchange={(e) => emit({ ...entity, audit: (e.currentTarget as HTMLInputElement).checked })} /> audit changes</label>
+    <Checkbox label="Soft delete (deletedAt)" value={entity.softDelete ?? false} oninput={softDelete => emit({ ...entity, softDelete })} />
+    <Checkbox label="Audit changes" value={entity.audit ?? true} oninput={audit => emit({ ...entity, audit })} />
   </div>
 </section>
 

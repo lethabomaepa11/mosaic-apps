@@ -7,6 +7,7 @@ import { HttpError, fail, ok, readJson } from './http.js';
 import { requirePermission } from './rbac.js';
 import { writeAudit } from './audit.js';
 import type { AuthEnv, AuthUser } from './auth.js';
+import { reservePageRoute } from './page-routes.js';
 
 export type ArtifactKind = 'form' | 'page';
 
@@ -329,6 +330,7 @@ export function artifactRoutes(deps: ArtifactDeps): Hono<AuthEnv> {
       if (!saved) throw new HttpError(404, 'Published version not found.', 'NOT_FOUND');
       const root = assertUsableSchema(saved.schema, deps.kind);
       validateArtifactInput({ settings: saved.settings ?? {}, ...(deps.kind === 'page' ? { route: saved.route } : {}) }, deps.kind);
+      if (deps.kind === 'page') await reservePageRoute(tx, saved.route!, current.id);
       await snapshotPublished(tx, current);
       const fields = deps.kind === 'page' ? ['name', 'description', 'folder', 'route', 'schema', 'settings'] : ['name', 'description', 'folder', 'entity', 'schema', 'data_source', 'settings'];
       const values = fields.map(key => ['schema', 'settings', 'data_source'].includes(key) ? JSON.stringify(key === 'schema' ? root : saved[key as keyof ArtifactRow] ?? null) : saved[key as keyof ArtifactRow] ?? null);
@@ -380,10 +382,10 @@ export function artifactRoutes(deps: ArtifactDeps): Hono<AuthEnv> {
           JSON.stringify(body.dataSource ?? { kind: 'none' }),
           JSON.stringify(body.settings ?? {}),
         ];
-    const res = await deps.db.query<ArtifactRow>(
-        `INSERT INTO ${table} ${cols} VALUES ${vals} RETURNING ${returnCols(deps.kind)}`,
-      params,
-    );
+    const res = await deps.db.tx(async tx => {
+      if (deps.kind === 'page') await reservePageRoute(tx, String(body.route ?? `/${slug}`));
+      return tx.query<ArtifactRow>(`INSERT INTO ${table} ${cols} VALUES ${vals} RETURNING ${returnCols(deps.kind)}`, params);
+    });
     writeAudit(deps.db, { action: 'create', entity: deps.kind, recordId: id, user });
     return ok(c, toRecord(res.rows[0]!, deps.kind), 201);
   });
@@ -403,6 +405,7 @@ export function artifactRoutes(deps: ArtifactDeps): Hono<AuthEnv> {
         throw new HttpError(409, `This ${deps.kind} changed after it was loaded`, 'STALE_VERSION', { expectedVersion, actualVersion: row.version });
       }
       await snapshotPublished(tx, row);
+      if (deps.kind === 'page') await reservePageRoute(tx, String(body.route ?? row.route), row.id);
       const schemaInput = body.root ?? body.schema;
       const root = schemaInput !== undefined ? assertUsableSchema(schemaInput, deps.kind) : row.schema;
       let updated: ArtifactRow;
@@ -466,7 +469,9 @@ export function artifactRoutes(deps: ArtifactDeps): Hono<AuthEnv> {
     const schemaInput = body.root ?? body.schema;
     const root = schemaInput !== undefined ? assertUsableSchema(schemaInput, deps.kind) : (row.schema as never);
     if (deps.kind === 'page') {
-      const res = await deps.db.query<ArtifactRow>(
+      const res = await deps.db.tx(async tx => {
+        await reservePageRoute(tx, String(body.route ?? row.route), row.id);
+        return tx.query<ArtifactRow>(
         `UPDATE ${table} SET
            name = COALESCE($2, name),
            description = COALESCE($3, description),
@@ -487,7 +492,8 @@ export function artifactRoutes(deps: ArtifactDeps): Hono<AuthEnv> {
           JSON.stringify(root),
           body.settings !== undefined ? JSON.stringify(body.settings) : null,
         ],
-      );
+        );
+      });
       writeAudit(deps.db, { action: 'update', entity: deps.kind, recordId: row.id, user });
       return ok(c, toRecord(res.rows[0]!, deps.kind));
     }
@@ -528,6 +534,7 @@ export function artifactRoutes(deps: ArtifactDeps): Hono<AuthEnv> {
       const row = selected.rows[0];
       if (!row) throw new HttpError(404, `${deps.kind} not found`, 'NOT_FOUND');
       await snapshotPublished(tx, row);
+      if (deps.kind === 'page') await reservePageRoute(tx, row.route!, row.id);
       if (row.published) {
         const previous = await tx.query<{ snapshot: unknown }>(
           `SELECT snapshot FROM ${historyTable} WHERE ${historyKey} = $1 ORDER BY version DESC LIMIT 1`, [row.id],

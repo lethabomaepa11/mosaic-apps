@@ -1,5 +1,6 @@
 <script lang="ts">
   import ShadcnButton from '../shadcn/button/Button.svelte';
+  import SelectField from './SelectField.svelte';
   interface Props {
     page: number;
     pageSize: number;
@@ -34,10 +35,5 @@
     {/each}
     <ShadcnButton variant="ghost" size="sm" class="m-btn m-btn--ghost m-btn--sm" disabled={page >= pageCount} onclick={() => onpage?.(page + 1)}>Next ›</ShadcnButton>
   </div>
-  <label class="m-row" style="gap:6px">
-    <span class="m-small m-muted">Rows</span>
-    <select class="m-select" style="width:auto" value={String(pageSize)} onchange={(e) => onpagesize?.(Number((e.currentTarget as HTMLSelectElement).value))}>
-      {#each pageSizes as s (s)}<option value={s}>{s}</option>{/each}
-    </select>
-  </label>
+  <div style="min-width:100px"><SelectField label="Rows" value={String(pageSize)} clearable={false} disabled={!onpagesize} options={[...new Set([...pageSizes, pageSize])].sort((a,b) => a-b).map(size => ({ value:String(size), label:String(size) }))} oninput={value => onpagesize?.(Number(value))} /></div>
 </div>

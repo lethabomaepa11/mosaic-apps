@@ -306,7 +306,7 @@
 .m-btn:active { transform: translateY(1px); }
 .m-btn:disabled,
 .m-btn[aria-disabled='true'] { opacity: 0.55; cursor: not-allowed; }
-.m-btn--primary { background: var(--m-primary); color: #fff; }
+.m-btn--primary { background: var(--m-primary); color: var(--primary-foreground, #fff); }
 .m-btn--primary:hover:not(:disabled) { background: var(--m-primary-hover); }
 .m-btn--secondary { background: var(--m-surface); color: var(--m-fg); border-color: var(--m-border-strong); }
 .m-btn--secondary:hover:not(:disabled) { background: var(--m-surface-2); }

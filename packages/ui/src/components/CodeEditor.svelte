@@ -22,8 +22,9 @@
   const declarations = `
 type StateScope = 'application' | 'page' | 'form' | 'component';
 type MosaicAction =
+  | { type: 'confirm'; title: string; description?: string; confirmLabel?: string; cancelLabel?: string }
   | { type: 'message'; variant?: 'info' | 'success' | 'warning' | 'error'; title: string; description?: string }
-  | { type: 'navigate'; target: 'form' | 'page' | 'url'; to: string; newTab?: boolean }
+  | { type: 'navigate'; target: 'form' | 'page' | 'url'; to: string; newTab?: boolean; params?: Record<string, unknown> }
   | { type: 'api'; method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'; path: string; body?: unknown; result?: { scope: StateScope; path: string } }
   | { type: 'state.set'; target: { scope: StateScope; path: string }; value: unknown };
 declare const state: Readonly<{
@@ -36,7 +37,8 @@ declare const state: Readonly<{
 declare const api: Readonly<{
   message: { info(title: string, description?: string): MosaicAction; success(title: string, description?: string): MosaicAction; warning(title: string, description?: string): MosaicAction; error(title: string, description?: string): MosaicAction };
   callApi(options: { method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'; path: string; body?: unknown; result?: { scope: StateScope; path: string } }): MosaicAction;
-  navigate: { form(to: string, newTab?: boolean): MosaicAction; page(to: string, newTab?: boolean): MosaicAction; url(to: string, newTab?: boolean): MosaicAction };
+  confirm(options: { title: string; description?: string; confirmLabel?: string; cancelLabel?: string }): MosaicAction;
+  navigate: { form(to: string, newTab?: boolean): MosaicAction; page(to: string, newTab?: boolean, params?: Record<string, unknown>): MosaicAction; url(to: string, newTab?: boolean): MosaicAction };
   state: { set(scope: StateScope, path: string, value: unknown): MosaicAction };
 }>;`;
 

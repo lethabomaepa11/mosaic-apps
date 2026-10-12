@@ -19,6 +19,7 @@ export type PropKind =
   | 'formRef'
   | 'columns'
   | 'condition'
+  | 'rowActions'
   | 'actions';
 
 export interface PropDesc {

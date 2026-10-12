@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { CodeEditorField, toast } from '@mosaic-apps/ui';
+  import { CodeEditorField, SelectField, TextField, toast } from '@mosaic-apps/ui';
   import type { EntityDef } from '@mosaic-apps/core';
   import { client } from '#lib/client';
 
@@ -25,17 +25,15 @@
 
   $effect(() => {
     if (!selected) return;
-    path =
-      method === 'GET' && !path.includes('/:id')
-        ? `/entities/${selected}`
-        : path || `/entities/${selected}`;
+    path = `/entities/${selected}`;
   });
 
   async function send() {
     busy = true;
     try {
       const token = client.token ?? '';
-      const res = await fetch(`/api${path.startsWith('/') ? path : '/' + path}`, {
+      if (!path.startsWith('/') || path.startsWith('//') || path.includes('\\')) throw new Error('Enter a path relative to the configured Mosaic API.');
+      const res = await fetch(`${client.apiBase}${path}`, {
         method,
         headers: {
           'Content-Type': 'application/json',
@@ -62,13 +60,9 @@
 
 <section class="m-card m-stack">
   <div class="m-row">
-    <select class="m-select" style="width:180px" bind:value={selected} onchange={() => (path = `/entities/${selected}`)}>
-      {#each entities as e (e.name)}<option value={e.name}>{e.name}</option>{/each}
-    </select>
-    <select class="m-select" style="width:120px" bind:value={method}>
-      <option>GET</option><option>POST</option><option>PATCH</option><option>DELETE</option>
-    </select>
-    <input class="m-input" style="flex:1;min-width:280px" bind:value={path} placeholder="/entities/customer" />
+    <SelectField label="Entity" value={selected} clearable={false} options={entities.map(entity => ({ value:entity.name, label:entity.label ?? entity.name }))} oninput={value => selected = value ?? ''} />
+    <SelectField label="Method" value={method} clearable={false} options={['GET','POST','PUT','PATCH','DELETE'].map(value => ({value,label:value}))} oninput={value => method = value ?? 'GET'} />
+    <TextField label="API path" bind:value={path} placeholder="/entities/customer" />
     <button class="m-btn m-btn--primary" disabled={busy} onclick={send}>{busy ? 'Sending…' : 'Send'}</button>
   </div>
   {#if method !== 'GET'}

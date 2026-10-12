@@ -26,6 +26,7 @@ const server = await createMosaicServer({
   log: true,
   entitiesDir: join(__dirname, 'entities'),
   uploadsDir: process.env.UPLOADS_DIR ?? join(projectDir, 'uploads'),
+  fileStorage: process.env.MOSAIC_FILE_STORAGE === 'database' ? 'database' : 'disk',
   cors: corsOrigins?.length ? { origins: corsOrigins } : true,
   auth: {
     enabled: process.env.AUTH !== 'off',

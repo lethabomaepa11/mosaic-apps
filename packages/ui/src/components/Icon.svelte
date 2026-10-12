@@ -30,10 +30,9 @@
     Network, Mouse, Speaker, VolumeX, Pause, SkipForward, SkipBack,
     Shuffle, Repeat, Podcast, FormInput, Columns3, AlignCenter,
     AlignRight, CircleHelp as HelpCircle,
-  } from 'lucide-svelte';
+  } from '@lucide/svelte';
 
-  // lucide-svelte exports Svelte 4 class components; use `any` to satisfy Svelte 5 Component type
-  const MAP: Record<string, any> = {
+  const MAP: Record<string, typeof Circle> = {
     type: Type, text: Type, heading: Heading1, heading1: Heading1,
     heading2: Heading2, heading3: Heading3, fileText: FileText, hash: Hash,
     dollarSign: DollarSign, currency: DollarSign, chevronDown: ChevronDown,

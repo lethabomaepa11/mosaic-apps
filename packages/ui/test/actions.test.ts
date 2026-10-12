@@ -49,3 +49,14 @@ test('page navigation resolves configured custom routes with record parameters',
   assert.equal(selected, '/customers/first%20order');
   await assert.rejects(runner.execute('missing', [{ type: 'navigate', target: 'page', to: 'detail-page' }]), /route parameter id/);
 });
+
+test('confirmation cancellation stops later mutations and records a cancelled action', async () => {
+  const state = createMosaicState();
+  const runner = createActionRunner({ state, confirm: async () => false });
+  await runner.execute('approved', [{ type: 'confirm', title: 'Continue?' }, { type: 'state.set', target: { scope: 'form', path: 'approved' }, value: true }]);
+  assert.equal(state.form.getPath('approved'), undefined);
+  assert.equal((state.component.getPath('actions.approved') as { status: string }).status, 'cancelled');
+  const confirmed = createActionRunner({ state, confirm: async () => true });
+  await confirmed.execute('approved', [{ type: 'confirm', title: 'Continue?' }, { type: 'state.set', target: { scope: 'form', path: 'approved' }, value: true }]);
+  assert.equal(state.form.getPath('approved'), true);
+});

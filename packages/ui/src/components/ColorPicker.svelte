@@ -20,7 +20,7 @@
 
 <div class="m-field m-field--inline">
   {#if label}<span class="m-field__label">{label}</span>{/if}
-  <ShadcnInput class="m-color" type="color" {value} {disabled} oninput={onChange} />
+  <ShadcnInput class="m-color" type="color" {value} {disabled} ariaLabel={label ?? 'Color'} oninput={onChange} />
   {#if presets.length}
     <span class="m-row" style="gap:5px">
       {#each presets as p (p)}

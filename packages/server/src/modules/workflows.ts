@@ -6,6 +6,7 @@ import { getEntity } from '../entities/registry.js';
 import { requirePermission } from './rbac.js';
 import { HttpError, fail, ok, readJson } from './http.js';
 import type { AuthEnv } from './auth.js';
+import { reservePageRoute } from './page-routes.js';
 
 export function workflowRoutes(db: Db): Hono<AuthEnv> {
   const app = new Hono<AuthEnv>();
@@ -30,6 +31,7 @@ export function workflowRoutes(db: Db): Hono<AuthEnv> {
     try { workflow = generateEntityWorkflow(entity.definition, body); }
     catch (error) { throw new HttpError(422, error instanceof Error ? error.message : 'Invalid view configuration.', 'BAD_INPUT'); }
     await db.tx(async (tx) => {
+      await reservePageRoute(tx, workflow.page.route);
       const slugs = Object.values(workflow.forms).map((form) => form.slug);
       const existing = await tx.query('SELECT id FROM mosaic_forms WHERE slug = ANY($1::text[]) UNION ALL SELECT id FROM mosaic_pages WHERE slug = $2 OR route = $3', [slugs, workflow.page.slug, workflow.page.route]);
       if (existing.rows.length) throw new HttpError(409, 'Views with this name already exist. Open those views or choose a different name.', 'WORKFLOW_EXISTS');

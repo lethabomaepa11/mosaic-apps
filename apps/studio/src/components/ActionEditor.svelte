@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { CodeEditorField, JsonEditor, Modal, SelectField, Switch, TextArea, TextField } from '@mosaic-apps/ui';
+  import { CodeEditorField, JsonEditor, Modal, SelectField, ShadcnInput, Switch, TextArea, TextField } from '@mosaic-apps/ui';
   import type { ComponentAction, ScriptAction, ScriptLanguage, StateScope } from '@mosaic-apps/core';
   import CodeEditor from './CodeEditor.svelte';
 
@@ -22,7 +22,7 @@
     onchange([...actions, { type: 'message', variant: 'success', title: 'Done' }]);
   }
   function changeType(index: number, type: ComponentAction['type']) {
-    const action: ComponentAction = type === 'message'
+    const action: ComponentAction = type === 'confirm' ? { type, title: 'Continue?', description: 'Confirm this operation.' } : type === 'message'
       ? { type, variant: 'success', title: 'Done' }
       : type === 'navigate'
         ? { type, target: 'page', to: '' }
@@ -60,17 +60,22 @@
         <strong>Action {index + 1}</strong>
         <button type="button" class="m-btn m-btn--ghost m-btn--sm" onclick={() => remove(index)}>Remove</button>
       </div>
-      <SelectField label="Type" value={action.type} options={[{value:'message',label:'Show message'},{value:'api',label:'Call API'},{value:'navigate',label:'Navigate'},{value:'state.set',label:'Set state'},{value:'script',label:'Execute script'}]} oninput={(next) => changeType(index, next as ComponentAction['type'])} />
+      <SelectField label="Type" value={action.type} options={[{value:'message',label:'Show message'},{value:'confirm',label:'Ask for confirmation'},{value:'api',label:'Call API'},{value:'navigate',label:'Navigate'},{value:'state.set',label:'Set state'},{value:'script',label:'Execute script'}]} oninput={(next) => changeType(index, next as ComponentAction['type'])} />
       {#if action.type === 'message'}
         <SelectField label="Style" value={action.variant ?? 'info'} options={[{value:'info',label:'Info'},{value:'success',label:'Success'},{value:'warning',label:'Warning'},{value:'error',label:'Error'}]} oninput={(variant) => patch(index, { variant })} />
         <TextField label="Title" value={action.title} oninput={(title) => patch(index, { title })} />
         <TextArea label="Description" value={action.description ?? ''} rows={2} oninput={(description) => patch(index, { description })} />
+      {:else if action.type === 'confirm'}
+        <TextField label="Confirmation title" value={action.title} oninput={title => patch(index, { title })} />
+        <TextArea label="Confirmation description" value={action.description ?? ''} oninput={description => patch(index, { description })} />
+        <TextField label="Confirm button label" value={action.confirmLabel ?? 'Continue'} oninput={confirmLabel => patch(index, { confirmLabel })} />
+        <TextField label="Cancel button label" value={action.cancelLabel ?? 'Cancel'} oninput={cancelLabel => patch(index, { cancelLabel })} />
       {:else if action.type === 'navigate'}
         <SelectField label="Destination" value={action.target} options={[{value:'form',label:'Form'},{value:'page',label:'Page'},{value:'url',label:'URL'}]} oninput={(target) => patch(index, { target, to: '' })} />
         {#if action.target === 'url'}
           <TextField label="URL" value={action.to} placeholder="/orders or https://example.com" oninput={(to) => patch(index, { to })} />
         {:else}
-          <label class="m-field"><span class="m-field__label">{action.target === 'form' ? 'Form' : 'Page'}</span><input class="m-input" list={`artifact-${index}`} value={action.to} placeholder={`Search ${action.target}s`} oninput={(event) => patch(index, { to: event.currentTarget.value })} /><datalist id={`artifact-${index}`}>{#each artifacts.filter((item) => item.kind === action.target) as item}<option value={item.value}>{item.label}</option>{/each}</datalist></label>
+          <label class="m-field"><span class="m-field__label">{action.target === 'form' ? 'Form' : 'Page'}</span><ShadcnInput class="m-input" ariaLabel={action.target === 'form' ? 'Form' : 'Page'} list={`artifact-${index}`} value={action.to} placeholder={`Search ${action.target}s`} oninput={(event) => patch(index, { to: event.currentTarget.value })} /><datalist id={`artifact-${index}`}>{#each artifacts.filter((item) => item.kind === action.target) as item}<option value={item.value}>{item.label}</option>{/each}</datalist></label>
         {/if}
         <Switch label="Open in new tab" value={action.newTab ?? false} oninput={(newTab) => patch(index, { newTab })} />
         {#if action.target === 'page'}<JsonEditor label="Route parameters" value={action.params ?? {}} oninput={(params) => patch(index, { params })} />{/if}

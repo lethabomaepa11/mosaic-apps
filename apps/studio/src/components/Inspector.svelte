@@ -55,7 +55,7 @@
               <div class="inspector-tab">
                 {#if tab.id === 'properties'}
                   {#if propertyProps.length}
-                    {#each propertyProps as prop (prop.key)}<div class="inspector-prop"><Control desc={prop} value={(n.props ?? {})[prop.key]} language={String(n.props?.language ?? 'typescript')} options={optionsFor(n, prop)} artifacts={prop.kind === 'formRef' ? designer.formOptions : []} onChange={(v) => setProp(prop.key, v)} /></div>{/each}
+                    {#each propertyProps as prop (prop.key)}<div class="inspector-prop"><Control desc={prop} value={(n.props ?? {})[prop.key]} language={String(n.props?.language ?? 'typescript')} options={optionsFor(n, prop)} artifacts={prop.kind === 'formRef' ? designer.formOptions : prop.kind === 'rowActions' ? designer.artifactOptions : []} onChange={(v) => setProp(prop.key, v)} /></div>{/each}
                   {:else}<p class="m-muted m-small">This component has no component-specific properties.</p>{/if}
                 {:else if tab.id === 'logic'}
                   {#each logicProps as prop (prop.key)}<div class="inspector-prop"><Control desc={prop} value={(n.props ?? {})[prop.key]} options={optionsFor(n, prop)} onChange={(v) => setProp(prop.key, v)} /></div>{/each}

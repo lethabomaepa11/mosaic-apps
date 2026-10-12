@@ -1,6 +1,6 @@
 <script lang="ts">
-  import type { EntityDef, FieldDef } from '@mosaic-apps/core';
-  import { allFields, entityLabelPlural } from '@mosaic-apps/core';
+  import type { EntityDef, FieldDef, TableRowAction } from '@mosaic-apps/core';
+  import { allFields, entityLabelPlural, evaluateBoolean } from '@mosaic-apps/core';
   import type { MosaicClient } from '../client/api';
   import DataTable from './DataTable.svelte';
   import Pagination from './Pagination.svelte';
@@ -12,6 +12,10 @@
   import type { Snippet } from 'svelte';
   import { getContext, onDestroy } from 'svelte';
   import { MOSAIC_NAVIGATION_CONTEXT, type MosaicNavigate } from '../state/navigation';
+  import { ACTION_CONFIRMATION_CONTEXT, type MosaicConfirm } from '../actions/confirmation';
+  import { actionScope, createActionRunner, type ActionContext } from '../actions/runner';
+  import { createMosaicState, MOSAIC_STATE_CONTEXT, type MosaicState } from '../state/store';
+  import Icon from './Icon.svelte';
 
   interface Props {
     entity: EntityDef | string;
@@ -29,11 +33,12 @@
     editFormId?: string;
     detailFormId?: string;
     readOnly?: boolean;
+    rowActions?: TableRowAction[];
     onrowclick?: (row: Record<string, unknown>) => void;
     actions?: Snippet<[Record<string, unknown>]>;
   }
 
-  let { entity, client, title, columns, pageSize = 10, sortable = true, searchable = true, allowCreate = true, allowEdit = true, allowDelete = true, drillDown = true, createFormId, editFormId, detailFormId, readOnly = false, onrowclick, actions }: Props = $props();
+  let { entity, client, title, columns, pageSize = 10, sortable = true, searchable = true, allowCreate = true, allowEdit = true, allowDelete = true, drillDown = true, createFormId, editFormId, detailFormId, readOnly = false, rowActions = [], onrowclick, actions }: Props = $props();
 
   let rows = $state<Record<string, unknown>[]>([]);
   let total = $state(0);
@@ -53,7 +58,12 @@
   let controller: AbortController | undefined;
   let capabilities = $state({ read: false, create: false, update: false, delete: false });
   const navigate = getContext<MosaicNavigate | undefined>(MOSAIC_NAVIGATION_CONTEXT);
-  onDestroy(() => controller?.abort());
+  const runtime = getContext<MosaicState | undefined>(MOSAIC_STATE_CONTEXT) ?? createMosaicState();
+  const actionContext: ActionContext = { state: runtime, navigate, confirm: getContext<MosaicConfirm | undefined>(ACTION_CONFIRMATION_CONTEXT), notify: (variant, title, description) => toast[variant](title, description) };
+  const actionRunner = createActionRunner(actionContext);
+  let runningAction = $state('');
+  let active = true;
+  onDestroy(() => { active = false; controller?.abort(); if (runningAction) actionRunner.cancel(runningAction); });
 
   // Resolve entity def from string or use directly
   $effect(() => {
@@ -73,8 +83,7 @@
 
   const fields: FieldDef[] = $derived(entityDef ? allFields(entityDef) : []);
   const cols = $derived((columns?.length ? columns : entityDef?.list?.columns?.length ? entityDef.list.columns : fields.slice(0, 6).map((f) => f.name))
-    .map((name) => fields.find((f) => f.name === name))
-    .filter((f): f is FieldDef => !!f));
+    .map((name) => fields.find((f) => f.name === name) ?? { name, label: name, type: 'string' as const, sortable: false }));
 
   const tableColumns = $derived(cols.map((f) => ({
     key: f.name,
@@ -135,10 +144,23 @@
     try { await client.deleteRecord(entityDef.name, String(row.id)); await load(); toast.success('Record deleted'); }
     catch (err) { toast.error('Delete failed', err instanceof Error ? err.message : String(err)); }
   }
+  function showAction(action: TableRowAction, row: Record<string, unknown>) {
+    return !action.when || evaluateBoolean(action.when, actionScope({ ...actionContext, data: row }), false);
+  }
+  async function runRowAction(action: TableRowAction, row: Record<string, unknown>) {
+    if (runningAction) return;
+    const key = `row:${String(row.id)}:${action.id}`;
+    runningAction = key;
+    actionContext.client = client; actionContext.data = structuredClone($state.snapshot(row));
+    runtime.component.set('selectedRecord', structuredClone($state.snapshot(row)));
+    try { await actionRunner.execute(key, action.actions); if (active) await load(); }
+    catch (reason) { if (active) toast.error('Row action failed', reason instanceof Error ? reason.message : String(reason)); }
+    finally { runningAction = ''; }
+  }
 </script>
 
 <div class="m-card">
-  {#if title || searchable}
+  {#if title || searchable || (allowCreate && capabilities.create && !readOnly)}
     <div class="m-toolbar">
       <div class="m-row">
         {#if title}<strong>{title}</strong>
@@ -155,18 +177,19 @@
       </div>
     </div>
   {/if}
-  {#snippet rowActions(row: Record<string, unknown>)}
+  {#snippet renderRowActions(row: Record<string, unknown>)}
     <div class="m-row" style="gap:4px">
       {#if drillDown}<ShadcnButton variant="ghost" size="sm" class="m-btn m-btn--ghost m-btn--sm" onclick={() => selectRow(row)}>View</ShadcnButton>{/if}
       {#if allowEdit && capabilities.update && !readOnly && client}<ShadcnButton variant="secondary" size="sm" class="m-btn m-btn--secondary m-btn--sm" onclick={() => openEdit(row)}>Edit</ShadcnButton>{/if}
       {#if allowDelete && capabilities.delete && !readOnly && client}<ShadcnButton variant="ghost" size="sm" class="m-btn m-btn--ghost m-btn--sm" onclick={() => deleteRow(row)}>Delete</ShadcnButton>{/if}
       {@render actions?.(row)}
+      {#each rowActions.filter(action => showAction(action, row)) as action (action.id)}<ShadcnButton type="button" variant="secondary" size="sm" disabled={!!runningAction} onclick={() => runRowAction(action, row)}>{#if action.icon}<Icon name={action.icon} size={14} />{/if}{action.label}</ShadcnButton>{/each}
     </div>
   {/snippet}
-  <DataTable columns={tableColumns} rows={rows} {sortBy} {sortDir} {onsort} onrowclick={selectRow} actions={rowActions} {loading} />
+  <DataTable columns={tableColumns} rows={rows} {sortBy} {sortDir} {onsort} onrowclick={selectRow} actions={renderRowActions} {loading} />
   {#if error}<div class="m-alert m-alert--warning" role="alert">{error} <ShadcnButton variant="secondary" size="sm" onclick={() => load()}>Retry</ShadcnButton></div>{/if}
   {#if !client}<p class="m-small m-muted" style="padding:12px 16px">Connect a runtime API client to load this table.</p>{/if}
-  <Pagination {page} {pageSize} {total} onpage={(p) => { page = p; }} />
+  <Pagination {page} {pageSize} {total} onpage={(p) => { page = p; }} onpagesize={size => { pageSize = size; page = 1; }} />
   {#if selectedRecord && entityDef && client}
     <section class="m-entity-detail">
       <header class="m-row" style="justify-content:space-between"><strong>{entityDef.label ?? entityDef.name} details</strong><ShadcnButton variant="ghost" size="sm" class="m-btn m-btn--ghost m-btn--sm" onclick={() => selectedRecord = null}>Back to table</ShadcnButton></header>

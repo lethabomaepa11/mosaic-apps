@@ -62,7 +62,23 @@ export interface SetStateAction extends ActionBase {
   value: unknown;
 }
 
-export type ComponentAction = MessageAction | NavigateAction | ApiAction | SetStateAction | ScriptAction;
+export interface ConfirmAction extends ActionBase {
+  type: 'confirm';
+  title: string;
+  description?: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+}
+
+export interface TableRowAction {
+  id: string;
+  label: string;
+  icon?: string;
+  when?: string;
+  actions: ComponentAction[];
+}
+
+export type ComponentAction = MessageAction | NavigateAction | ApiAction | SetStateAction | ScriptAction | ConfirmAction;
 
 export interface ActionExecutionState {
   status: 'idle' | 'running' | 'succeeded' | 'failed' | 'cancelled';

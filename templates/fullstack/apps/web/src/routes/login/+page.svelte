@@ -2,10 +2,10 @@
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import { client } from '#lib/client';
-  import { toast } from '@mosaic-apps/ui';
+  import { TextField, toast } from '@mosaic-apps/ui';
 
-  let email = $state('admin@mosaic.local');
-  let password = $state('admin1234');
+  let email = $state(import.meta.env.DEV ? 'admin@mosaic.local' : '');
+  let password = $state(import.meta.env.DEV ? 'admin1234' : '');
   let error = $state('');
   let busy = $state(false);
 
@@ -32,14 +32,8 @@
 <div style="max-width:380px;margin:6vh auto">
   <form class="m-card m-stack" onsubmit={submit}>
     <h1 class="m-h3" style="margin:0">Sign in</h1>
-    <label class="m-field">
-      <span class="m-field__label">Email</span>
-      <input class="m-input" type="email" bind:value={email} autocomplete="username" required />
-    </label>
-    <label class="m-field">
-      <span class="m-field__label">Password</span>
-      <input class="m-input" type="password" bind:value={password} autocomplete="current-password" required />
-    </label>
+    <TextField label="Email" format="email" bind:value={email} autocomplete="username" required />
+    <TextField label="Password" format="password" bind:value={password} autocomplete="current-password" required />
     {#if error}<span class="m-field__error">{error}</span>{/if}
     <button class="m-btn m-btn--primary m-btn--block" disabled={busy} type="submit">
       {busy ? 'Signing in…' : 'Sign in'}

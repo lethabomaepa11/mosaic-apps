@@ -1,7 +1,7 @@
 <script lang="ts">
   import { DatePicker as BitsDatePicker } from 'bits-ui';
   import { parseDate, parseDateTime, type DateValue } from '@internationalized/date';
-  import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-svelte';
+  import { CalendarDays, ChevronLeft, ChevronRight } from '@lucide/svelte';
   import ShadcnInput from '../shadcn/input/Input.svelte';
   interface Props {
     label?: string;

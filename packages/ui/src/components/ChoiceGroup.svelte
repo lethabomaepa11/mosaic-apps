@@ -1,6 +1,6 @@
 <script lang="ts">
   import { Checkbox as BitsCheckbox, RadioGroup as BitsRadioGroup } from 'bits-ui';
-  import { Check, Circle } from 'lucide-svelte';
+  import { Check, Circle } from '@lucide/svelte';
   import type { Option } from './SelectField.svelte';
 
   interface Props {

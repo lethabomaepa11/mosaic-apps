@@ -2,7 +2,7 @@
   import { page } from '$app/state';
   import { CodeEditor, FormRenderer, Modal, toast, Icon } from '@mosaic-apps/ui';
   import type { FormDataSource, FormDef, EntityDef, FormSettings } from '@mosaic-apps/core';
-  import { validateDefinitionTree } from '@mosaic-apps/core';
+  import { allFields, validateDefinitionTree } from '@mosaic-apps/core';
   import { client } from '#lib/client';
   import { designer } from '#lib/designer.svelte';
   import Palette from '../../../../components/Palette.svelte';
@@ -14,6 +14,7 @@
   import AuthoringRecovery from '../../../../components/AuthoringRecovery.svelte';
   import DefinitionConflict from '../../../../components/DefinitionConflict.svelte';
   import VersionHistory from '../../../../components/VersionHistory.svelte';
+  import RuntimePreview from '../../../../components/RuntimePreview.svelte';
 
   const id = $derived(page.params.id ?? '');
   let loading = $state(true);
@@ -37,14 +38,15 @@
   let entities = $state<EntityDef[]>([]);
 
   $effect(() => {
-    designer.bindingOptions = entities.find((e) => e.name === entity)?.fields.map((field) => field.name) ?? [];
+    const definition = entities.find((e) => e.name === entity);
+    designer.bindingOptions = definition ? allFields(definition).map(field => field.name) : [];
   });
 
   async function loadEntities() {
     try {
       const res = await client.listEntities();
       entities = res.map((e) => e.definition);
-      designer.entityOptionsByName = Object.fromEntries(entities.map((definition) => [definition.name, definition.fields.map((field) => field.name)]));
+      designer.entityOptionsByName = Object.fromEntries(entities.map((definition) => [definition.name, allFields(definition).map((field) => field.name)]));
     } catch { /* ignore */ }
   }
 
@@ -249,7 +251,7 @@
         <article class="designer-preview__page" class:designer-preview__page--tablet={previewWidth === 'tablet'} class:designer-preview__page--mobile={previewWidth === 'mobile'}>
           <h1>{settings.seo?.title || name}</h1>
           {#if settings.seo?.description}<p>{settings.seo.description}</p>{/if}
-          <FormRenderer form={{ ...designer.form, name, description, entity: entity || undefined, settings, dataSource }} {client} />
+          <RuntimePreview form={{ ...designer.form, name, description, entity: entity || undefined, settings, dataSource }} {client} />
         </article>
       {/if}
     </main>

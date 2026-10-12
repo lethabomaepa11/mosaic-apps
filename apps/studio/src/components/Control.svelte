@@ -1,8 +1,9 @@
 <script lang="ts">
-  import { CodeEditorField, TextField, TextArea, NumberField, Switch, SelectField, ColorPicker, JsonEditor, Checkbox } from '$ui';
+  import { CodeEditorField, TextField, TextArea, NumberField, Switch, SelectField, ColorPicker, JsonEditor, Checkbox, ShadcnInput } from '$ui';
   import type { PropDesc } from '$ui';
   import ActionEditor from './ActionEditor.svelte';
   import ConditionEditor from './ConditionEditor.svelte';
+  import RowActionsEditor from './RowActionsEditor.svelte';
 
   interface Props {
     desc: PropDesc;
@@ -41,7 +42,7 @@
 {:else if desc.kind === 'formRef'}
   <label class="m-field">
     <span class="m-field__label">{desc.label}</span>
-    <input class="m-input" value={search} placeholder="Search forms…" autocomplete="off" oninput={(event) => { search = event.currentTarget.value; const selected = artifacts.find((item) => item.value === String(value ?? '')); if (selected && selected.label !== search) onChange(''); }} />
+    <ShadcnInput class="m-input" ariaLabel={desc.label} value={search} placeholder="Search forms…" autocomplete="off" oninput={(event) => { search = event.currentTarget.value; const selected = artifacts.find((item) => item.value === String(value ?? '')); if (selected && selected.label !== search) onChange(''); }} />
     {#if search && matchingArtifacts.length}
       <div class="m-stack" style="gap:4px;max-height:180px;overflow:auto" role="listbox" aria-label="Matching forms">
         {#each matchingArtifacts as artifact (artifact.value)}
@@ -53,6 +54,8 @@
   </label>
 {:else if desc.kind === 'actions'}
   <ActionEditor {value} artifacts={artifacts.filter((item): item is { value: string; label: string; kind: 'form' | 'page' } => Boolean(item.kind))} onchange={onChange} />
+{:else if desc.kind === 'rowActions'}
+  <RowActionsEditor {value} artifacts={artifacts.filter((item): item is { value: string; label: string; kind: 'form' | 'page' } => Boolean(item.kind))} onchange={onChange} />
 {:else if desc.kind === 'condition'}
   <ConditionEditor label={desc.label} {value} onchange={onChange} />
 {:else if desc.kind === 'json' || desc.kind === 'options' || desc.kind === 'columns'}
@@ -79,7 +82,7 @@
 {:else if desc.kind === 'binding'}
   <label class="m-field">
     <span class="m-field__label">{desc.label}</span>
-    <input class="m-input" list="mosaic-binding-options" value={String(value ?? '')} placeholder="Choose a field or enter a custom path" oninput={(event) => onChange(event.currentTarget.value)} />
+    <ShadcnInput class="m-input" ariaLabel={desc.label} list="mosaic-binding-options" value={String(value ?? '')} placeholder="Choose a field or enter a custom path" oninput={(event) => onChange(event.currentTarget.value)} />
     <datalist id="mosaic-binding-options">
       {#each options as option (option)}<option value={option}></option>{/each}
     </datalist>

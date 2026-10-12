@@ -19,19 +19,13 @@ function initialize(): Promise<MosaicServer> {
     seed: false,
     // Entity metadata is migrated into PostgreSQL before deployment. Never
     // depend on the function bundle containing a mutable entities directory.
-    uploadsDir: '/tmp/mosaic-uploads-disabled',
+    fileStorage: 'database',
+    maxFileBytes: 4 * 1024 * 1024,
   }).catch((error) => { initialization = undefined; throw error; });
   return initialization;
 }
 
 export async function mosaicFetch(request: Request): Promise<Response> {
-  const pathname = new URL(request.url).pathname;
-  if (/^\/(api\/files|files)(\/|$)/.test(pathname)) {
-    return Response.json({ success: false, error: {
-      code: 'PERSISTENT_UPLOAD_STORAGE_REQUIRED',
-      message: 'File uploads require a persistent API host. Local upload storage is disabled on serverless deployments.',
-    } }, { status: 501 });
-  }
   try {
     return await (await initialize()).app.fetch(request);
   } catch (error) {

@@ -31,7 +31,7 @@ function transpile(request: SandboxRequest): string {
 function validateAction(action: unknown): action is ComponentAction {
   if (!action || typeof action !== 'object') return false;
   const value = action as Record<string, unknown>;
-  if (value.type === 'message') return typeof value.title === 'string';
+  if (value.type === 'message' || value.type === 'confirm') return typeof value.title === 'string';
   if (value.type === 'navigate') return ['form', 'page', 'url'].includes(String(value.target)) && typeof value.to === 'string';
   if (value.type === 'api') return typeof value.path === 'string';
   if (value.type === 'state.set') {
@@ -70,9 +70,10 @@ const api = __freeze({
     error: (title, description) => ({ type: 'message', variant: 'error', title, description })
   },
   callApi: (options) => ({ type: 'api', ...options }),
+  confirm: (options) => ({ type: 'confirm', ...options }),
   navigate: {
     form: (to, newTab = false) => ({ type: 'navigate', target: 'form', to, newTab }),
-    page: (to, newTab = false) => ({ type: 'navigate', target: 'page', to, newTab }),
+    page: (to, newTab = false, params = {}) => ({ type: 'navigate', target: 'page', to, newTab, params }),
     url: (to, newTab = false) => ({ type: 'navigate', target: 'url', to, newTab })
   },
   state: { set: (scope, path, value) => ({ type: 'state.set', target: { scope, path }, value }) }

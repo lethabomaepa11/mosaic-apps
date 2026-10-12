@@ -12,6 +12,7 @@ export * from './form/tree.js';
 export * from './form/workflow.js';
 export * from './form/validation.js';
 export * from './page/routing.js';
+export * from './theme.js';
 export * from './expression/index.js';
 export * from './entity/defaults.js';
 export * from './decorators.js';

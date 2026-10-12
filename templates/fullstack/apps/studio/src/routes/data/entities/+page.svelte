@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { toast } from '@mosaic-apps/ui';
+  import { TextField, toast } from '@mosaic-apps/ui';
   import type { EntityDef } from '@mosaic-apps/core';
   import { client } from '#lib/client';
 
@@ -44,7 +44,7 @@
 <header class="app-header">
   <h1 class="m-h2" style="margin:0">Entities</h1>
   <div class="m-row">
-    <input class="m-input" style="width:220px" bind:value={newName} placeholder="New entity name…" />
+    <TextField label="New entity name" bind:value={newName} placeholder="New entity name…" />
     <button class="m-btn m-btn--primary" disabled={busy || !newName.trim()} onclick={createEntity}>+ Create entity</button>
   </div>
 </header>

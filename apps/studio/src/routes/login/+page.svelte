@@ -1,10 +1,10 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { auth } from '#lib/auth.svelte';
-  import { toast } from '@mosaic-apps/ui';
+  import { TextField, toast } from '@mosaic-apps/ui';
 
-  let email = $state('admin@mosaic.local');
-  let password = $state('admin1234');
+  let email = $state(import.meta.env.DEV ? 'admin@mosaic.local' : '');
+  let password = $state(import.meta.env.DEV ? 'admin1234' : '');
   let error = $state('');
   let busy = $state(false);
 
@@ -36,19 +36,13 @@
       <span style="width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,#6366f1,#8b5cf6)"></span>
       <strong>Mosaic Studio</strong>
     </div>
-    <label class="m-field">
-      <span class="m-field__label">Email</span>
-      <input class="m-input" type="email" bind:value={email} autocomplete="username" required />
-    </label>
-    <label class="m-field">
-      <span class="m-field__label">Password</span>
-      <input class="m-input" type="password" bind:value={password} autocomplete="current-password" required />
-    </label>
+    <TextField label="Email" format="email" bind:value={email} autocomplete="username" required />
+    <TextField label="Password" format="password" bind:value={password} autocomplete="current-password" required />
     {#if error}<span class="m-field__error">{error}</span>{/if}
     <button class="m-btn m-btn--primary m-btn--block" type="submit" disabled={busy}>
       {busy ? 'Signing in…' : 'Sign in'}
     </button>
-    <p class="m-small m-muted" style="margin:0">Default seeded admin: admin@mosaic.local / admin1234</p>
+    {#if import.meta.env.DEV}<p class="m-small m-muted" style="margin:0">Default seeded admin: admin@mosaic.local / admin1234</p>{/if}
   </form>
 </div>
 

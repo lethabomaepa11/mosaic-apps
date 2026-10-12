@@ -123,6 +123,8 @@ try {
     const productionHydrated = page.waitForResponse((response) => response.url().includes('/api/auth/me'));
     await page.goto('http://127.0.0.1:3202/login', { waitUntil: 'domcontentloaded' });
     await productionHydrated;
+    await page.getByLabel(/^Email/).fill('admin@mosaic.local');
+    await page.getByLabel(/^Password/).fill('admin1234');
     await page.getByRole('button', { name: 'Sign in', exact: true }).click();
     await page.waitForURL('http://127.0.0.1:3202/', { waitUntil: 'domcontentloaded' });
     await page.goto('http://127.0.0.1:3202/studio', { waitUntil: 'domcontentloaded' });
@@ -131,6 +133,8 @@ try {
     await page.getByRole('heading').first().waitFor();
     assert.deepEqual(errors, [], 'Production Node frontends have runtime exceptions.');
     console.log('[mosaic] production web/Studio passed: Node startup, cross-origin API/CORS, authenticated Studio definitions.');
+    const { verifyWorkflows } = await import('./browser-workflows.mjs');
+    await verifyWorkflows(browser, { api: 'http://127.0.0.1:3101/api', studio: 'http://127.0.0.1:3102', web: 'http://127.0.0.1:3100', evidence: join(app, 'evidence') });
   } finally { await browser.close(); }
 } catch (error) { console.error(logs); throw error; }
 finally {
@@ -155,10 +159,17 @@ await writeFile(join(app, 'evidence', 'verify-serverless.mjs'), `
   assert.ok(token);
   const records = await hono.request('http://api.test/api/entities', {headers:{Authorization:'Bearer '+token}});
   assert.equal(records.status, 200);
-  assert.equal((await hono.request('http://api.test/api/files')).status, 501);
+  assert.equal((await hono.request('http://api.test/api/files')).status, 401);
+  const attachment = new FormData(); attachment.append('file', new File(['serverless durable content'], 'sample.txt', {type:'text/plain'}));
+  const uploaded = await hono.request('http://api.test/api/files', { method:'POST', headers:{Authorization:'Bearer '+token}, body:attachment });
+  assert.equal(uploaded.status, 201);
+  const file = (await uploaded.json()).data;
+  assert.equal((await hono.request('http://api.test/files/'+file.id)).status, 401);
+  const content = await hono.request('http://api.test/files/'+file.id, {headers:{Authorization:'Bearer '+token}});
+  assert.equal(await content.text(), 'serverless durable content');
   const { closeServerlessMosaicServer } = await import('../apps/api/dist/vercel.js');
   await closeServerlessMosaicServer();
-  console.log('[mosaic] native serverless Hono entry passed: shared initialization, health, auth, metadata, persistent-upload guard.');
+  console.log('[mosaic] native serverless Hono entry passed: shared initialization, health, auth, metadata and durable private uploads.');
 `);
 run(['--import', 'tsx', 'evidence/verify-serverless.mjs'], app);
 for (const target of ['netlify', 'vercel']) {

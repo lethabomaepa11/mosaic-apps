@@ -13,7 +13,7 @@ import { authRoutes } from './modules/auth-routes.js';
 import { crudRoutes } from './crud/router.js';
 import { entityAdminRoutes } from './modules/entity-admin.js';
 import { artifactRoutes } from './modules/artifacts.js';
-import { navRoutes, settingsRoutes, themeRoutes } from './modules/settings.js';
+import { brandingRoutes, navRoutes, settingsRoutes, themeRoutes } from './modules/settings.js';
 import { refListRoutes } from './modules/reflists.js';
 import { roleAdminRoutes, userAdminRoutes } from './modules/users.js';
 import { migrationRoutes } from './modules/migrations-routes.js';
@@ -40,6 +40,9 @@ export interface MosaicServerConfig {
   entitiesDir?: string;
   uploadsDir?: string;
   publicFiles?: boolean;
+  /** Database storage supports durable small uploads on serverless and multiple API instances. */
+  fileStorage?: 'disk' | 'database';
+  maxFileBytes?: number;
   /** `true` seeds default admin + demo data; or pass explicit options */
   seed?: SeedOptions | boolean;
   log?: boolean;
@@ -137,13 +140,14 @@ export async function createMosaicServer(config: MosaicServerConfig): Promise<Mo
   app.route('/api/settings', settingsRoutes(db));
   app.route('/api/nav', navRoutes(db));
   app.route('/api/theme', themeRoutes(db));
+  app.route('/api/branding', brandingRoutes(db));
   app.route('/api/ref-lists', refListRoutes(db));
   app.route('/api/users', userAdminRoutes(db));
   app.route('/api/roles', roleAdminRoutes(db));
   app.route('/api/migrations', migrationRoutes(db));
   app.route('/api/audit', auditRoutes(db));
-  app.route('/api/files', fileRoutes({ db, uploadsDir, publicRead: config.publicFiles ?? false }));
-  app.route('/files', fileRoutes({ db, uploadsDir, publicRead: config.publicFiles ?? true }));
+  app.route('/api/files', fileRoutes({ db, uploadsDir, publicRead: config.publicFiles ?? false, storage: config.fileStorage, maxFileBytes: config.maxFileBytes }));
+  app.route('/files', fileRoutes({ db, uploadsDir, publicRead: config.publicFiles ?? false, storage: config.fileStorage, maxFileBytes: config.maxFileBytes }));
   app.route('/api/endpoints', endpointRegistryRoutes(db));
   app.route('/api', metaRoutes(db));
 

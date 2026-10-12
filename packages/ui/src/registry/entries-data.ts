@@ -56,6 +56,7 @@ export const DATA_ENTRIES: ComponentDef[] = [
       { key: 'createFormId', label: 'Create form', kind: 'formRef', help: 'Use this form for creating records; leave empty for the inline editor.' },
       { key: 'editFormId', label: 'Edit form', kind: 'formRef', help: 'The selected record ID is passed to the form.' },
       { key: 'detailFormId', label: 'Detail form', kind: 'formRef', help: 'Choose a read-only form for record drill-down.' },
+      { key: 'rowActions', label: 'Row actions', kind: 'rowActions', help: 'Run actions with the selected row available as state.data.' },
     ],
     pages: true,
   },

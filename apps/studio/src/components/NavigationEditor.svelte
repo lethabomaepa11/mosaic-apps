@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { Icon, TextField, toast } from '@mosaic-apps/ui';
+  import { Icon, SelectField, TextField, toast } from '@mosaic-apps/ui';
   import type { NavItemDef } from '@mosaic-apps/core';
   import { client } from '#lib/client';
 
@@ -37,7 +37,7 @@
       <div class="nav-preview"><Icon name={item.icon ?? 'link'} size={16} /></div>
       <TextField label="Label" bind:value={item.label} />
       <TextField label="Path" bind:value={item.href} placeholder="/orders" />
-      <label>Icon<select class="m-select" bind:value={item.icon}>{#each icons as icon (icon)}<option value={icon}>{icon}</option>{/each}</select></label>
+      <SelectField label="Icon" value={item.icon ?? 'link'} clearable={false} options={icons.map(icon => ({ value: icon, label: icon }))} oninput={icon => item.icon = icon ?? 'link'} />
       <TextField label="Section" bind:value={item.section} placeholder="Optional" />
       <div class="nav-actions"><button class="m-btn m-btn--ghost m-btn--icon" title="Move up" onclick={() => move(i, -1)}><Icon name="arrowUp" size={14} /></button><button class="m-btn m-btn--ghost m-btn--icon" title="Move down" onclick={() => move(i, 1)}><Icon name="arrowDown" size={14} /></button><button class="m-btn m-btn--ghost m-btn--icon" title="Remove" onclick={() => items = items.filter((_, index) => index !== i)}><Icon name="trash2" size={14} /></button></div>
     </div>
@@ -49,7 +49,7 @@
   .nav-editor { display:grid; gap:14px; }
   .nav-row { display:grid; grid-template-columns:26px minmax(120px,1fr) minmax(140px,1fr) 150px minmax(110px,.7fr) auto; gap:10px; align-items:end; padding:10px 0; border-bottom:1px solid var(--m-border); }
   .nav-preview { padding-bottom:8px; color:var(--m-primary); }
-  .nav-row label { display:grid; gap:5px; font-size:.75rem; font-weight:650; }
+
   .nav-actions { display:flex; }
   .nav-live { display:grid; gap:4px; padding:14px; background:#101827; color:#cbd5e1; border-radius:var(--m-radius); }
   .nav-live div { display:flex; gap:9px; align-items:center; padding:5px 8px; border-radius:5px; }

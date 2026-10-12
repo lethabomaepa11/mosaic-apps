@@ -2,6 +2,7 @@
 
 import { Hono } from 'hono';
 import type { PageSettings, SettingRecord, NavItemDef } from '@mosaic-apps/core';
+import { validateThemeConfig } from '@mosaic-apps/core';
 import type { Db } from '../db/driver.js';
 import { HttpError, fail, ok, readJson } from './http.js';
 import { requirePermission } from './rbac.js';
@@ -36,6 +37,22 @@ export function themeRoutes(db: Db): Hono<AuthEnv> {
     const res = await db.query<{ value: unknown }>("SELECT value FROM mosaic_settings WHERE key = 'theme.config'");
     const value = res.rows[0]?.value;
     return ok(c, value && typeof value === 'object' && !Array.isArray(value) ? value : {});
+  });
+  return app;
+}
+
+export function brandingRoutes(db: Db): Hono<AuthEnv> {
+  const app = new Hono<AuthEnv>();
+  app.get('/', async c => {
+    const result = await db.query<{ key: string; value: unknown }>("SELECT key,value FROM mosaic_settings WHERE key IN ('app.name','app.logo')");
+    const settings = new Map(result.rows.map(row => [row.key, row.value]));
+    const name = typeof settings.get('app.name') === 'string' ? String(settings.get('app.name')).slice(0, 200) : '';
+    let logo = typeof settings.get('app.logo') === 'string' ? String(settings.get('app.logo')) : '';
+    if (logo.startsWith('/files/')) {
+      const stored = await db.query<{ public: boolean }>('SELECT public FROM mosaic_files WHERE id = $1', [logo.slice('/files/'.length)]);
+      if (!stored.rows[0]?.public) logo = '';
+    } else if (logo && !/^https?:\/\//i.test(logo)) logo = '';
+    return ok(c, { name, logo });
   });
   return app;
 }
@@ -80,6 +97,9 @@ export function settingsRoutes(db: Db): Hono<AuthEnv> {
     const body = await readJson<{ key?: string; value?: unknown; description?: string }>(c);
     const key = String(body.key ?? '').trim();
     if (!key || !/^[a-z0-9_.:-]+$/i.test(key)) throw new HttpError(422, 'Invalid settings key', 'BAD_KEY');
+    if (key === 'theme.config') { try { validateThemeConfig(body.value); } catch (error) { throw new HttpError(422, error instanceof Error ? error.message : 'Invalid theme.', 'BAD_THEME'); } }
+    if (key === 'app.name' && (typeof body.value !== 'string' || !body.value.trim() || body.value.length > 200)) throw new HttpError(422, 'Application name must be 1–200 characters.', 'BAD_INPUT');
+    if (key === 'app.logo' && (typeof body.value !== 'string' || body.value.length > 2000 || (body.value && !/^\/files\/[\w-]+$/.test(body.value) && !/^https?:\/\//i.test(body.value)))) throw new HttpError(422, 'Logo must be an uploaded image or HTTP(S) URL.', 'BAD_INPUT');
     await db.query(
       `INSERT INTO mosaic_settings (key, value, description, updated_at)
        VALUES ($1, $2::jsonb, $3, now())

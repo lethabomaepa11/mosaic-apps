@@ -16,6 +16,7 @@
 
 <script lang="ts" generics="T extends Record<string, unknown>">
   import Icon from './Icon.svelte';
+  import { readDataPath } from '../state/data-source';
 
   interface Column {
     key: string;
@@ -29,7 +30,7 @@
   let { columns, rows, sortBy, sortDir, onsort, onrowclick, emptyText = 'No records', actions, loading }: Props<T> = $props();
 
   function cellValue(row: T, col: Column): string {
-    const v = row[col.key];
+    const v = Object.hasOwn(row, col.key) ? row[col.key] : readDataPath(row, col.key);
     if (col.render) return col.render(row);
     if (v === null || v === undefined) return '';
     if (typeof v === 'object') return JSON.stringify(v);
@@ -42,7 +43,7 @@
 
   function onRowClick(event: MouseEvent, row: T) {
     const target = event.target;
-    if (target instanceof Element && target.closest('button, a, input, [role="button"]')) return;
+    if (target instanceof Element && target.closest('button, a, input, select, textarea, [role="button"], [role="combobox"]')) return;
     onrowclick?.(row);
   }
 </script>
@@ -71,6 +72,7 @@
             {#each columns as col (col.key)}
               <td style:text-align={col.align ?? 'left'}>
                 {#if typeof row[col.key] === 'boolean'}
+                  <span class="sr-only">{row[col.key] ? 'Yes' : 'No'}</span>
                   {#if row[col.key]}<Icon name="check" size={14} />{:else}—{/if}
                 {:else if onrowclick && col.key === columns[0]?.key}
                   <button type="button" class="m-table__record-link" onclick={() => onrowclick?.(row)}>{cellValue(row, col)}</button>

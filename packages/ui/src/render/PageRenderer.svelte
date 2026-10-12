@@ -11,6 +11,8 @@
   import { getContext, setContext, onDestroy } from 'svelte';
   import { themeState } from '../lib/theme.svelte';
   import { createMosaicState, MOSAIC_STATE_CONTEXT, type MosaicState } from '../state/store';
+  import ActionConfirmation from '../components/ActionConfirmation.svelte';
+  import { ACTION_CONFIRMATION_CONTEXT, type MosaicConfirm } from '../actions/confirmation';
 
   interface Props {
     page: PageDef;
@@ -18,14 +20,20 @@
     /** form data scope for the page (route params, query, etc.) */
     scope?: Record<string, unknown>;
     state?: MosaicState;
+    includeMetadata?: boolean;
   }
 
-  let { page, client, scope, state: suppliedState }: Props = $props();
+  let { page, client, scope, state: suppliedState, includeMetadata = true }: Props = $props();
+
+  const setLayout = getContext<((layout: 'app' | 'bare') => () => void) | undefined>('mosaic:page-layout');
+  $effect(() => setLayout?.(page.settings?.layout === 'bare' ? 'bare' : 'app'));
 
   const inheritedState = getContext<MosaicState | undefined>(MOSAIC_STATE_CONTEXT);
   // svelte-ignore state_referenced_locally -- choose the page state scope once at renderer creation.
   const runtimeState = suppliedState ?? inheritedState?.forkPage() ?? createMosaicState();
   setContext(MOSAIC_STATE_CONTEXT, runtimeState);
+  let confirmation = $state<{ confirm: MosaicConfirm }>();
+  setContext<MosaicConfirm>(ACTION_CONFIRMATION_CONTEXT, options => confirmation?.confirm(options) ?? Promise.resolve(false));
   let stateRevision = $state(0);
   const unsubscribers = [runtimeState.application, runtimeState.page, runtimeState.form]
     .map((store) => store.subscribe(() => { stateRevision += 1; }, false));
@@ -55,6 +63,7 @@
 </script>
 
 <svelte:head>
+  {#if includeMetadata}
   {#if seo?.title}<title>{seo.title}</title>{/if}
   {#if seo?.description}<meta name="description" content={seo.description} />{/if}
   {#if seo?.robots}<meta name="robots" content={seo.robots} />{/if}
@@ -62,7 +71,9 @@
   {#if seo?.socialTitle}<meta property="og:title" content={seo.socialTitle} />{/if}
   {#if seo?.socialDescription}<meta property="og:description" content={seo.socialDescription} />{/if}
   {#if seo?.socialImage}<meta property="og:image" content={seo.socialImage} />{/if}
+  {/if}
 </svelte:head>
+<ActionConfirmation bind:this={confirmation} />
 
 <div class={`m-root m-stack m-transition-${transition?.kind ?? 'fade'}`} style={`--m-enter-duration:${duration}ms;--m-enter-delay:${transition?.delay ?? 0}ms`} in:fade={{ duration, delay: transition?.delay ?? 0 }}>
   {#each root.children ?? [] as child, index (child.id)}

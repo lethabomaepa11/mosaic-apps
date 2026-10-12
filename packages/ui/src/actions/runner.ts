@@ -1,4 +1,5 @@
-import { buildPageRoute, evaluateBoolean, type ActionExecutionState, type ComponentAction, type StateScope } from '@mosaic-apps/core';
+import { buildPageRoute, evaluateBoolean, validateComponentActions, type ActionExecutionState, type ComponentAction, type StateScope } from '@mosaic-apps/core';
+import { readDataPath } from '../state/data-source.js';
 import type { MosaicClient } from '../client/api.js';
 import type { MosaicState, StateStore } from '../state/store.js';
 import { runActionScript } from './sandbox.js';
@@ -10,6 +11,7 @@ export interface ActionContext {
   data?: Record<string, unknown>;
   navigate?: (href: string, newTab: boolean) => void | Promise<void>;
   notify?: (variant: 'info' | 'success' | 'warning' | 'error', title: string, description?: string) => void;
+  confirm?: (options: { title: string; description?: string; confirmLabel?: string; cancelLabel?: string; signal: AbortSignal }) => Promise<boolean>;
 }
 
 function scopeStore(state: MosaicState, scope: StateScope): StateStore<Record<string, unknown>> {
@@ -17,12 +19,7 @@ function scopeStore(state: MosaicState, scope: StateScope): StateStore<Record<st
 }
 
 function readPath(value: unknown, path: string): unknown {
-  let current = value;
-  for (const part of path.split('.').filter(Boolean)) {
-    if (!current || typeof current !== 'object') return undefined;
-    current = (current as Record<string, unknown>)[part];
-  }
-  return current;
+  return readDataPath(value, path);
 }
 
 export function actionScope(context: ActionContext, result?: unknown): ScriptStateSnapshot & Record<string, unknown> {
@@ -77,6 +74,7 @@ export class ActionRunner {
     this.controllers.set(key, controller);
     this.setStatus(key, { status: 'running', startedAt: new Date().toISOString() });
     try {
+      validateComponentActions(actions);
       const result = await this.runActions(actions, controller);
       if (this.controllers.get(key) === controller) this.setStatus(key, { status: 'succeeded', finishedAt: new Date().toISOString() });
       return result;
@@ -94,6 +92,7 @@ export class ActionRunner {
   }
 
   private async runActions(actions: ComponentAction[], controller: AbortController, initialResult?: unknown): Promise<unknown> {
+    validateComponentActions(actions);
     let result = initialResult;
     for (const action of actions) {
       if (controller.signal.aborted) throw new DOMException('Action cancelled', 'AbortError');
@@ -108,6 +107,10 @@ export class ActionRunner {
           signal: controller.signal,
         });
         result = await this.runActions(generated, controller, result);
+      } else if (action.type === 'confirm') {
+        const options = { title: String(resolveValue(action.title, scope) ?? 'Continue?'), description: String(resolveValue(action.description, scope) ?? ''), confirmLabel: action.confirmLabel, cancelLabel: action.cancelLabel, signal: controller.signal };
+        const confirmed = this.context.confirm ? await this.context.confirm(options) : typeof window !== 'undefined' && window.confirm([options.title, options.description].filter(Boolean).join('\n\n'));
+        if (!confirmed) { controller.abort(); throw new DOMException('Action cancelled', 'AbortError'); }
       } else if (action.type === 'message') {
         const title = String(resolveValue(action.title, scope) ?? '');
         const description = String(resolveValue(action.description, scope) ?? '');

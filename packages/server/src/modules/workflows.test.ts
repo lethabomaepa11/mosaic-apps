@@ -10,6 +10,7 @@ test('entity views are authorized, linked, published atomically and protected ag
     assert.equal((await call({ entity: 'customer' })).status, 401);
     const login = await server.app.request('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: 'admin@mosaic.local', password: 'admin1234' }) });
     const token = ((await login.json()) as { data: { token: string } }).data.token;
+    assert.equal((await call(null, token)).status, 422, 'Invalid payloads must not cause a 500.');
     const response = await call({ entity: 'customer', name: 'Client workflow', columns: ['name', 'email'] }, token);
     assert.equal(response.status, 201, await response.clone().text());
     const workflow = ((await response.json()) as { data: EntityWorkflow }).data;
@@ -38,6 +39,8 @@ test('entity views are authorized, linked, published atomically and protected ag
     assert.equal(resolved.status, 200);
     assert.deepEqual(((await resolved.json()) as { data: { params: unknown } }).data.params, { id: '123' });
     assert.equal((await server.app.request('/api/pages/resolve?path=%2Fclients%2F123')).status, 401);
+    const duplicate = await server.app.request('/api/pages', { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'Duplicate route', route: '/clients/:customerId' }) });
+    assert.equal(duplicate.status, 409, 'Equivalent parameter patterns must not create ambiguous routes.');
     const history = await server.app.request(`/api/pages/${workflow.page.id}/versions`, { headers: { Authorization: `Bearer ${token}` } });
     assert.equal(history.status, 200);
     assert.equal(((await history.json()) as { data: unknown[] }).data.length, 2);

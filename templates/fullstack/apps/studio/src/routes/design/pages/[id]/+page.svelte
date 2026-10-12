@@ -2,7 +2,7 @@
   import { page } from '$app/state';
   import { CodeEditor, Icon, Modal, PageRenderer, toast } from '@mosaic-apps/ui';
   import type { PageDef, PageSettings } from '@mosaic-apps/core';
-  import { validateDefinitionTree } from '@mosaic-apps/core';
+  import { allFields, validateDefinitionTree } from '@mosaic-apps/core';
   import { client } from '#lib/client';
   import { designer } from '#lib/designer.svelte';
   import Palette from '../../../../components/Palette.svelte';
@@ -14,6 +14,7 @@
   import AuthoringRecovery from '../../../../components/AuthoringRecovery.svelte';
   import DefinitionConflict from '../../../../components/DefinitionConflict.svelte';
   import VersionHistory from '../../../../components/VersionHistory.svelte';
+  import RuntimePreview from '../../../../components/RuntimePreview.svelte';
 
   const id = $derived(page.params.id ?? '');
   let loading = $state(true);
@@ -46,7 +47,7 @@
     void (async () => {
     try {
       const entityList = await client.listEntities();
-      designer.entityOptionsByName = Object.fromEntries(entityList.map((entry) => [entry.name, entry.definition.fields.map((field) => field.name)]));
+      designer.entityOptionsByName = Object.fromEntries(entityList.map((entry) => [entry.name, allFields(entry.definition).map((field) => field.name)]));
       const [forms, pages] = await Promise.all([client.listForms(), client.listPages()]);
       designer.formOptions = forms.map((item) => ({ value: item.id, label: `${item.name} · /${item.slug}` }));
       designer.artifactOptions = [
@@ -187,7 +188,7 @@
   {:else if showPreview}
     <main class="page-preview" aria-label="Inline page preview">
       <div class="page-preview__toolbar"><span class="m-badge">Local preview · Save publishes live</span><button class="m-btn m-btn--primary m-btn--sm" disabled={saving} onclick={save}>{saving ? 'Saving…' : 'Save'}</button></div>
-      <article class="page-preview__surface"><PageRenderer page={{ ...designer.page, name, description, route, settings }} {client} /></article>
+      <article class="page-preview__surface"><RuntimePreview page={{ ...designer.page, name, description, route, settings }} {client} /></article>
     </main>
   {:else}
     <div class="designer" style={`--palette-width:${paletteWidth}px;--inspector-width:${inspectorWidth}px`}>

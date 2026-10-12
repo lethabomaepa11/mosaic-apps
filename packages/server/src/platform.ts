@@ -3,6 +3,7 @@
 import type { Db } from './db/driver.js';
 
 export const PLATFORM_DDL = `
+CREATE TABLE IF NOT EXISTS mosaic_locks (name text PRIMARY KEY);
 CREATE TABLE IF NOT EXISTS mosaic_entities (
   name        text PRIMARY KEY,
   definition  jsonb NOT NULL,
@@ -140,6 +141,8 @@ CREATE TABLE IF NOT EXISTS mosaic_files (
   uploaded_by uuid,
   created_at  timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE mosaic_files ADD COLUMN IF NOT EXISTS data bytea;
+ALTER TABLE mosaic_files ADD COLUMN IF NOT EXISTS public boolean NOT NULL DEFAULT false;
 `;
 
 export async function ensurePlatformTables(db: Db): Promise<void> {

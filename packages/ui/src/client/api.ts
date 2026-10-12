@@ -33,7 +33,11 @@ export class MosaicClient {
 
   constructor(opts: ClientOptions) {
     this.baseUrl = opts.baseUrl.replace(/\/+$/, '');
-    this.token = opts.token ?? (typeof localStorage !== 'undefined' ? localStorage.getItem('mosaic_token') : null);
+    let storedToken: string | null = null;
+    if (opts.token === undefined && typeof window !== 'undefined') {
+      try { storedToken = window.localStorage.getItem('mosaic_token'); } catch { /* This session can still use in-memory authentication. */ }
+    }
+    this.token = opts.token ?? storedToken;
     this.onUnauthorized = opts.onUnauthorized;
   }
 
@@ -41,12 +45,35 @@ export class MosaicClient {
     return this.baseUrl;
   }
 
+  fileUrl(id: string): string {
+    return `${this.baseUrl.replace(/\/api$/, '')}/files/${encodeURIComponent(id)}`;
+  }
+
+  async uploadFile(file: File, purpose?: 'brand'): Promise<{ id: string; filename: string; mime: string; size: number; url: string; public: boolean }> {
+    const body = new FormData(); body.append('file', file); if (purpose) body.append('purpose', purpose);
+    const response = await fetch(`${this.baseUrl}/files`, { method: 'POST', headers: this.token ? { Authorization: `Bearer ${this.token}` } : {}, body });
+    const json = await response.json().catch(() => null) as Ok<{ id: string; filename: string; mime: string; size: number; url: string; public: boolean }> | Err | null;
+    if (response.status === 401) this.onUnauthorized?.();
+    if (!response.ok || !json || !json.success) throw new ApiError(json && !json.success ? json.error.message : response.status === 413 ? 'The file exceeds the upload limit.' : `Upload failed (${response.status}).`, response.status);
+    return { ...json.data, url: this.fileUrl(json.data.id) };
+  }
+
+  async downloadFile(id: string): Promise<Blob> {
+    const response = await fetch(`${this.baseUrl}/files/${encodeURIComponent(id)}`, { headers: this.token ? { Authorization: `Bearer ${this.token}` } : {} });
+    if (!response.ok) throw new ApiError(`Could not download the file (${response.status}).`, response.status);
+    return response.blob();
+  }
+
+  branding(): Promise<{ name: string; logo: string }> { return this.request('GET', '/branding'); }
+
   setToken(token: string | null): void {
     const changed = this.token !== token;
     this.token = token;
-    if (typeof localStorage !== 'undefined') {
-      if (token) localStorage.setItem('mosaic_token', token);
-      else localStorage.removeItem('mosaic_token');
+    if (typeof window !== 'undefined') {
+      try {
+        if (token) window.localStorage.setItem('mosaic_token', token);
+        else window.localStorage.removeItem('mosaic_token');
+      } catch { /* Restricted storage must not break the current session. */ }
     }
     if (changed) for (const listener of this.sessionListeners) listener();
   }

@@ -17,6 +17,8 @@
   import { loadFormSource, resolveFormSource, readDataPath } from '../state/data-source';
   import { FORM_VALIDATION_CONTEXT, type FormValidationRegistry } from '../state/validation';
   import { MOSAIC_NAVIGATION_CONTEXT, type MosaicNavigate } from '../state/navigation';
+  import ActionConfirmation from '../components/ActionConfirmation.svelte';
+  import { ACTION_CONFIRMATION_CONTEXT, type MosaicConfirm } from '../actions/confirmation';
 
   interface Props {
     form: FormDef;
@@ -49,6 +51,8 @@
   const runtimeState = suppliedState ?? inheritedState?.forkForm() ?? createMosaicState();
   setContext(MOSAIC_STATE_CONTEXT, runtimeState);
   const navigate = getContext<MosaicNavigate | undefined>(MOSAIC_NAVIGATION_CONTEXT);
+  let confirmation = $state<{ confirm: MosaicConfirm }>();
+  setContext<MosaicConfirm>(ACTION_CONFIRMATION_CONTEXT, options => confirmation?.confirm(options) ?? Promise.resolve(false));
   const childValidators = new Map<symbol, { label: string; validate: () => boolean }>();
   setContext<FormValidationRegistry>(FORM_VALIDATION_CONTEXT, { register(label, validate) {
     const id = Symbol();
@@ -288,6 +292,7 @@
     {#if seo?.socialImage}<meta property="og:image" content={seo.socialImage} />{/if}
   {/if}
 </svelte:head>
+<ActionConfirmation bind:this={confirmation} />
 
 <svelte:element this={showActions ? 'form' : 'div'} class={['m-form-renderer', `m-form-renderer--${form.settings?.layout ?? 'vertical'}`, className, `m-transition-${transition?.kind ?? 'fade'}`].filter(Boolean).join(' ')} style={`--m-form-columns:${Math.max(1, Math.min(4, form.settings?.columns ?? 1))};--m-enter-duration:${transitionDuration}ms;--m-enter-delay:${transition?.delay ?? 0}ms`} in:fade={{ duration: transitionDuration, delay: transition?.delay ?? 0 }} onsubmit={submit} novalidate>
   {#if loadingSource}<div class="m-form-renderer__status" role="status"><span class="m-spinner"></span> Loading record…</div>{/if}

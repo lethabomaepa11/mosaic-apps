@@ -75,6 +75,7 @@ export interface NavItemDef {
 
 export interface ThemePalette {
   primary?: string;
+  primaryForeground?: string;
   background?: string;
   surface?: string;
   surface2?: string;
@@ -98,7 +99,7 @@ export interface ThemeConfig extends ThemePalette {
   dark?: ThemePalette;
   activeTheme?: string;
   /** Optional named palettes, inspired by daisyUI's theme gallery. */
-  themes?: Record<string, ThemePalette>;
+  themes?: Record<string, ThemePalette & { dark?: ThemePalette }>;
   transition?: { kind?: 'fade' | 'slide' | 'scale' | 'blur' | 'none'; duration?: number; delay?: number };
 }
 
