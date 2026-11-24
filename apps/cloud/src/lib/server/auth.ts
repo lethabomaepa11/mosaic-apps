@@ -34,7 +34,7 @@ export async function registerAccount(name: string, email: string, password: str
       await tx.query('INSERT INTO cloud_organizations (id, name, slug) VALUES ($1, $2, $3)', [organizationId, `${name.trim()}\'s workspace`, `${slugify(name)}-${organizationId.slice(0, 8)}`]);
       await tx.query('INSERT INTO cloud_memberships (organization_id, user_id, role) VALUES ($1, $2, $3)', [organizationId, userId, 'owner']);
       await tx.query(`INSERT INTO cloud_audit_log (id, organization_id, user_id, action, target_type, target_id)
-        VALUES ($1, $2, $3, 'account.create', 'user', $3)`, [id(), organizationId, userId]);
+        VALUES ($1, $2, $3, 'account.create', 'user', $4)`, [id(), organizationId, userId, userId]);
     });
   } catch (cause) {
     const duplicate = cause instanceof Error && /unique|duplicate/i.test(cause.message);
