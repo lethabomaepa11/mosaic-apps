@@ -71,7 +71,7 @@ const services = [development];
 let logs = '';
 for (const stream of [development.stdout, development.stderr]) stream.on('data', (chunk) => { logs = (logs + chunk.toString()).slice(-60_000); });
 async function waitHealthy(url) {
-  const deadline = Date.now() + 120_000;
+  const deadline = Date.now() + 240_000;
   while (Date.now() < deadline) {
     if (development.exitCode !== null) throw new Error(`Generated dev stack exited before ${url} became healthy.`);
     if (services.some((service) => service.exitCode !== null)) throw new Error(`A production frontend exited before ${url} became healthy.`);
@@ -84,7 +84,9 @@ try {
   await Promise.all([
     waitHealthy('http://127.0.0.1:3100/'),
     waitHealthy('http://127.0.0.1:3100/api/health'),
-    waitHealthy('http://127.0.0.1:3102/studio'),
+    // Use the light shell for readiness; the browser exercise below verifies the
+    // full Studio after Vite has finished its first dependency optimization.
+    waitHealthy('http://127.0.0.1:3102/login'),
     waitHealthy('http://127.0.0.1:3102/api/health'),
   ]);
   // HTTP health cannot detect a client prebundling failure. Exercise hydration

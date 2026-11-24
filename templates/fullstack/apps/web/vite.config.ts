@@ -21,16 +21,5 @@ export default defineConfig({
     host: '127.0.0.1',
     fs: { allow: [fileURLToPath(new URL('./', import.meta.resolve('@mosaic-apps/ui')))] },
     port: Number(process.env.MOSAIC_WEB_PORT ?? __WEB_PORT__),
-    proxy: {
-      // proxy API calls to the Hono server during development
-      '/api': {
-        target: process.env.MOSAIC_API_TARGET ?? 'http://127.0.0.1:__API_PORT__',
-        changeOrigin: true,
-      },
-      '/files': {
-        target: process.env.MOSAIC_API_TARGET ?? 'http://127.0.0.1:__API_PORT__',
-        changeOrigin: true,
-      },
-    },
   },
 });

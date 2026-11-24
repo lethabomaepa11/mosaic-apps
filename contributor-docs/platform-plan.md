@@ -195,6 +195,18 @@ to preserve user code, avoid derived output, preview destructive migrations, and
 keep secrets out of source. Release checks verify hidden files survive template
 packing and scaffolding.
 
+## OpenAPI and generated clients
+
+Orval is an optional code-generation adapter, not a runtime foundation. Use it when
+a project imports a stable OpenAPI service or wants a published TypeScript client
+and framework-specific query hooks. Keep Mosaic's same-origin client and metadata
+contracts authoritative for dynamic pages, forms, entities, revisions, and Studio;
+those surfaces can change at authoring time without regenerating application code.
+Generated clients live in an explicit source directory, are reproducible from the
+committed contract, and are refreshed by a script or release job rather than during
+request handling. Projects may choose Orval or another OpenAPI generator without
+making generated clients a required dependency of every Mosaic app.
+
 ## Security and operations
 
 - Stable secrets, OAuth refresh/rotation, auth and generation rate limits

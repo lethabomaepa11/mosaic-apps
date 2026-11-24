@@ -33,6 +33,7 @@ test('plain create works with spaces, commits one message and ignores secrets an
   assert.ok(existsSync(join(app, 'AGENTS.md')));
   assert.ok(existsSync(join(app, 'apps/web/src/routes/api/[...path]/+server.ts')));
   assert.ok(existsSync(join(app, 'apps/web/src/routes/[...route]/+page.server.ts')));
+  assert.doesNotMatch(await readFile(join(app, 'apps/web/vite.config.ts'), 'utf8'), /proxy:/);
   assert.match(await readFile(join(app, 'apps/web/package.json'), 'utf8'), /@mosaic-apps\/sveltekit/);
   assert.match(
     await readFile(join(app, '.agents/skills/mosaic-app/SKILL.md'), 'utf8'),
