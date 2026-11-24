@@ -30,6 +30,7 @@ export { hashPassword, verifyPassword, signJwt, verifyJwt, type AuthUser, type A
 export { canAccessEntity, hasPermission, isAdmin, requirePermission } from './modules/rbac.js';
 export { writeAudit, auditRoutes } from './modules/audit.js';
 export { artifactRoutes } from './modules/artifacts.js';
+export { getPreviousRevision, getRevision, listRevisions, recordRevision, revisionChecksum } from './modules/revisions.js';
 export { settingsRoutes, seedSettings, DEFAULT_SETTINGS } from './modules/settings.js';
 export { refListRoutes } from './modules/reflists.js';
 export { userAdminRoutes, roleAdminRoutes } from './modules/users.js';

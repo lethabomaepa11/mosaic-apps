@@ -127,8 +127,8 @@ export async function createMosaicServer(config: MosaicServerConfig): Promise<Mo
 
   // ---- modules ----
   app.route('/api/auth', authRoutes({ db, secret: jwtSecret, enabled: authEnabled, tokenTtl, allowRegistration }));
-  app.route('/api/entities', crudRoutes({ db, authEnabled, resolveEntity }));
   app.route('/api/entities', entityAdminRoutes(db, reloadRegistry));
+  app.route('/api/entities', crudRoutes({ db, authEnabled, resolveEntity }));
   app.route('/api/forms', artifactRoutes({ db, kind: 'form', managePerm: 'forms:manage' }));
   app.route('/api/pages', artifactRoutes({ db, kind: 'page', managePerm: 'pages:manage' }));
   app.route('/api/settings', settingsRoutes(db));

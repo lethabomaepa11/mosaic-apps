@@ -1,10 +1,10 @@
 /** MosaicClient - typed fetch wrapper for the Mosaic API (part 1: core/auth/meta/entities). */
 
-import type { AuditEntry, EntityDef, FormDef, PageDef, QuerySpec, RefList, SettingRecord, UserRecord } from '@mosaic-apps/core';
+import type { ArtifactRevision, ArtifactRevisionDiff, AuditEntry, EntityDef, FormDef, PageDef, QuerySpec, RefList, SettingRecord, UserRecord } from '@mosaic-apps/core';
 import { buildQueryString } from '@mosaic-apps/core';
 
 export interface ClientOptions {
-  /** API base, e.g. '/api' (proxied) or 'http://localhost:3001/api' */
+  /** API base, normally the same-origin `/api`; an absolute URL is also supported. */
   baseUrl: string;
   token?: string;
   onUnauthorized?: () => void;
@@ -161,6 +161,12 @@ export class MosaicClient {
   validateEntity(entity: EntityDef): Promise<{ valid: boolean; errors: string[] }> {
     return this.request('POST', '/entities/validate', { entity });
   }
+  entityRevisions(name: string): Promise<ArtifactRevision[]> {
+    return this.request('GET', `/entities/${name}/revisions`);
+  }
+  entityRevisionDiff(name: string, revision: number, against: number | 'current' = 'current'): Promise<ArtifactRevisionDiff> {
+    return this.request('GET', `/entities/${name}/revisions/${revision}/diff?against=${against}`);
+  }
 
   // ---- forms / pages ----
   listForms(publishedOnly = false): Promise<FormDef[]> {
@@ -195,6 +201,15 @@ export class MosaicClient {
   }
   deleteForm(id: string): Promise<{ id: string; deleted: boolean }> {
     return this.request('DELETE', `/forms/${id}`);
+  }
+  formRevisions(idOrSlug: string): Promise<ArtifactRevision[]> {
+    return this.request('GET', `/forms/${idOrSlug}/revisions`);
+  }
+  formRevisionDiff(idOrSlug: string, revision: number, against: number | 'current' = 'current'): Promise<ArtifactRevisionDiff> {
+    return this.request('GET', `/forms/${idOrSlug}/revisions/${revision}/diff?against=${against}`);
+  }
+  restoreForm(idOrSlug: string, revision: number, expectedVersion: number, message?: string): Promise<FormDef> {
+    return this.request('POST', `/forms/${idOrSlug}/revisions/${revision}/restore`, { expectedVersion, message });
   }
   listPages(publishedOnly = false): Promise<PageDef[]> {
     return this.request('GET', `/pages${publishedOnly ? '?published=true' : ''}`);
@@ -234,6 +249,15 @@ export class MosaicClient {
   }
   deletePage(id: string): Promise<{ id: string; deleted: boolean }> {
     return this.request('DELETE', `/pages/${id}`);
+  }
+  pageRevisions(idOrSlug: string): Promise<ArtifactRevision[]> {
+    return this.request('GET', `/pages/${idOrSlug}/revisions`);
+  }
+  pageRevisionDiff(idOrSlug: string, revision: number, against: number | 'current' = 'current'): Promise<ArtifactRevisionDiff> {
+    return this.request('GET', `/pages/${idOrSlug}/revisions/${revision}/diff?against=${against}`);
+  }
+  restorePage(idOrSlug: string, revision: number, expectedVersion: number, message?: string): Promise<PageDef> {
+    return this.request('POST', `/pages/${idOrSlug}/revisions/${revision}/restore`, { expectedVersion, message });
   }
 
   // ---- migrations ----

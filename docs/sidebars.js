@@ -3,6 +3,7 @@ const sidebars = {
   guide: [
     'intro',
     'quickstart',
+    'workflows',
     'architecture',
     'cli',
     'entities',
@@ -10,6 +11,7 @@ const sidebars = {
     'auto-crud',
     'form-json',
     'builder',
+    'history',
     'state-management',
     {
       type: 'category',

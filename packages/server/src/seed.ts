@@ -8,6 +8,7 @@ import { DEFAULT_ROLES } from './platform.js';
 import { applyPlan } from './migrate/runner.js';
 import { seedSettings } from './modules/settings.js';
 import { seedDemoArtifacts } from './seed-demo.js';
+import { recordRevision } from './modules/revisions.js';
 
 export interface SeedOptions {
   admin?: { email: string; password: string; name?: string };
@@ -49,6 +50,27 @@ export async function seedPlatform(db: Db, opts: SeedOptions = {}): Promise<Seed
   await seedSettings(db);
   result.settings = 1;
 
+  const home = await db.query<Record<string, unknown>>(
+    `INSERT INTO mosaic_pages (id, slug, route, name, description, version, published, schema, settings)
+     SELECT 'pg_home', 'home', '/', 'Home', 'Welcome page', 1, true, $1::jsonb, $2::jsonb
+     WHERE NOT EXISTS (SELECT 1 FROM mosaic_pages WHERE route = '/')
+     RETURNING id, slug, route, name, description, folder, version, published, schema, settings, created_at, updated_at`,
+    [
+      JSON.stringify({ id: 'pg_home_root', type: 'page', children: [
+        { id: 'pg_home_title', type: 'heading', props: { text: 'Welcome', level: 1 } },
+        { id: 'pg_home_intro', type: 'text', props: { text: 'Build this page in Mosaic Studio.' } },
+      ] }),
+      JSON.stringify({ title: 'Home', description: 'Welcome page', layout: 'default' }),
+    ],
+  );
+  if (home.rows[0]) {
+    await recordRevision(db, {
+      kind: 'page', artifactId: 'pg_home', revision: 1, snapshot: home.rows[0],
+      message: 'Create starter home page', origin: 'system',
+    });
+    result.pages += 1;
+  }
+
   if (opts.admin) {
     const existing = await db.query('SELECT 1 FROM mosaic_users WHERE lower(email) = $1', [opts.admin.email.toLowerCase()]);
     if (!existing.rows.length) {
@@ -70,7 +92,7 @@ export async function seedPlatform(db: Db, opts: SeedOptions = {}): Promise<Seed
     result.migrations = applied.applied.length;
     const artifacts = await seedDemoArtifacts(db);
     result.forms = artifacts.forms;
-    result.pages = artifacts.pages;
+    result.pages += artifacts.pages;
   }
 
   return result;

@@ -14,11 +14,11 @@ mosaic — the metadata-driven full-stack platform
 Usage: mosaic <command> [options]
 
 Commands:
-  create <name>          Scaffold a new Mosaic app (Hono API + SvelteKit PWA web)
+  create <name>          Scaffold a SvelteKit app with a same-origin Hono API
   migrate                Plan + apply pending migrations (dry-run preview)
   seed [--demo]          Seed roles, settings, admin user (and demo data)
-  entity <Name>          Scaffold an entity class in apps/api/src/entities
-  dev                    Run the project's API + web apps together
+  entity <Name>          Scaffold an entity class in the app's server directory
+  dev                    Run the application and local Studio together
   studio                 Open the Mosaic drag & drop studio against this project
   info                   Show project info (config + live server status)
   help                   Show this help
@@ -29,7 +29,7 @@ create options:
   --auth on|off          Enable authentication (default on)
   --demo | --no-demo     Seed demo entities/forms (default demo)
   --pwa | --no-pwa       PWA-enabled web app (default pwa)
-  --port <n>             API port (default 3001)
+  --port <n>             Legacy API port setting (retained for older projects)
   --web-port <n>         Web port (default 3000)
   --studio-port <n>      Studio port (default 3002)
   --db-port <n>          Docker Postgres host port (default 5432)
@@ -55,7 +55,7 @@ async function main(): Promise<void> {
 
   if (command === 'help' || command === '--help' || command === '-h' || command === 'version' || command === '--version') {
     if (command === 'version' || command === '--version') {
-      console.log('mosaic 0.2.3');
+      console.log('mosaic 0.3.0');
       return;
     }
     console.log(HELP);

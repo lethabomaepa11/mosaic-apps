@@ -19,8 +19,8 @@ npx @mosaic-apps/cli@latest create "Acme CRM"
 | `--auth on\|off` | Enable authentication; defaults to on |
 | `--demo` / `--no-demo` | Include or omit seeded example records, forms, and pages |
 | `--pwa` / `--no-pwa` | Include or omit PWA support |
-| `--port 3001` | API port |
-| `--web-port 3000` | Frontend port |
+| `--port 3001` | Legacy separate-API port retained for older projects |
+| `--web-port 3000` | Unified app and API port |
 | `--studio-port 3002` | Studio port |
 | `--db-port 5433` | Docker database host port; used only when you choose external PostgreSQL |
 | `--link PATH` | Explicitly use packages from a Mosaic source checkout for contributor development |

@@ -75,14 +75,14 @@ Inside a generated app:
 
 ```bash
 docker compose up -d      # or any Postgres pointed at by DATABASE_URL
-npm run dev               # API + web together (scripts/dev.mjs)
+npm run dev               # unified app/API + local Studio (scripts/dev.mjs)
 npm run migrate           # plan (preview) + apply schema changes
 mosaic entity Order --fields "total:decimal,customer:ref:customer" --soft-delete
 ```
 
 ## Entities as classes
 
-Entity classes live in `apps/api/src/entities/*.entity.ts` and are synced into the
+Entity classes live in `apps/web/src/lib/server/entities/*.entity.ts` and are synced into the
 registry at boot — edit, restart, `npm run migrate`:
 
 ```ts

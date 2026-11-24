@@ -50,14 +50,15 @@ export function findTemplateDir(cliFileUrl: string): string | null {
 /**
  * Entity directories of a project, in precedence order (last wins).
  *
- * Modern projects keep entity classes in `apps/api/src/entities`; projects
- * scaffolded before classes existed used `apps/api/entities`.
+ * Current one-project apps keep entity classes beside the SvelteKit server.
+ * Earlier projects used either `apps/api/src/entities` or `apps/api/entities`.
  */
 export function entitiesDirsOf(dir: string): string[] {
   const legacy = join(dir, 'apps', 'api', 'entities');
   const modern = join(dir, 'apps', 'api', 'src', 'entities');
-  const found = [legacy, modern].filter((path) => existsSync(path));
-  return found.length ? found : [modern];
+  const current = join(dir, 'apps', 'web', 'src', 'lib', 'server', 'entities');
+  const found = [legacy, modern, current].filter((path) => existsSync(path));
+  return found.length ? found : [current];
 }
 
 /** The directory new entity files are written to. */
@@ -154,7 +155,7 @@ export async function copyTemplate(
 
 /** Rewrite @mosaic-apps/* deps to file: links (link mode). */
 export async function rewriteMosaicDeps(dir: string, linkDir: string): Promise<void> {
-  const packages = join(linkDir, 'packages');
+  const packages = resolve(linkDir, 'packages');
   const files: string[] = [];
   const walk = async (relative: string): Promise<void> => {
     const src = join(dir, relative);

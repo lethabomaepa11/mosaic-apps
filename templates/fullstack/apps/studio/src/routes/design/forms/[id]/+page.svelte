@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { page } from '$app/state';
   import { CodeEditor, FormRenderer, Modal, toast, Icon } from '@mosaic-apps/ui';
-  import type { FormDataSource, FormDef, EntityDef, FormSettings } from '@mosaic-apps/core';
+  import type { ArtifactRevision, FormDataSource, FormDef, EntityDef, FormSettings } from '@mosaic-apps/core';
   import { client } from '#lib/client';
   import { designer } from '#lib/designer.svelte';
   import Palette from '../../../../components/Palette.svelte';
@@ -11,12 +11,15 @@
   import LayersTree from '../../../../components/LayersTree.svelte';
   import ResizeHandle from '../../../../components/ResizeHandle.svelte';
   import FormSettingsEditor from '../../../../components/FormSettingsEditor.svelte';
+  import RevisionHistory from '../../../../components/RevisionHistory.svelte';
 
   const id = $derived(page.params.id ?? '');
   let loading = $state(true);
   let showJson = $state(false);
   let showPreview = $state(false);
   let showSettings = $state(false);
+  let showHistory = $state(false);
+  let revisions = $state<ArtifactRevision[]>([]);
   let saving = $state(false);
   let saveAgain = false;
   let jsonText = $state('');
@@ -131,6 +134,29 @@
     }
   }
 
+  async function openHistory() {
+    if (!designer.form) return;
+    try {
+      revisions = await client.formRevisions(designer.form.id);
+      showHistory = true;
+    } catch (err) {
+      toast.error('Could not load history', err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function restoreRevision(revision: ArtifactRevision) {
+    if (!designer.form) return;
+    const restored = await client.restoreForm(designer.form.id, revision.revision, designer.form.version, `Restore revision ${revision.revision}`);
+    designer.loadForm(restored);
+    name = restored.name;
+    description = restored.description ?? '';
+    folder = restored.folder ?? '';
+    settings = restored.settings ?? {};
+    dataSource = restored.dataSource ?? { kind: 'none' };
+    entity = restored.entity ?? '';
+    toast.success(`Restored as v${restored.version}`);
+  }
+
   function openJson() {
     jsonText = designer.toJson();
     showJson = true;
@@ -197,6 +223,7 @@
       <button class="m-btn m-btn--ghost m-btn--sm" onclick={() => designer.undo()} disabled={designer.past.length === 0} title="Undo"><Icon name="rotateCcw" size={14} /> Undo</button>
       <button class="m-btn m-btn--ghost m-btn--sm" onclick={() => designer.redo()} disabled={designer.future.length === 0} title="Redo"><Icon name="rotateCw" size={14} /> Redo</button>
       <button class="m-btn m-btn--secondary m-btn--sm" onclick={openJson} title="JSON"><Icon name="braces" size={14} /> JSON</button>
+      <button class="m-btn m-btn--secondary m-btn--sm" onclick={openHistory}><Icon name="history" size={14} /> History</button>
       <button class="m-btn m-btn--secondary m-btn--sm" aria-pressed={showPreview} onclick={() => { showPreview = !showPreview; showSettings = false; }} title="Preview"><Icon name={showPreview ? 'pencil' : 'play'} size={14} /> {showPreview ? 'Edit' : 'Preview'}</button>
       <button class="m-btn m-btn--secondary m-btn--sm" aria-pressed={showSettings} onclick={() => { showSettings = !showSettings; showPreview = false; }}><Icon name="settings" size={14} /> Form settings</button>
       <button class="m-btn m-btn--primary m-btn--sm" disabled={saving} onclick={save}>{saving ? 'Saving…' : 'Save'}</button>
@@ -252,6 +279,8 @@
     <button class="m-btn m-btn--primary" onclick={applyJson}>Apply to canvas</button>
   {/snippet}
 </Modal>
+<RevisionHistory bind:open={showHistory} {revisions} title={`${name || 'Form'} history`}
+  oninspect={(revision) => client.formRevisionDiff(id, revision.revision)} onrestore={restoreRevision} />
 
 <style>
   .designer-preview { min-height: calc(100vh - 76px); padding: 24px; overflow: auto; background: var(--m-bg); }

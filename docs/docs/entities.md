@@ -40,7 +40,7 @@ export class Customer {
 }
 ```
 
-Classes live in `apps/api/src/entities/*.entity.ts`, are typechecked with your app,
+Classes live in `apps/web/src/lib/server/entities/*.entity.ts`, are typechecked with your app,
 and are synced into `mosaic_entities` at boot (a class wins over a JSON file with the
 same `name`).
 

@@ -30,6 +30,14 @@ test('plain create works with spaces, commits one message and ignores secrets an
   assert.match(env, /^DATABASE_URL=pglite:\/\/\.\/data$/m);
   assert.ok(existsSync(join(app, '.gitignore')));
   assert.ok(existsSync(join(app, '.gitattributes')));
+  assert.ok(existsSync(join(app, 'AGENTS.md')));
+  assert.ok(existsSync(join(app, 'apps/web/src/routes/api/[...path]/+server.ts')));
+  assert.ok(existsSync(join(app, 'apps/web/src/routes/[...route]/+page.server.ts')));
+  assert.match(await readFile(join(app, 'apps/web/package.json'), 'utf8'), /@mosaic-apps\/sveltekit/);
+  assert.match(
+    await readFile(join(app, '.agents/skills/mosaic-app/SKILL.md'), 'utf8'),
+    /^name: mosaic-app$/m,
+  );
   const commit = spawnSync('git', ['log', '-1', '--format=%s'], { cwd: app, encoding: 'utf8', shell: false });
   assert.equal(commit.status, 0);
   assert.equal(commit.stdout.trim(), 'chore: scaffold Mosaic project');
@@ -37,7 +45,7 @@ test('plain create works with spaces, commits one message and ignores secrets an
   assert.ok(!tracked.stdout.split(/\r?\n/).includes('.env'));
   const ignored = spawnSync('git', ['check-ignore', '.env', 'data/db', 'uploads/logo.png'], { cwd: app, encoding: 'utf8', shell: false });
   assert.equal(ignored.status, 0);
-  for (const path of ['package.json', 'apps/api/package.json', 'apps/web/package.json', 'apps/studio/package.json']) {
+  for (const path of ['package.json', 'apps/web/package.json', 'apps/studio/package.json']) {
     assert.doesNotMatch(await readFile(join(app, path), 'utf8'), /file:/);
   }
   assert.doesNotMatch(await readFile(join(app, 'apps/studio/vite.config.ts'), 'utf8'), /__\w+__/);

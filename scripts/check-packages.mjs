@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process';
 const node = process.execPath;
 const npmCli = process.env.npm_execpath;
 if (!npmCli) throw new Error('Run this check through npm so npm_execpath is available.');
-const packages = ['@mosaic-apps/core', '@mosaic-apps/server', '@mosaic-apps/ui', '@mosaic-apps/cli'];
+const packages = ['@mosaic-apps/core', '@mosaic-apps/server', '@mosaic-apps/sveltekit', '@mosaic-apps/ui', '@mosaic-apps/cli'];
 
 for (const name of packages) {
   console.log(`\n[mosaic] checking npm tarball for ${name}`);

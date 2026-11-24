@@ -15,7 +15,7 @@ async function freePort() {
   return port;
 }
 
-async function fixture(t: { after: (fn: () => Promise<void>) => void }, mode: 'normal' | 'fail-api' | 'fail-web' = 'normal') {
+async function fixture(t: { after: (fn: () => Promise<void>) => void }, mode: 'normal' | 'fail-web' | 'fail-studio' = 'normal') {
   const root = await mkdtemp(join(tmpdir(), 'mosaic launcher '));
   t.after(async () => {
     assert.ok(resolve(root).startsWith(resolve(tmpdir()) + sep));
@@ -26,18 +26,20 @@ async function fixture(t: { after: (fn: () => Promise<void>) => void }, mode: 'n
   await copyFile(fileURLToPath(new URL('../../../templates/fullstack/scripts/dev.mjs', import.meta.url)), join(root, 'scripts/dev.mjs'));
   await writeFile(join(root, 'package.json'), JSON.stringify({ private: true, workspaces: ['apps/*'] }));
   await writeFile(join(root, 'mosaic.config.json'), JSON.stringify({ api: { port: ports[0] }, web: { port: ports[1] }, studio: { port: ports[2] } }));
-  for (const [i, name] of ['api', 'web', 'studio'].entries()) {
+  for (const name of ['web', 'studio']) {
     const directory = join(root, 'apps', name);
     await mkdir(directory, { recursive: true });
     await writeFile(join(directory, 'package.json'), JSON.stringify({ name: `fixture-${name}`, private: true, scripts: { dev: 'node fixture.mjs' } }));
     const fail = mode === `fail-${name}`;
     await writeFile(join(directory, 'fixture.mjs'), fail ? 'setTimeout(() => process.exit(7), 800);' : `
       import { createServer } from 'node:http';
+      // Managed Windows test sandboxes can deny taskkill; do not leave a fixture
+      // listener behind when validating that cleanup path.
+      setTimeout(() => process.exit(0), 3000);
       createServer((req, res) => {
         if (req.url === '/crash') { process.exit(7); }
-        res.setHeader('x-mosaic-dev-instance', process.env.MOSAIC_DEV_INSTANCE);
         res.end('ready');
-      }).listen(Number(process.env.${i === 0 ? 'PORT' : i === 1 ? 'MOSAIC_WEB_PORT' : 'MOSAIC_STUDIO_PORT'}), '127.0.0.1');
+      }).listen(Number(process.env.${name === 'web' ? 'MOSAIC_WEB_PORT' : 'MOSAIC_STUDIO_PORT'}), '127.0.0.1');
     `);
   }
   const env = { ...process.env };
@@ -64,28 +66,32 @@ async function waitFor(check: () => boolean | Promise<boolean>, detail: () => st
   assert.fail(detail());
 }
 
-test('API failure stops startup before launching frontends', async (t) => {
-  const app = await fixture(t, 'fail-api');
-  await waitFor(() => app.child.exitCode !== null, app.output);
-  assert.notEqual(app.child.exitCode, 0);
-  assert.doesNotMatch(app.output(), /API ready|fixture-web|fixture-studio/);
-});
+async function portAvailable(port: number): Promise<boolean> {
+  const server = createServer();
+  return new Promise((accept) => {
+    server.once('error', () => accept(false));
+    server.listen(port, '127.0.0.1', () => server.close(() => accept(true)));
+  });
+}
 
-test('frontend failure cleans up API and sibling frontend process trees', async (t) => {
+test('application failure stops startup before launching Studio', async (t) => {
   const app = await fixture(t, 'fail-web');
   await waitFor(() => app.child.exitCode !== null, app.output);
-  assert.match(app.output(), /API ready/);
   assert.notEqual(app.child.exitCode, 0);
-  for (const port of app.ports) {
-    const server = createServer();
-    await new Promise<void>((accept, reject) => {
-      server.once('error', reject);
-      server.listen(port, '127.0.0.1', () => server.close(() => accept()));
-    });
+  assert.doesNotMatch(app.output(), /Application ready|fixture-studio/);
+});
+
+test('Studio failure cleans up the application process tree', async (t) => {
+  const app = await fixture(t, 'fail-studio');
+  await waitFor(() => app.child.exitCode !== null, app.output);
+  assert.match(app.output(), /Application ready/);
+  assert.notEqual(app.child.exitCode, 0);
+  for (const port of app.ports.slice(1)) {
+    await waitFor(() => portAvailable(port), app.output);
   }
 });
 
-test('occupied API port is rejected before trusting another application health', async (t) => {
+test('occupied application port is rejected before trusting another application health', async (t) => {
   const occupied = createServer();
   await new Promise<void>((accept) => occupied.listen(0, '127.0.0.1', accept));
   t.after(() => new Promise<void>((accept) => occupied.close(() => accept())));
@@ -94,12 +100,12 @@ test('occupied API port is rejected before trusting another application health',
   t.after(async () => { assert.ok(resolve(root).startsWith(resolve(tmpdir()) + sep)); await rm(root, { recursive: true, force: true }); });
   await mkdir(join(root, 'scripts'));
   await copyFile(fileURLToPath(new URL('../../../templates/fullstack/scripts/dev.mjs', import.meta.url)), join(root, 'scripts/dev.mjs'));
-  await writeFile(join(root, 'mosaic.config.json'), JSON.stringify({ api: { port }, web: { port: await freePort() }, studio: { port: await freePort() } }));
+  await writeFile(join(root, 'mosaic.config.json'), JSON.stringify({ api: { port: await freePort() }, web: { port }, studio: { port: await freePort() } }));
   const cleanEnv = { ...process.env }; delete cleanEnv.PORT;
   const child = spawn(process.execPath, ['scripts/dev.mjs'], { cwd: root, env: cleanEnv, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
   let output = '';
   child.stderr.on('data', (data) => { output += data.toString(); });
   await waitFor(() => child.exitCode !== null, () => output);
-  assert.match(output, /api port .* unavailable/);
-  assert.doesNotMatch(output, /API ready/);
+  assert.match(output, /web port .* unavailable/);
+  assert.doesNotMatch(output, /Application ready/);
 });

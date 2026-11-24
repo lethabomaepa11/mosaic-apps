@@ -15,7 +15,7 @@ const artifacts = resolve(process.argv[2] ?? join(repository, '.tmp-generated/br
 const directory = await mkdtemp(join(process.env.RUNNER_TEMP ?? tmpdir(), 'mosaic-release-consumer-'));
 const npm = process.env.npm_execpath;
 if (!npm) throw new Error('Run through npm run release:consumer so npm_execpath is available.');
-const packages = ['core', 'server', 'ui', 'cli'];
+const packages = ['core', 'server', 'sveltekit', 'ui', 'cli'];
 const dependencies = Object.fromEntries(await Promise.all(packages.map(async (name) => {
   const manifest = JSON.parse(await readFile(join(repository, 'packages', name, 'package.json'), 'utf8'));
   const path = join(artifacts, `mosaic-apps-${name}-${manifest.version}.tgz`);
@@ -64,9 +64,9 @@ run([npm, 'install', '--no-audit', '--no-fund'], app);
 run([npm, 'run', 'migrate', '--', '--dry-run'], app);
 run([npm, 'run', 'check', '-w', 'apps/web'], app);
 run([npm, 'run', 'check', '-w', 'apps/studio'], app);
-run([npm, 'run', 'build'], app, { ...process.env, PUBLIC_API_URL: 'http://127.0.0.1:3101/api' });
+run([npm, 'run', 'build'], app);
 
-const development = spawn(process.execPath, [npm, 'run', 'dev'], { cwd: app, env: { ...process.env, CORS_ORIGINS: 'http://127.0.0.1:3100,http://127.0.0.1:3102,http://127.0.0.1:3200,http://127.0.0.1:3202' }, detached: process.platform !== 'win32', windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+const development = spawn(process.execPath, [npm, 'run', 'dev'], { cwd: app, env: process.env, detached: process.platform !== 'win32', windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
 const services = [development];
 let logs = '';
 for (const stream of [development.stdout, development.stderr]) stream.on('data', (chunk) => { logs = (logs + chunk.toString()).slice(-60_000); });
@@ -82,7 +82,6 @@ async function waitHealthy(url) {
 }
 try {
   await Promise.all([
-    waitHealthy('http://127.0.0.1:3101/api/health'),
     waitHealthy('http://127.0.0.1:3100/'),
     waitHealthy('http://127.0.0.1:3100/api/health'),
     waitHealthy('http://127.0.0.1:3102/studio'),
@@ -114,23 +113,14 @@ try {
     await page.getByRole('heading').first().waitFor();
     assert.deepEqual(errors, [], 'Installed web application has browser runtime exceptions.');
     console.log('[mosaic] installed consumer browser passed: login, Studio hydration, Form JSON Monaco modal, web rendering.');
-    for (const [name, port] of [['web', 3200], ['studio', 3202]]) {
-      const service = spawn(process.execPath, ['build/index.js'], { cwd: join(app, 'apps', name), env: { ...process.env, PORT: String(port), HOST: '127.0.0.1' }, detached: process.platform !== 'win32', windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
-      services.push(service);
-      for (const stream of [service.stdout, service.stderr]) stream.on('data', (chunk) => { logs = (logs + chunk.toString()).slice(-60_000); });
-      await waitHealthy(`http://127.0.0.1:${port}/login`);
-    }
-    const productionHydrated = page.waitForResponse((response) => response.url().includes('/api/auth/me'));
-    await page.goto('http://127.0.0.1:3202/login', { waitUntil: 'domcontentloaded' });
-    await productionHydrated;
-    await page.getByRole('button', { name: 'Sign in', exact: true }).click();
-    await page.waitForURL('http://127.0.0.1:3202/', { waitUntil: 'domcontentloaded' });
-    await page.goto('http://127.0.0.1:3202/studio', { waitUntil: 'domcontentloaded' });
-    await page.locator('a.explorer-recent').first().waitFor();
+    const service = spawn(process.execPath, ['build/index.js'], { cwd: join(app, 'apps', 'web'), env: { ...process.env, PORT: '3200', HOST: '127.0.0.1' }, detached: process.platform !== 'win32', windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    services.push(service);
+    for (const stream of [service.stdout, service.stderr]) stream.on('data', (chunk) => { logs = (logs + chunk.toString()).slice(-60_000); });
+    await waitHealthy('http://127.0.0.1:3200/api/health');
     await page.goto('http://127.0.0.1:3200/', { waitUntil: 'domcontentloaded' });
     await page.getByRole('heading').first().waitFor();
-    assert.deepEqual(errors, [], 'Production Node frontends have runtime exceptions.');
-    console.log('[mosaic] production web/Studio passed: Node startup, cross-origin API/CORS, authenticated Studio definitions.');
+    assert.deepEqual(errors, [], 'Production unified app has runtime exceptions.');
+    console.log('[mosaic] production unified app passed: Node startup, same-origin API and database page rendering.');
   } finally { await browser.close(); }
 } catch (error) { console.error(logs); throw error; }
 finally {
@@ -142,28 +132,7 @@ finally {
   }
 }
 if (!((await readdir(join(app, 'data'))).length)) throw new Error('Persistent data was not stored at project root.');
-await writeFile(join(app, 'evidence', 'verify-serverless.mjs'), `
-  import assert from 'node:assert/strict';
-  process.env.DATABASE_URL = ${JSON.stringify(`pglite://${join(app, 'data')}`)};
-  process.env.MOSAIC_JWT_SECRET = 'consumer-verification-only-not-a-production-secret';
-  delete process.env.VERCEL;
-  const { default: hono } = await import('../apps/api/app.ts');
-  const responses = await Promise.all([1,2,3].map(() => hono.request('http://api.test/api/health')));
-  for (const response of responses) assert.equal(response.status, 200);
-  const login = await hono.request('http://api.test/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({email:'admin@mosaic.local',password:'admin1234'}) });
-  const token = (await login.json()).data.token;
-  assert.ok(token);
-  const records = await hono.request('http://api.test/api/entities', {headers:{Authorization:'Bearer '+token}});
-  assert.equal(records.status, 200);
-  assert.equal((await hono.request('http://api.test/api/files')).status, 501);
-  const { closeServerlessMosaicServer } = await import('../apps/api/dist/vercel.js');
-  await closeServerlessMosaicServer();
-  console.log('[mosaic] native serverless Hono entry passed: shared initialization, health, auth, metadata, persistent-upload guard.');
-`);
-run(['--import', 'tsx', 'evidence/verify-serverless.mjs'], app);
 for (const target of ['netlify', 'vercel']) {
-  for (const name of ['web', 'studio']) {
-    run([npm, 'run', 'build', '-w', `apps/${name}`], app, { ...process.env, MOSAIC_DEPLOY_TARGET: target, PUBLIC_API_URL: 'https://api.example.com/api' });
-  }
+  run([npm, 'run', 'build', '-w', 'apps/web'], app, { ...process.env, MOSAIC_DEPLOY_TARGET: target });
 }
-console.log(`[mosaic] packed consumer passed: default CLI/Git/PWA, ignored secrets, install/migration, API/web/Studio checks, Node/Netlify/Vercel frontend builds, serverless Hono entry, persistent storage, development proxies, browser/Monaco and production frontend/API wiring. Evidence retained at ${directory}`);
+console.log(`[mosaic] packed consumer passed: default CLI/Git/PWA, ignored secrets, install/migration, unified app/Studio checks, Node/Netlify/Vercel builds, persistent storage, browser/Monaco and same-origin API wiring. Evidence retained at ${directory}`);

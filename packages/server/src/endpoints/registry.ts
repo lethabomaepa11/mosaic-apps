@@ -60,9 +60,9 @@ export async function scanApiDir(dir: string): Promise<EndpointRegistryRow[]> {
   return rows;
 }
 
-/** Directory scanned for endpoint modules (`MOSAIC_ENDPOINTS_DIR`, else `apps/api/src/endpoints`). */
+/** Directory scanned for endpoint modules (`MOSAIC_ENDPOINTS_DIR`, else the unified web app's server endpoints). */
 function endpointsDir(): string {
-  return resolve(process.env.MOSAIC_ENDPOINTS_DIR ?? join(process.cwd(), 'apps', 'api', 'src', 'endpoints'));
+  return resolve(process.env.MOSAIC_ENDPOINTS_DIR ?? join(process.cwd(), 'apps', 'web', 'src', 'lib', 'server', 'endpoints'));
 }
 
 function guard(user: AuthUser | null, perm: string): AuthUser {

@@ -182,7 +182,7 @@ export async function studio(opts: { dir: string; port?: number }): Promise<void
     cwd: repo,
     stdio: 'inherit',
     shell: process.platform === 'win32',
-    env: { ...process.env, MOSAIC_API_TARGET: `http://127.0.0.1:${config.api.port}`, PUBLIC_API_URL: `http://localhost:${config.api.port}/api`, MOSAIC_STUDIO_PORT: String(opts.port ?? config.studio?.port ?? 3002), PORT: String(opts.port ?? config.studio?.port ?? 3002) },
+    env: { ...process.env, MOSAIC_API_TARGET: `http://127.0.0.1:${config.web.port}`, PUBLIC_API_URL: `http://localhost:${config.web.port}/api`, MOSAIC_STUDIO_PORT: String(opts.port ?? config.studio?.port ?? 3002), PORT: String(opts.port ?? config.studio?.port ?? 3002) },
   });
   child.on('exit', (code) => process.exit(code ?? 0));
 }

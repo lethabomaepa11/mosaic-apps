@@ -12,4 +12,5 @@ export * from './form/tree.js';
 export * from './expression/index.js';
 export * from './entity/defaults.js';
 export * from './decorators.js';
+export * from './revision-diff.js';
 

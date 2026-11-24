@@ -1,11 +1,10 @@
 import { createClient } from '@mosaic-apps/ui';
 
 /**
- * Keep PUBLIC_API_URL empty for same-origin hosting, or set it to the API's
- * public URL when the web and API services are deployed separately.
+ * The generated SvelteKit runtime mounts Hono at same-origin `/api`.
  */
 export const client = createClient({
-  baseUrl: import.meta.env.PUBLIC_API_URL || '/api',
+  baseUrl: '/api',
   onUnauthorized: () => {
     if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
       window.location.href = '/login';

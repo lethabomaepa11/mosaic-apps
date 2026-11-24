@@ -1,6 +1,5 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { createServer } from 'node:net';
-import { randomUUID } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -11,9 +10,7 @@ const config = JSON.parse(readFileSync(resolve(project, 'mosaic.config.json'), '
 const apiPort = Number(process.env.PORT ?? config.api?.port ?? 3001);
 const webPort = Number(process.env.MOSAIC_WEB_PORT ?? config.web?.port ?? 3000);
 const studioPort = Number(process.env.MOSAIC_STUDIO_PORT ?? config.studio?.port ?? 3002);
-const instance = randomUUID();
 const targets = [
-  { name: 'api', port: apiPort, color: '\x1b[36m', workspace: 'apps/api' },
   { name: 'web', port: webPort, color: '\x1b[35m', workspace: 'apps/web' },
   { name: 'studio', port: studioPort, color: '\x1b[33m', workspace: 'apps/studio' },
 ];
@@ -44,8 +41,7 @@ function startTarget(target) {
     PORT: String(apiPort),
     MOSAIC_WEB_PORT: String(webPort),
     MOSAIC_STUDIO_PORT: String(studioPort),
-    MOSAIC_API_TARGET: `http://127.0.0.1:${apiPort}`,
-    MOSAIC_DEV_INSTANCE: instance,
+    MOSAIC_API_TARGET: `http://127.0.0.1:${webPort}`,
   };
   const options = { cwd: project, env, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true, detached: process.platform !== 'win32' };
   const child = process.env.npm_execpath?.endsWith('npm-cli.js')
@@ -80,23 +76,22 @@ async function main() {
     throw new Error('API, web and Studio ports must be different integers between 1 and 65535.');
   }
   for (const target of targets) await requireFreePort(target);
-  const api = startTarget(targets[0]);
-  const health = `http://127.0.0.1:${apiPort}/api/health`;
+  const web = startTarget(targets[0]);
+  const health = `http://127.0.0.1:${webPort}/api/health`;
   const deadline = Date.now() + 60_000;
   while (Date.now() < deadline && !shuttingDown) {
-    if (api.exitCode !== null) throw new Error('API stopped before becoming ready.');
+    if (web.exitCode !== null) throw new Error('Application stopped before becoming ready.');
     try {
       const response = await fetch(health, { signal: AbortSignal.timeout(1500) });
-      if (response.ok && response.headers.get('x-mosaic-dev-instance') === instance) {
-        console.log(`[mosaic] API ready; starting web (:${webPort}) and Studio (:${studioPort})`);
+      if (response.ok) {
+        console.log(`[mosaic] Application ready on :${webPort}; starting Studio on :${studioPort}`);
         startTarget(targets[1]);
-        startTarget(targets[2]);
         return;
       }
     } catch { /* The API may still be initializing its database. */ }
     await new Promise((ready) => setTimeout(ready, 300));
   }
-  throw new Error(`API did not become healthy at ${health}. Check DATABASE_URL and API logs.`);
+  throw new Error(`Application did not become healthy at ${health}. Check DATABASE_URL and application logs.`);
 }
 
 function shutdown(code) {
@@ -105,7 +100,9 @@ function shutdown(code) {
   for (const child of children) {
     if (child.exitCode !== null || !child.pid) continue;
     if (process.platform === 'win32') {
-      spawnSync('taskkill', ['/PID', String(child.pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true });
+      try { child.kill(); } catch { /* The process may already have exited. */ }
+      const killed = spawnSync('taskkill', ['/PID', String(child.pid), '/T', '/F'], { encoding: 'utf8', windowsHide: true });
+      if (killed.status !== 0) console.error(`[mosaic] Could not stop ${child.pid}: ${(killed.stderr || killed.stdout || 'taskkill failed').trim()}`);
     } else {
       try { process.kill(-child.pid, 'SIGTERM'); } catch { /* Already exited. */ }
     }

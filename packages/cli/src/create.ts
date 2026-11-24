@@ -84,7 +84,7 @@ export async function create(opts: CreateOptions): Promise<void> {
   });
 
   // .env with generated secret
-  await writeEnv(target, databaseUrl, opts.apiPort, opts.webPort, studioPort, jwtSecret, opts.auth, opts.demo);
+  await writeEnv(target, databaseUrl, opts.webPort, studioPort, jwtSecret, opts.auth, opts.demo);
 
   // Published dependencies are the default; local links are explicit.
   if (opts.link) {
@@ -124,10 +124,10 @@ export async function create(opts: CreateOptions): Promise<void> {
 
   cd ${slug}
   ${opts.install ? '' : `${opts.pm} install\n  `}${databaseUrl.startsWith('pglite') ? '# Embedded PostgreSQL: no database service needed' : '# Start the PostgreSQL service configured in DATABASE_URL'}
-  npm run dev                   # API (:${opts.apiPort}) + web (:${opts.webPort}) + Studio (:${studioPort})
+  npm run dev                   # app + same-origin API (:${opts.webPort}) + Studio (:${studioPort})
 
-  API   → http://localhost:${opts.apiPort}
-  Web   → http://localhost:${opts.webPort}
+  App   → http://localhost:${opts.webPort}
+  API   → http://localhost:${opts.webPort}/api
   Studio → http://localhost:${studioPort}
   Admin → admin@mosaic.local / admin1234${opts.demo ? '' : '\n\n  (demo seeding disabled)'}
 
@@ -138,7 +138,7 @@ Next:
 `);
 }
 
-async function writeEnv(target: string, db: string, port: number, webPort: number, studioPort: number, secret: string, auth: boolean, demo: boolean): Promise<void> {
+async function writeEnv(target: string, db: string, webPort: number, studioPort: number, secret: string, auth: boolean, demo: boolean): Promise<void> {
   const env = `# Database
 DATABASE_URL=${db}
 
@@ -147,15 +147,10 @@ AUTH=${auth ? 'on' : 'off'}
 MOSAIC_JWT_SECRET=${secret}
 
 # Boot
-PORT=${port}
 MOSAIC_WEB_PORT=${webPort}
 MOSAIC_STUDIO_PORT=${studioPort}
 SEED=true
 SEED_DEMO=${demo}
-
-# Web/API topology
-PUBLIC_API_URL=
-CORS_ORIGINS=http://localhost:${webPort}
 `;
   const { writeFile } = await import('node:fs/promises');
   await writeFile(join(target, '.env'), env, 'utf8');

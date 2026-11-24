@@ -55,6 +55,24 @@ CREATE TABLE IF NOT EXISTS mosaic_form_versions (
 );
 CREATE INDEX IF NOT EXISTS mosaic_form_versions_form_idx ON mosaic_form_versions (form_id, version DESC);
 
+CREATE TABLE IF NOT EXISTS mosaic_revisions (
+  id           text PRIMARY KEY,
+  kind         text NOT NULL,
+  artifact_id  text NOT NULL,
+  revision     integer NOT NULL,
+  parent_id    text,
+  checksum     text NOT NULL,
+  snapshot     jsonb NOT NULL,
+  message      text,
+  origin       text NOT NULL DEFAULT 'system',
+  author_id    text,
+  author_name  text,
+  created_at   timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (kind, artifact_id, revision)
+);
+CREATE INDEX IF NOT EXISTS mosaic_revisions_artifact_idx
+  ON mosaic_revisions (kind, artifact_id, revision DESC);
+
 CREATE TABLE IF NOT EXISTS mosaic_pages (
   id          text PRIMARY KEY,
   slug        text NOT NULL UNIQUE,

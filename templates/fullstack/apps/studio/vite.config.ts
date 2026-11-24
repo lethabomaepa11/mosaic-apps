@@ -6,7 +6,7 @@ import { defineConfig } from 'vite';
 import tailwindcss from '@tailwindcss/vite';
 import { fileURLToPath } from 'node:url';
 
-const apiUrl = process.env.MOSAIC_API_TARGET || process.env.PUBLIC_API_URL || 'http://127.0.0.1:__API_PORT__';
+const apiUrl = process.env.MOSAIC_API_TARGET || process.env.PUBLIC_API_URL || 'http://127.0.0.1:__WEB_PORT__';
 
 /** SvelteKit 3: all config lives in vite.config.ts (svelte.config.js removed). */
 export default defineConfig({

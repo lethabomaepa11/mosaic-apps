@@ -151,4 +151,35 @@ export interface EntityRegistryRecord {
   updatedAt: string;
 }
 
+export type ArtifactKind = 'page' | 'form' | 'entity';
+export type RevisionOrigin = 'studio' | 'ai' | 'cli' | 'import' | 'system';
+
+export interface ArtifactRevision {
+  id: string;
+  kind: ArtifactKind;
+  artifactId: string;
+  revision: number;
+  parentId?: string;
+  checksum: string;
+  snapshot: unknown;
+  message?: string;
+  origin: RevisionOrigin;
+  authorId?: string;
+  authorName?: string;
+  createdAt: string;
+}
+
+export interface ArtifactChange {
+  path: string;
+  kind: 'added' | 'removed' | 'changed';
+  before?: unknown;
+  after?: unknown;
+}
+
+export interface ArtifactRevisionDiff {
+  revision: number;
+  against: number | 'current' | 'empty';
+  changes: ArtifactChange[];
+}
+
 export type { FormDef, PageDef };

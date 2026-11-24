@@ -23,6 +23,9 @@ The public site in `docs/` teaches application builders how to use Mosaic.
 Repository development and release procedures belong here.
 
 - [Enterprise architecture and delivery priorities](./enterprise-architecture.md)
+- [Platform specification and delivery plan](./platform-plan.md)
+- [Acceptance fixtures](./acceptance-fixtures.md)
+- [Architecture decisions](./adr/0001-database-first-artifacts.md)
 - [Package validation and releasing](./releasing.md)
 - [Current execution plan](../.opencode/plan.md)
 - [Handoff and implementation history](../HANDOFF.md)
@@ -35,9 +38,9 @@ npm run build
 npm run dev
 ```
 
-Repository Studio uses `http://localhost:3000` and the API uses
-`http://localhost:3001`. Generated applications use web `3000`, API `3001`, and
-Studio `3002` so all three services can run together. Override ports through the
+Repository Studio uses `http://localhost:3000` and the development API uses
+`http://localhost:3001`. Generated applications use the unified app and same-origin
+API on `3000`, with the local-only Studio on `3002`. Override ports through the
 CLI or the documented environment variables when running multiple projects.
 
 Keep Studio source changes synchronized with the Studio template. Update the

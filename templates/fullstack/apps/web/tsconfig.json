@@ -1,6 +1,7 @@
 {
   "extends": "$app/tsconfig",
   "compilerOptions": {
+    "preserveSymlinks": true,
     "paths": {
       "#lib/*": ["./src/lib/*"]
     }

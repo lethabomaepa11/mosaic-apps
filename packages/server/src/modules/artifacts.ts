@@ -1,12 +1,13 @@
 /** Form & page artifacts: JSON schemas stored in postgres, with publish-versioning. */
 
 import { Hono } from 'hono';
-import { ensureRoot, slugify, type FormDef, type PageDef } from '@mosaic-apps/core';
+import { diffArtifactSnapshots, ensureRoot, slugify, type FormDef, type PageDef } from '@mosaic-apps/core';
 import type { Db } from '../db/driver.js';
 import { HttpError, fail, ok, readJson } from './http.js';
 import { requirePermission } from './rbac.js';
 import { writeAudit } from './audit.js';
 import type { AuthEnv, AuthUser } from './auth.js';
+import { getPreviousRevision, getRevision, listRevisions, recordRevision } from './revisions.js';
 
 export type ArtifactKind = 'form' | 'page';
 
@@ -241,6 +242,115 @@ export function artifactRoutes(deps: ArtifactDeps): Hono<AuthEnv> {
     return ok(c, toRecord(row, deps.kind));
   });
 
+  app.get('/:idOrSlug/revisions', async (c) => {
+    if (!c.get('user')) throw new HttpError(401, 'Authentication required', 'UNAUTHENTICATED');
+    const row = await rowOr404(c.req.param('idOrSlug'));
+    return ok(c, await listRevisions(deps.db, deps.kind, row.id));
+  });
+
+  app.get('/:idOrSlug/revisions/:revision', async (c) => {
+    if (!c.get('user')) throw new HttpError(401, 'Authentication required', 'UNAUTHENTICATED');
+    const row = await rowOr404(c.req.param('idOrSlug'));
+    const revision = Number(c.req.param('revision'));
+    if (!Number.isInteger(revision) || revision < 1) throw new HttpError(422, 'Invalid revision', 'BAD_INPUT');
+    const found = await getRevision(deps.db, deps.kind, row.id, revision);
+    if (!found) throw new HttpError(404, 'Revision not found', 'NOT_FOUND');
+    return ok(c, found);
+  });
+
+  app.get('/:idOrSlug/revisions/:revision/diff', async (c) => {
+    if (!c.get('user')) throw new HttpError(401, 'Authentication required', 'UNAUTHENTICATED');
+    const row = await rowOr404(c.req.param('idOrSlug'));
+    const revision = Number(c.req.param('revision'));
+    if (!Number.isInteger(revision) || revision < 1) throw new HttpError(422, 'Invalid revision', 'BAD_INPUT');
+    const found = await getRevision(deps.db, deps.kind, row.id, revision);
+    if (!found) throw new HttpError(404, 'Revision not found', 'NOT_FOUND');
+    const against = c.req.query('against');
+    if (against === 'current') {
+      return ok(c, { revision, against: 'current', changes: diffArtifactSnapshots(row, found.snapshot) });
+    }
+    const previous = await getPreviousRevision(deps.db, deps.kind, row.id, revision);
+    return ok(c, {
+      revision,
+      against: previous?.revision ?? 'empty',
+      changes: diffArtifactSnapshots(previous?.snapshot ?? {}, found.snapshot),
+    });
+  });
+
+  app.post('/:idOrSlug/revisions/:revision/restore', async (c) => {
+    const user = requireManage(c.get('user'), deps.managePerm, 'publish');
+    const idOrSlug = c.req.param('idOrSlug');
+    const revision = Number(c.req.param('revision'));
+    if (!Number.isInteger(revision) || revision < 1) throw new HttpError(422, 'Invalid revision', 'BAD_INPUT');
+    const body = await readJson<{ expectedVersion?: unknown; message?: unknown; origin?: unknown }>(c);
+    const expectedVersion = Number(body.expectedVersion);
+    if (!Number.isInteger(expectedVersion) || expectedVersion < 1) {
+      throw new HttpError(422, 'expectedVersion is required', 'BAD_INPUT');
+    }
+
+    const restored = await deps.db.tx(async (tx) => {
+      const selected = await tx.query<ArtifactRow>(
+        `SELECT ${returnCols(deps.kind)} FROM ${table} WHERE id = $1 OR slug = $1 FOR UPDATE`,
+        [idOrSlug],
+      );
+      const row = selected.rows[0];
+      if (!row) throw new HttpError(404, `${deps.kind} not found`, 'NOT_FOUND');
+      if (row.version !== expectedVersion) {
+        throw new HttpError(409, `This ${deps.kind} changed after history was opened`, 'STALE_VERSION', {
+          expectedVersion,
+          actualVersion: row.version,
+        });
+      }
+      const target = await getRevision(tx, deps.kind, row.id, revision);
+      if (!target) throw new HttpError(404, 'Revision not found', 'NOT_FOUND');
+      if (!target.snapshot || typeof target.snapshot !== 'object') {
+        throw new HttpError(422, 'Revision snapshot is invalid', 'BAD_REVISION');
+      }
+      const snapshot = target.snapshot as Partial<ArtifactRow>;
+      const root = assertUsableSchema(snapshot.schema, deps.kind);
+      const nextVersion = row.version + 1;
+      let result: ArtifactRow;
+      if (deps.kind === 'page') {
+        const updated = await tx.query<ArtifactRow>(
+          `UPDATE ${table} SET name = $2, description = $3, folder = $4, route = $5,
+             schema = $6::jsonb, settings = $7::jsonb, published = true, version = $8, updated_at = now()
+           WHERE id = $1 RETURNING ${returnCols(deps.kind)}`,
+          [row.id, String(snapshot.name ?? row.name), snapshot.description ?? null, snapshot.folder ?? null,
+            String(snapshot.route ?? row.route ?? `/${row.slug}`), JSON.stringify(root),
+            JSON.stringify(snapshot.settings ?? {}), nextVersion],
+        );
+        result = updated.rows[0]!;
+      } else {
+        const updated = await tx.query<ArtifactRow>(
+          `UPDATE ${table} SET name = $2, description = $3, folder = $4, entity = $5,
+             schema = $6::jsonb, data_source = $7::jsonb, settings = $8::jsonb,
+             published = true, version = $9, updated_at = now()
+           WHERE id = $1 RETURNING ${returnCols(deps.kind)}`,
+          [row.id, String(snapshot.name ?? row.name), snapshot.description ?? null, snapshot.folder ?? null,
+            snapshot.entity ?? null, JSON.stringify(root), JSON.stringify(snapshot.data_source ?? { kind: 'none' }),
+            JSON.stringify(snapshot.settings ?? {}), nextVersion],
+        );
+        result = updated.rows[0]!;
+        await tx.query(
+          'INSERT INTO mosaic_form_versions (id, form_id, version, snapshot) VALUES ($1, $2, $3, $4::jsonb)',
+          [`fv_${Math.random().toString(36).slice(2, 12)}`, row.id, nextVersion, JSON.stringify(result)],
+        );
+      }
+      await recordRevision(tx, {
+        kind: deps.kind,
+        artifactId: row.id,
+        revision: nextVersion,
+        snapshot: result,
+        message: String(body.message ?? `Restore revision ${revision}`),
+        origin: body.origin === 'ai' || body.origin === 'cli' || body.origin === 'import' ? body.origin : 'studio',
+        author: user,
+      });
+      return result;
+    });
+    writeAudit(deps.db, { action: 'publish', entity: deps.kind, recordId: restored.id, user });
+    return ok(c, toRecord(restored, deps.kind));
+  });
+
   // versions (forms only)
   if (deps.kind === 'form') {
     app.get('/:idOrSlug/versions', async (c) => {
@@ -380,6 +490,17 @@ export function artifactRoutes(deps: ArtifactDeps): Hono<AuthEnv> {
           [`fv_${Math.random().toString(36).slice(2, 12)}`, row.id, nextVersion, JSON.stringify(updated)],
         );
       }
+      if (changed) {
+        await recordRevision(tx, {
+          kind: deps.kind,
+          artifactId: row.id,
+          revision: nextVersion,
+          snapshot: updated,
+          message: body.message === undefined ? `Publish ${deps.kind} ${updated.name}` : String(body.message),
+          origin: body.origin === 'ai' || body.origin === 'cli' || body.origin === 'import' ? body.origin : 'studio',
+          author: user,
+        });
+      }
       return { row: updated, changed };
     });
     writeAudit(deps.db, { action: 'update', entity: deps.kind, recordId: result.row.id, user });
@@ -471,6 +592,16 @@ export function artifactRoutes(deps: ArtifactDeps): Hono<AuthEnv> {
           [`fv_${Math.random().toString(36).slice(2, 12)}`, row.id, nextVersion, JSON.stringify(snapshot)],
         );
       }
+      const snapshot = { ...row, version: nextVersion, published: true };
+      await recordRevision(tx, {
+        kind: deps.kind,
+        artifactId: row.id,
+        revision: nextVersion,
+        snapshot,
+        message: `Publish ${deps.kind} ${row.name}`,
+        origin: 'studio',
+        author: user,
+      });
       const updated = await tx.query<ArtifactRow>(`SELECT ${returnCols(deps.kind)} FROM ${table} WHERE id = $1`, [row.id]);
       return { row: updated.rows[0]!, changed: true };
     });
