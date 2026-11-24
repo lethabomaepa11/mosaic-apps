@@ -1,6 +1,7 @@
 /** /api/auth routes: login, register (bootstrap-safe), me, logout, change-password. */
 
 import { Hono } from 'hono';
+import { deleteCookie, setCookie } from 'hono/cookie';
 import type { LoginResponse, UserRecord } from '@mosaic-apps/core';
 import type { Db } from '../db/driver.js';
 import { HttpError, fail, ok, readJson } from './http.js';
@@ -12,6 +13,7 @@ import {
   type AuthDeps,
   type AuthEnv,
   type AuthUser,
+  MOSAIC_SESSION_COOKIE,
 } from './auth.js';
 import { isAdmin } from './rbac.js';
 import { writeAudit } from './audit.js';
@@ -70,6 +72,13 @@ export function authRoutes(deps: AuthRoutesDeps): Hono<AuthEnv> {
     const user = await loadAuthUser(deps, row.id);
     if (!user) return fail(c, 401, 'Invalid email or password', 'INVALID_CREDENTIALS');
     const token = signJwt({ sub: row.id, email: row.email, roles: row.roles ?? [] }, deps.secret, deps.tokenTtl);
+    setCookie(c, MOSAIC_SESSION_COOKIE, token, {
+      httpOnly: true,
+      sameSite: 'Lax',
+      secure: new URL(c.req.url).protocol === 'https:',
+      path: '/',
+      maxAge: deps.tokenTtl,
+    });
     writeAudit(deps.db, { action: 'login', user, ip: c.req.header('x-forwarded-for') ?? null });
     const response: LoginResponse = { token, user: toUserRecord(row), expiresIn: deps.tokenTtl };
     return ok(c, response);
@@ -100,6 +109,13 @@ export function authRoutes(deps: AuthRoutesDeps): Hono<AuthEnv> {
     const row = insert.rows[0]!;
     const user = await loadAuthUser(deps, row.id);
     const token = signJwt({ sub: row.id, email: row.email, roles: row.roles ?? [] }, deps.secret, deps.tokenTtl);
+    setCookie(c, MOSAIC_SESSION_COOKIE, token, {
+      httpOnly: true,
+      sameSite: 'Lax',
+      secure: new URL(c.req.url).protocol === 'https:',
+      path: '/',
+      maxAge: deps.tokenTtl,
+    });
     writeAudit(deps.db, {
       action: 'create',
       entity: 'user',
@@ -119,6 +135,7 @@ export function authRoutes(deps: AuthRoutesDeps): Hono<AuthEnv> {
   app.post('/logout', (c) => {
     const user = c.get('user');
     if (user) writeAudit(deps.db, { action: 'logout', user, ip: c.req.header('x-forwarded-for') ?? null });
+    deleteCookie(c, MOSAIC_SESSION_COOKIE, { path: '/' });
     return ok(c, { ok: true });
   });
 

@@ -72,8 +72,11 @@ and use that port in `DATABASE_URL`; keep other databases running.
 
 ![Customer intake form in Studio](/img/screenshots/form-studio.png)
 
-The generated web application renders published forms at `/f/<slug>` and pages
-at `/p/<slug>`. Choose an entity when the form should create or update a record.
+The generated web application renders published forms at `/f/<slug>`. Pages use
+their configured routes directly: `/`, `/about`, `/customers/:id`, or any other
+available path. The seeded `/404` page is editable too. Concrete SvelteKit files
+still win when a developer needs a fully custom route. Choose an entity when the
+form should create or update a record.
 
 ## 4. Add a business entity
 

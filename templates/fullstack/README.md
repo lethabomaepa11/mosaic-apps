@@ -69,7 +69,9 @@ export class Invoice {
 Open **Mosaic Studio** at http://localhost:__STUDIO_PORT__ and choose components from the palette.
 Pages and forms are stored in PostgreSQL; users edit them visually rather than editing
 JSON. Published pages resolve at their configured route, including `/` and arbitrary
-nested routes. Concrete SvelteKit route files override database routes.
+nested or parameterized routes such as `/customers/:id`. The seeded `/404` page is
+editable, and page settings can require login. Concrete SvelteKit route files override
+database routes.
 
 ## PWA
 
@@ -95,7 +97,8 @@ Deploy one application project after provisioning PostgreSQL.
 1. Create or connect Neon, Supabase, or compatible PostgreSQL.
 2. Run `npm run migrate` against the production `DATABASE_URL`.
 3. Set `DATABASE_URL`, a stable `MOSAIC_JWT_SECRET` of at least 32 characters,
-   `SEED=false`, and `SEED_DEMO=false` in the host.
+   `SEED=false`, and `SEED_DEMO=false` in the host. On serverless hosts, start with
+   `MOSAIC_DB_POOL_MAX=2` and increase it only within the database connection budget.
 4. Set the project root to `apps/web`, build with `npm run build`, and deploy.
 
 For Vercel set `MOSAIC_DEPLOY_TARGET=vercel`; for Netlify use `netlify`. UI and

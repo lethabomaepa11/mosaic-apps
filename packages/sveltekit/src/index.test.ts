@@ -1,7 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { PageDef } from '@mosaic-apps/core';
-import { createMosaicServerProvider, normalizeMosaicRoute, resolveMosaicPage } from './index.js';
+import {
+  createMosaicRouteLoader,
+  createMosaicServerProvider,
+  matchMosaicPage,
+  normalizeMosaicRoute,
+  resolveMosaicPage,
+} from './index.js';
 
 const page = (route: string): PageDef => ({
   id: route, slug: route === '/' ? 'home' : route.slice(1), name: route, route,
@@ -15,6 +21,17 @@ test('normalizes application routes and resolves exact published pages', () => {
   assert.equal(resolveMosaicPage(pages, '/customer'), undefined);
 });
 
+test('prefers exact routes and extracts dynamic route parameters', () => {
+  const pages = [page('/customers/:id'), page('/customers/new')];
+  assert.equal(matchMosaicPage(pages, '/customers/new')?.page.route, '/customers/new');
+  assert.deepEqual(matchMosaicPage(pages, '/customers/cust%201'), {
+    page: pages[0],
+    params: { id: 'cust 1' },
+  });
+  assert.equal(matchMosaicPage(pages, '/customers/%E0%A4%A'), undefined);
+  assert.equal(matchMosaicPage(pages, '/customers/one/details'), undefined);
+});
+
 test('server provider initializes once for concurrent requests', async () => {
   let calls = 0;
   const expected = { app: {} } as never;
@@ -26,4 +43,33 @@ test('server provider initializes once for concurrent requests', async () => {
   assert.equal(first, expected);
   assert.equal(second, expected);
   assert.equal(calls, 1);
+});
+
+test('route loader returns dynamic params after a successful access check', async () => {
+  const protectedPage = { ...page('/customers/:id'), settings: { requiresAuth: true } };
+  const load = createMosaicRouteLoader();
+  const result = await load({
+    url: new URL('https://example.test/customers/cust%201'),
+    fetch: async (input: RequestInfo | URL) => String(input).includes('/auth/me')
+      ? new Response(JSON.stringify({ success: true, data: { id: 'user_1' } }))
+      : new Response(JSON.stringify({ success: true, data: [protectedPage] })),
+  } as never);
+  assert.deepEqual(result, { mosaicPage: protectedPage, mosaicParams: { id: 'cust 1' } });
+});
+
+test('route loader sends anonymous users to login with a safe return path', async () => {
+  const protectedPage = { ...page('/account'), settings: { requiresAuth: true } };
+  const load = createMosaicRouteLoader();
+  await assert.rejects(
+    () => load({
+      url: new URL('https://example.test/account?tab=billing'),
+      fetch: async (input: RequestInfo | URL) => String(input).includes('/auth/me')
+        ? new Response(null, { status: 401 })
+        : new Response(JSON.stringify({ success: true, data: [protectedPage] })),
+    } as never),
+    (cause: unknown) => {
+      const redirect = cause as { status?: number; location?: string };
+      return redirect.status === 303 && redirect.location === '/login?next=%2Faccount%3Ftab%3Dbilling';
+    },
+  );
 });

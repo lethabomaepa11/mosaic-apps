@@ -6,11 +6,14 @@ sidebar_position: 12
 
 ## Authentication
 
-JWT bearer tokens (`Authorization: Bearer <token>`), scrypt-hashed passwords,
-`mosaic_users` sessions via `expiresAt`. `POST /api/auth/login|register|logout`,
-`GET /api/auth/me`, `POST /api/auth/change-password`. The client persists the
-token in `localStorage` (`mosaic_token`) with an `onUnauthorized` redirect
-hook. Rotate `MOSAIC_JWT_SECRET` per environment.
+JWT bearer tokens (`Authorization: Bearer <token>`) and scrypt-hashed passwords.
+`POST /api/auth/login|register|logout`, `GET /api/auth/me`, and
+`POST /api/auth/change-password` provide the authentication surface. Same-origin
+login also sets an HttpOnly `mosaic_session` cookie so protected database pages
+can be enforced during server rendering. Bearer tokens remain supported for CLI
+and SDK clients. The browser client also keeps the token in `localStorage`
+(`mosaic_token`) for client-side API calls. Rotate `MOSAIC_JWT_SECRET` per
+environment.
 
 ## RBAC model
 

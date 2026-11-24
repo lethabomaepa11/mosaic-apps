@@ -71,6 +71,27 @@ export async function seedPlatform(db: Db, opts: SeedOptions = {}): Promise<Seed
     result.pages += 1;
   }
 
+  const notFound = await db.query<Record<string, unknown>>(
+    `INSERT INTO mosaic_pages (id, slug, route, name, description, version, published, schema, settings)
+     SELECT 'pg_not_found', 'not-found', '/404', 'Not found', 'Page not found', 1, true, $1::jsonb, $2::jsonb
+     WHERE NOT EXISTS (SELECT 1 FROM mosaic_pages WHERE route = '/404')
+     RETURNING id, slug, route, name, description, folder, version, published, schema, settings, created_at, updated_at`,
+    [
+      JSON.stringify({ id: 'pg_not_found_root', type: 'page', children: [
+        { id: 'pg_not_found_title', type: 'heading', props: { text: 'Page not found', level: 1 } },
+        { id: 'pg_not_found_intro', type: 'text', props: { text: 'The page you requested does not exist.' } },
+      ] }),
+      JSON.stringify({ title: 'Page not found', layout: 'bare', menu: { show: false }, seo: { robots: 'noindex,nofollow' } }),
+    ],
+  );
+  if (notFound.rows[0]) {
+    await recordRevision(db, {
+      kind: 'page', artifactId: 'pg_not_found', revision: 1, snapshot: notFound.rows[0],
+      message: 'Create starter not-found page', origin: 'system',
+    });
+    result.pages += 1;
+  }
+
   if (opts.admin) {
     const existing = await db.query('SELECT 1 FROM mosaic_users WHERE lower(email) = $1', [opts.admin.email.toLowerCase()]);
     if (!existing.rows.length) {

@@ -28,6 +28,7 @@
     groups.set(key, group);
     return groups;
   }, new Map<string, NavItemDef[]>())].map(([section, items]) => ({ section, items })));
+  const bareLayout = $derived(page.url.pathname === '/login' || page.data.mosaicPage?.settings?.layout === 'bare');
 
   onMount(async () => {
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
@@ -46,7 +47,8 @@
   }
 </script>
 
-<div class="app-shell">
+<div class:app-shell={!bareLayout}>
+  {#if !bareLayout}
   <nav class="app-nav">
     <div class="app-nav__brand"><span class="dot"></span> __PROJECT_NAME__</div>
     {#each navGroups as group (group.section)}
@@ -63,7 +65,8 @@
       <a href="/login" class:active={page.url.pathname === '/login'}><Icon name="keyRound" /> Sign in</a>
     {/if}
   </nav>
-  <main class="app-main">
+  {/if}
+  <main class:app-main={!bareLayout}>
     {@render children()}
   </main>
 </div>

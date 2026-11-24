@@ -15,9 +15,9 @@ npm run release:check
 The check builds typed packages, runs the UI Svelte check, and invokes
 `npm pack --dry-run` for each package. The CLI template is copied only for the
 pack lifecycle and the check cleans that copy afterward. The command does not upload tarballs. Publish the
-packages in dependency order: `@mosaic-apps/core`, `@mosaic-apps/server`, `@mosaic-apps/ui`,
-then `@mosaic-apps/cli`. Core, server and UI are `0.2.0`; the CLI startup patch is `0.2.1`. Bump and
-review versions and changelogs together before each release.
+packages in dependency order: `@mosaic-apps/core`, `@mosaic-apps/server`,
+`@mosaic-apps/sveltekit`, `@mosaic-apps/ui`, then `@mosaic-apps/cli`. Bump and review
+versions, internal dependency ranges, and changelogs together before each release.
 
 ## Publishing manually
 
@@ -30,23 +30,26 @@ for subsequent source changes instead of expecting a repeated push to overwrite 
 # Login to npm (requires 2FA or automation token)
 npm login
 
-# Build and publish the four public packages in dependency order
+# Build and publish the five public packages in dependency order
 npm run build
 npm run release:check
 npm publish --workspace @mosaic-apps/core --access public
 npm publish --workspace @mosaic-apps/server --access public
+npm publish --workspace @mosaic-apps/sveltekit --access public
 npm publish --workspace @mosaic-apps/ui --access public
 npm publish --workspace @mosaic-apps/cli --access public
 ```
 
 ## Automated publishing (CI/CD)
 
-A GitHub Actions workflow (`.github/workflows/ci.yml`) runs on every push to `main`:
+A GitHub Actions workflow (`.github/workflows/ci.yml`) validates every push to `main`
+and every `v*` tag:
 
 1. **Build & Test** - Installs deps, typechecks, builds and runs tests.
 2. **Windows CLI** - Verifies scaffolding, process cleanup and packed consumer
    builds/browser behavior on Windows.
-3. **Publish** - After both jobs pass, publishes new versions using `NPM_TOKEN`.
+3. **Publish** - Only for a `v*` tag, and only after both jobs pass, publishes new
+   versions using `NPM_TOKEN`.
 
 ### Setup
 
@@ -57,9 +60,9 @@ providers; configuring it also requires registering each package's trusted
 publisher and updating the workflow. See [npm CI authentication](https://docs.npmjs.com/using-private-packages-in-a-ci-cd-workflow/)
 and [trusted publishing](https://docs.npmjs.com/trusted-publishers/).
 
-The workflow publishes only the four public packages; Studio is private. It
-currently runs publishing on a successful push to `main`. Versions must be new
-before that run; npm does not permit overwriting a published version.
+The workflow publishes only the five public packages; Studio is private. A normal
+`main` push never publishes. Versions must be new before creating a release tag;
+npm does not permit overwriting a published version.
 
 ### Versioning
 
@@ -67,15 +70,17 @@ Bump changed packages and update their internal consumers. A CLI/template-only
 patch can keep unchanged runtime packages at their existing versions. To release:
 
 ```bash
-# Update the versions in packages/{core,server,ui,cli}/package.json,
+# Update the versions in packages/{core,server,sveltekit,ui,cli}/package.json,
 # internal dependency ranges, Studio and template dependencies together.
 # Then refresh the lockfile and verify.
 npm install --package-lock-only
 npm run typecheck
 npm run release:check
 
-# Commit and push
-git push origin main --tags
+# Commit and push main, then create and push an intentional release tag
+git push origin main
+git tag v0.3.0
+git push origin v0.3.0
 
 # CI will build, test, and publish
 ```
@@ -89,7 +94,7 @@ npm run release:consumer:pack
 npm run release:consumer
 ```
 
-The script installs the four tarballs outside the repository, invokes the packed
+The script installs the five tarballs outside the repository, invokes the packed
 CLI and its bundled template, and builds the generated API, web app, and Studio.
 It also builds web/Studio for Node, Netlify and Vercel, checks the native Hono
 serverless entry, and verifies browser hydration, Monaco and production API wiring.
@@ -100,5 +105,5 @@ links and without publishing.
 ## Package details
 
 - `@mosaic-apps/ui` - Source-first Svelte package. Consumers need Svelte 5, Tailwind CSS 4, and the Tailwind Vite plugin. Import `@mosaic-apps/ui/style.css` or the package entry from a Svelte-aware bundler.
-- `@mosaic-apps/core`, `@mosaic-apps/server`, `@mosaic-apps/cli` - Publish compiled ESM and declaration files from `dist`.
+- `@mosaic-apps/core`, `@mosaic-apps/server`, `@mosaic-apps/sveltekit`, `@mosaic-apps/cli` - Publish compiled ESM and declaration files from `dist`.
 - `@mosaic-apps/cli` - Includes the generated full-stack template in its tarball. The pack check confirms the template files are present. Review the generated template's dependency versions and test a scaffolded app before release.

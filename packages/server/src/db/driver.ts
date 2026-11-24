@@ -59,11 +59,19 @@ class PgDriver implements Db {
   }
 }
 
-export function createPgDriver(connectionString: string, opts: { max?: number } = {}): Db {
+export interface PgDriverOptions {
+  max?: number;
+  connectionTimeoutMillis?: number;
+  idleTimeoutMillis?: number;
+}
+
+export function createPgDriver(connectionString: string, opts: PgDriverOptions = {}): Db {
   const pool = new Pool({
     connectionString,
     max: opts.max ?? 10,
-    connectionTimeoutMillis: 5000,
+    connectionTimeoutMillis: opts.connectionTimeoutMillis ?? 5000,
+    idleTimeoutMillis: opts.idleTimeoutMillis ?? 30_000,
+    allowExitOnIdle: true,
   });
   pool.on('error', (err) => {
     console.error('[mosaic] postgres pool error:', err.message);

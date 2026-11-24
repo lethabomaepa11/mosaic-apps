@@ -12,6 +12,10 @@ if (env.VERCEL && (!env.MOSAIC_JWT_SECRET || env.MOSAIC_JWT_SECRET.length < 32))
 
 export const mosaicServer = createMosaicServerProvider({
   databaseUrl,
+  database: {
+    poolMax: Number(env.MOSAIC_DB_POOL_MAX ?? (env.VERCEL ? 2 : 10)),
+    idleTimeoutMillis: Number(env.MOSAIC_DB_IDLE_TIMEOUT_MS ?? 30_000),
+  },
   auth: {
     enabled: env.AUTH !== 'off',
     allowRegistration: false,

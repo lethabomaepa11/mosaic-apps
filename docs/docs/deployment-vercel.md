@@ -38,6 +38,8 @@ Set these environment variables for Preview and Production as appropriate:
 ```text
 DATABASE_URL=postgresql://...
 MOSAIC_JWT_SECRET=<stable random value, at least 32 characters>
+MOSAIC_DB_POOL_MAX=2
+MOSAIC_DB_IDLE_TIMEOUT_MS=30000
 MOSAIC_DEPLOY_TARGET=vercel
 SEED=false
 SEED_DEMO=false

@@ -89,6 +89,24 @@ export interface AuthDeps {
   enabled: boolean;
 }
 
+export const MOSAIC_SESSION_COOKIE = 'mosaic_session';
+
+/** Bearer tokens win; the HttpOnly cookie enables same-origin SSR route guards. */
+export function resolveRequestToken(authorization = '', cookie = ''): string {
+  if (authorization.toLowerCase().startsWith('bearer ')) return authorization.slice(7).trim();
+  for (const part of cookie.split(';')) {
+    const [name, ...value] = part.trim().split('=');
+    if (name === MOSAIC_SESSION_COOKIE) {
+      try {
+        return decodeURIComponent(value.join('='));
+      } catch {
+        return '';
+      }
+    }
+  }
+  return '';
+}
+
 /** Resolve `Authorization: Bearer` into `c.set('user', ...)` (or null). Never rejects. */
 export function resolveUser(deps: AuthDeps): MiddlewareHandler<AuthEnv> {
   return async (c, next) => {
@@ -97,8 +115,7 @@ export function resolveUser(deps: AuthDeps): MiddlewareHandler<AuthEnv> {
       await next();
       return;
     }
-    const header = c.req.header('authorization') ?? '';
-    const token = header.toLowerCase().startsWith('bearer ') ? header.slice(7).trim() : '';
+    const token = resolveRequestToken(c.req.header('authorization') ?? '', c.req.header('cookie') ?? '');
     if (!token) {
       await next();
       return;

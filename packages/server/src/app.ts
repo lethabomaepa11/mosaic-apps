@@ -27,6 +27,12 @@ import { endpointRegistryRoutes } from './endpoints/registry.js';
 
 export interface MosaicServerConfig {
   databaseUrl: string;
+  database?: {
+    /** Keep this small for serverless functions; Neon/Supabase poolers are recommended. */
+    poolMax?: number;
+    connectionTimeoutMillis?: number;
+    idleTimeoutMillis?: number;
+  };
   auth?: {
     enabled?: boolean;
     jwtSecret?: string;
@@ -60,7 +66,11 @@ const DEFAULT_SEED: SeedOptions = {
 export async function createMosaicServer(config: MosaicServerConfig): Promise<MosaicServer> {
   const db = isPgliteUrl(config.databaseUrl)
     ? await createPgliteDriver(config.databaseUrl)
-    : createPgDriver(config.databaseUrl);
+    : createPgDriver(config.databaseUrl, {
+        max: config.database?.poolMax,
+        connectionTimeoutMillis: config.database?.connectionTimeoutMillis,
+        idleTimeoutMillis: config.database?.idleTimeoutMillis,
+      });
   await ensurePlatformTables(db);
 
   const authEnabled = config.auth?.enabled ?? true;

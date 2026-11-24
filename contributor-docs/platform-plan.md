@@ -247,11 +247,13 @@ making generated clients a required dependency of every Mosaic app.
 
 - [x] Create `@mosaic-apps/sveltekit` and its loader/provider/API contracts.
 - [x] Scaffold only minimal catch-all and API adapters.
-- [ ] Render home, login, arbitrary routes, shells, SEO, access, and 404 from DB.
+- [x] Render home, login, arbitrary parameterized routes, shells, SEO, access, and
+  an editable 404 artifact from the database.
 - [x] Remove per-app Studio and separate API deployment requirements. Studio remains
   an optional local authoring client.
-- [ ] Make Neon/Supabase pooling serverless-safe.
-- [ ] Add one-project Vercel integration tests.
+- [x] Make Neon/Supabase pooling serverless-safe with warm-process reuse, explicit
+  small pool limits, idle cleanup, and pooled connection guidance.
+- [x] Add packed one-project Node, Netlify, and Vercel adapter integration tests.
 
 ### 4. Complete intuitive builder
 
