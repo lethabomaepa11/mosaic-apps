@@ -1,7 +1,7 @@
 # Mosaic Cloud
 
 Mosaic Cloud is the hosted control plane for creating and operating Mosaic apps.
-This first vertical slice provides sign-in, organizations, projects, default page
+This first vertical slice provides self-serve account creation, sign-in, organizations, projects, default page
 choices, framework/UI-system/theme preferences, conversations, environments, durable jobs, provider-connection records,
 and an audit log.
 

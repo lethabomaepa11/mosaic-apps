@@ -8,5 +8,6 @@
     <fieldset class="fieldset"><legend class="fieldset-legend">Password</legend><input class="input input-bordered w-full" id="password" name="password" type="password" autocomplete="current-password" required /></fieldset>
     {#if form?.message}<div class="alert alert-error text-sm" role="alert">{form.message}</div>{/if}
     <button class="btn btn-primary w-full" type="submit">Sign in</button>
+    <p class="mb-0 text-center text-sm muted">New to Mosaic? <a class="link link-primary font-medium" href="/signup">Create an account</a></p>
   </form>
 </section>

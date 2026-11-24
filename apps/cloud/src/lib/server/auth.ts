@@ -1,6 +1,6 @@
 import type { Cookies } from '@sveltejs/kit';
-import { signJwt, verifyJwt, verifyPassword } from '@mosaic-apps/server';
-import { getCloudDb } from './db';
+import { hashPassword, signJwt, verifyJwt, verifyPassword } from '@mosaic-apps/server';
+import { getCloudDb, id, slugify } from './db';
 
 const env = process.env;
 
@@ -19,6 +19,29 @@ export async function authenticate(email: string, password: string) {
   );
   const user = result.rows[0];
   return user && verifyPassword(password, user.password_hash) ? { id: user.id, email: user.email, name: user.name } : null;
+}
+
+export async function registerAccount(name: string, email: string, password: string) {
+  const db = await getCloudDb();
+  const normalizedEmail = email.trim().toLowerCase();
+  const existing = await db.query('SELECT id FROM cloud_users WHERE lower(email) = $1', [normalizedEmail]);
+  if (existing.rows.length) return null;
+  const userId = id();
+  const organizationId = id();
+  try {
+    await db.tx(async (tx) => {
+      await tx.query('INSERT INTO cloud_users (id, email, name, password_hash) VALUES ($1, $2, $3, $4)', [userId, normalizedEmail, name.trim(), hashPassword(password)]);
+      await tx.query('INSERT INTO cloud_organizations (id, name, slug) VALUES ($1, $2, $3)', [organizationId, `${name.trim()}\'s workspace`, `${slugify(name)}-${organizationId.slice(0, 8)}`]);
+      await tx.query('INSERT INTO cloud_memberships (organization_id, user_id, role) VALUES ($1, $2, $3)', [organizationId, userId, 'owner']);
+      await tx.query(`INSERT INTO cloud_audit_log (id, organization_id, user_id, action, target_type, target_id)
+        VALUES ($1, $2, $3, 'account.create', 'user', $3)`, [id(), organizationId, userId]);
+    });
+  } catch (cause) {
+    const duplicate = cause instanceof Error && /unique|duplicate/i.test(cause.message);
+    if (duplicate) return null;
+    throw cause;
+  }
+  return { id: userId, email: normalizedEmail, name: name.trim() };
 }
 
 export function setSession(cookies: Cookies, user: { id: string; email: string }): void {
