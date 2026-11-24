@@ -49,6 +49,25 @@ those nodes unsupported, so migrate or replace them before uninstalling it.
 ## Server extensions
 
 Keep server-only packages under `apps/web/src/lib/server`. Entity classes and
-`*.endpoint.ts` modules are discovered there. Never import server modules into a
-Svelte component or the browser bundle. Review migrations and environment variables
-alongside dependency changes; visual artifact publishing alone does not install code.
+`*.endpoint.ts` modules are discovered there. Explicit handlers belong in
+`apps/web/src/lib/server/endpoints.ts` and mount under `/api/extensions`:
+
+```ts
+import type { MosaicEndpointRegistration } from '@mosaic-apps/server';
+
+export const endpoints: MosaicEndpointRegistration[] = [{
+  method: 'POST', path: '/invoices/send', summary: 'Send an invoice',
+  permission: 'entity:invoice:update',
+  responses: { 200: { description: 'Sent' } },
+  handler: async ({ json, user }) => {
+    const input = await json<{ invoiceId: string }>();
+    return { invoiceId: input.invoiceId, sentBy: user?.email };
+  },
+}];
+```
+
+Endpoints require authentication by default. Set `public: true` intentionally for
+webhooks or public APIs, and verify their signatures or add rate limiting as needed.
+Never import server modules into a Svelte component or browser bundle. Review
+migrations and environment variables alongside dependency changes; visual artifact
+publishing alone does not install code.

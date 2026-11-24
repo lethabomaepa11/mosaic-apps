@@ -1,5 +1,6 @@
 import { createMosaicApiHandlers, createMosaicServerProvider } from '@mosaic-apps/sveltekit';
 import { fileURLToPath } from 'node:url';
+import { endpoints } from './endpoints';
 
 const env = process.env;
 const databaseUrl = env.DATABASE_URL ?? '__DB_URL__';
@@ -12,6 +13,7 @@ if (env.VERCEL && (!env.MOSAIC_JWT_SECRET || env.MOSAIC_JWT_SECRET.length < 32))
 
 export const mosaicServer = createMosaicServerProvider({
   databaseUrl,
+  endpoints,
   database: {
     poolMax: Number(env.MOSAIC_DB_POOL_MAX ?? (env.VERCEL ? 2 : 10)),
     idleTimeoutMillis: Number(env.MOSAIC_DB_IDLE_TIMEOUT_MS ?? 30_000),

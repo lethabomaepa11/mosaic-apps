@@ -9,6 +9,7 @@ import { ok } from '../modules/http.js';
 import { requirePermission } from '../modules/rbac.js';
 import type { AuthEnv, AuthUser } from '../modules/auth.js';
 import { importEntityModule } from '@mosaic-apps/core';
+import { HttpError } from '../modules/http.js';
 
 export interface EndpointDef {
   method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
@@ -25,6 +26,23 @@ export interface EndpointDef {
 
 export interface EndpointRegistryRow extends EndpointDef {
   handlerName: string;
+}
+
+export interface MosaicEndpointContext {
+  request: Request;
+  db: Db;
+  user: AuthUser | null;
+  params: Record<string, string>;
+  query: Record<string, string>;
+  json: <T = unknown>() => Promise<T>;
+}
+
+export interface MosaicEndpointRegistration extends EndpointDef {
+  /** Public endpoints opt out of the authenticated-by-default policy. */
+  public?: boolean;
+  /** Optional Mosaic RBAC permission checked after authentication. */
+  permission?: string;
+  handler: (context: MosaicEndpointContext) => unknown | Promise<unknown>;
 }
 
 const ENDPOINT_FILE = /\.endpoint\.(ts|mts|js|mjs)$/;
@@ -71,12 +89,65 @@ function guard(user: AuthUser | null, perm: string): AuthUser {
   return user as AuthUser;
 }
 
-export function endpointRegistryRoutes(_db: Db): Hono<AuthEnv> {
+function normalizedPath(path: string): string {
+  const normalized = `/${path}`.replace(/\/{2,}/g, '/').replace(/\/$/, '');
+  if (normalized === '/' || normalized.includes('..') || !/^\/[a-z0-9_/:.-]+$/i.test(normalized)) {
+    throw new Error(`Invalid Mosaic endpoint path: ${path}`);
+  }
+  return normalized;
+}
+
+export function registeredEndpointRoutes(
+  db: Db,
+  registrations: MosaicEndpointRegistration[] = [],
+  authEnabled = true,
+): Hono<AuthEnv> {
+  const app = new Hono<AuthEnv>();
+  validateEndpointRegistrations(registrations);
+  for (const registration of registrations) {
+    const path = normalizedPath(registration.path);
+    app.on(registration.method, path, async (c) => {
+      const user = c.get('user');
+      if (authEnabled && !registration.public && !user) {
+        throw new HttpError(401, 'Authentication required', 'UNAUTHENTICATED');
+      }
+      if (registration.permission && !requirePermission(user, registration.permission)) {
+        throw new HttpError(403, `Missing permission: ${registration.permission}`, 'FORBIDDEN');
+      }
+      const result = await registration.handler({
+        request: c.req.raw,
+        db,
+        user,
+        params: c.req.param(),
+        query: c.req.query(),
+        json: <T>() => c.req.json<T>(),
+      });
+      return result instanceof Response ? result : c.json(result ?? null);
+    });
+  }
+  return app;
+}
+
+export function validateEndpointRegistrations(registrations: MosaicEndpointRegistration[] = []): void {
+  const seen = new Set<string>();
+  for (const registration of registrations) {
+    const key = `${registration.method} ${normalizedPath(registration.path)}`;
+    if (seen.has(key)) throw new Error(`Duplicate Mosaic endpoint registration: ${key}`);
+    seen.add(key);
+  }
+}
+
+export function endpointRegistryRoutes(_db: Db, registrations: MosaicEndpointRegistration[] = []): Hono<AuthEnv> {
   const app = new Hono<AuthEnv>();
 
   app.get('/', async (c) => {
     guard(c.get('user'), 'endpoints:read');
-    return ok(c, await scanApiDir(endpointsDir()));
+    const explicit: EndpointRegistryRow[] = registrations.map(({ handler: _handler, public: _public, permission: _permission, ...endpoint }) => ({
+      ...endpoint,
+      path: `/extensions${normalizedPath(endpoint.path)}`,
+      handlerName: 'registered',
+    }));
+    return ok(c, [...await scanApiDir(endpointsDir()), ...explicit]);
   });
 
   return app;

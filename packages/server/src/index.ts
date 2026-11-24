@@ -39,6 +39,16 @@ export { fileRoutes } from './modules/files.js';
 export { metaRoutes, PLATFORM_VERSION } from './modules/meta.js';
 export { authRoutes } from './modules/auth-routes.js';
 export { entityAdminRoutes } from './modules/entity-admin.js';
+export {
+  endpointRegistryRoutes,
+  registeredEndpointRoutes,
+  scanApiDir,
+  validateEndpointRegistrations,
+  type EndpointDef,
+  type EndpointRegistryRow,
+  type MosaicEndpointContext,
+  type MosaicEndpointRegistration,
+} from './endpoints/registry.js';
 export { seedPlatform, type SeedOptions, type SeedResult } from './seed.js';
 export { ensurePlatformTables, DEFAULT_ROLES, RESERVED_ENTITY_NAMES, PLATFORM_DDL } from './platform.js';
 export { HttpError, fail, ok, readJson, mapDbError } from './modules/http.js';

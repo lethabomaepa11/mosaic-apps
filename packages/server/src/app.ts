@@ -23,7 +23,12 @@ import { metaRoutes, PLATFORM_VERSION } from './modules/meta.js';
 import { seedPlatform, type SeedOptions } from './seed.js';
 import { HttpError, fail, mapDbError } from './modules/http.js';
 import { QueryError } from './crud/sql.js';
-import { endpointRegistryRoutes } from './endpoints/registry.js';
+import {
+  endpointRegistryRoutes,
+  registeredEndpointRoutes,
+  validateEndpointRegistrations,
+  type MosaicEndpointRegistration,
+} from './endpoints/registry.js';
 
 export interface MosaicServerConfig {
   databaseUrl: string;
@@ -45,6 +50,8 @@ export interface MosaicServerConfig {
   entitiesDir?: string;
   uploadsDir?: string;
   publicFiles?: boolean;
+  /** Package/project endpoints mounted under `/api/extensions`. */
+  endpoints?: MosaicEndpointRegistration[];
   /** `true` seeds default admin + demo data; or pass explicit options */
   seed?: SeedOptions | boolean;
   log?: boolean;
@@ -64,6 +71,7 @@ const DEFAULT_SEED: SeedOptions = {
 };
 
 export async function createMosaicServer(config: MosaicServerConfig): Promise<MosaicServer> {
+  validateEndpointRegistrations(config.endpoints);
   const db = isPgliteUrl(config.databaseUrl)
     ? await createPgliteDriver(config.databaseUrl)
     : createPgDriver(config.databaseUrl, {
@@ -151,7 +159,8 @@ export async function createMosaicServer(config: MosaicServerConfig): Promise<Mo
   app.route('/api/audit', auditRoutes(db));
   app.route('/api/files', fileRoutes({ db, uploadsDir, publicRead: config.publicFiles ?? false }));
   app.route('/files', fileRoutes({ db, uploadsDir, publicRead: config.publicFiles ?? true }));
-  app.route('/api/endpoints', endpointRegistryRoutes(db));
+  app.route('/api/endpoints', endpointRegistryRoutes(db, config.endpoints));
+  app.route('/api/extensions', registeredEndpointRoutes(db, config.endpoints, authEnabled));
   app.route('/api', metaRoutes(db));
 
   app.notFound((c) => fail(c, 404, `No route for ${c.req.method} ${c.req.path}`, 'NOT_FOUND'));

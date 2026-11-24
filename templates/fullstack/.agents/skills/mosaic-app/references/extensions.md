@@ -13,6 +13,10 @@ public extension contract.
 - Use Svelte for the default runtime. A framework-neutral Web Component is the
   interoperability boundary when a non-Svelte library must render UI.
 - Keep secrets and privileged SDK calls server-side.
+- Add explicit server handlers to `apps/web/src/lib/server/endpoints.ts`; their
+  declared paths mount under `/api/extensions`. They require authentication by
+  default. Use `permission` for RBAC and `public: true` only after reviewing public
+  input validation, signature checks, and rate limits.
 - Reuse installed packages and platform APIs. When a new package is necessary,
   update both `package.json` and the lockfile and explain its runtime location.
 - Do not install arbitrary packages into a hosted Studio process; generation and
