@@ -26,7 +26,7 @@
     "prepack": "npm run build && node scripts/pack-template.mjs",
     "postpack": "node scripts/clean-template.mjs",
     "typecheck": "tsc -p tsconfig.test.json",
-    "test": "node --import tsx --test --test-isolation=none --test-concurrency=1 \"src/**/*.test.ts\"",
+    "test": "node --import tsx src/create.test.ts && node --import tsx src/launcher.test.ts",
     "dev": "node --import tsx src/index.ts"
   },
   "dependencies": {
