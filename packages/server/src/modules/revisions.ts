@@ -61,8 +61,10 @@ export async function recordRevision(db: Db, input: {
   author?: AuthUser | null;
 }): Promise<ArtifactRevision> {
   const previous = await db.query<RevisionRow>(
-    `SELECT ${COLUMNS} FROM mosaic_revisions WHERE kind = $1 AND artifact_id = $2 ORDER BY revision DESC LIMIT 1`,
-    [input.kind, input.artifactId],
+    `SELECT ${COLUMNS} FROM mosaic_revisions
+     WHERE kind = $1 AND artifact_id = $2 AND revision < $3
+     ORDER BY revision DESC LIMIT 1`,
+    [input.kind, input.artifactId, input.revision],
   );
   const row = await db.query<RevisionRow>(
     `INSERT INTO mosaic_revisions
@@ -76,6 +78,74 @@ export async function recordRevision(db: Db, input: {
     ],
   );
   return toRecord(row.rows[0]!);
+}
+
+/** Import the pre-0.3 form version ledger without rewriting snapshots or timestamps. */
+export async function migrateLegacyFormVersions(db: Db): Promise<number> {
+  return db.tx(async (tx) => {
+    const legacy = await tx.query<{
+      form_id: string;
+      version: number;
+      snapshot: unknown;
+      published_at: string;
+    }>(
+      `SELECT legacy.form_id, legacy.version, legacy.snapshot, legacy.published_at
+       FROM mosaic_form_versions legacy
+       WHERE NOT EXISTS (
+         SELECT 1 FROM mosaic_revisions revision
+         WHERE revision.kind = 'form'
+           AND revision.artifact_id = legacy.form_id
+           AND revision.revision = legacy.version
+       )
+       ORDER BY legacy.form_id, legacy.version`,
+    );
+    if (!legacy.rows.length) return 0;
+
+    const affected = new Set<string>();
+    let imported = 0;
+    for (const item of legacy.rows) {
+      const previous = await tx.query<{ id: string }>(
+        `SELECT id FROM mosaic_revisions
+         WHERE kind = 'form' AND artifact_id = $1 AND revision < $2
+         ORDER BY revision DESC LIMIT 1`,
+        [item.form_id, item.version],
+      );
+      const inserted = await tx.query<{ id: string }>(
+        `INSERT INTO mosaic_revisions
+           (id, kind, artifact_id, revision, parent_id, checksum, snapshot, message, origin, created_at)
+         VALUES ($1, 'form', $2, $3, $4, $5, $6::jsonb, $7, 'system', $8)
+         ON CONFLICT (kind, artifact_id, revision) DO NOTHING
+         RETURNING id`,
+        [
+          newId('rev'), item.form_id, item.version, previous.rows[0]?.id ?? null,
+          revisionChecksum(item.snapshot), JSON.stringify(item.snapshot),
+          'Imported legacy form version', item.published_at,
+        ],
+      );
+      if (inserted.rowCount) {
+        imported += 1;
+        affected.add(item.form_id);
+      }
+    }
+
+    // A newer generic revision can already exist when an interrupted upgrade resumes.
+    // Re-link the affected chain to the nearest earlier revision after all imports land.
+    for (const formId of affected) {
+      const chain = await tx.query<{ id: string; parent_id: string | null }>(
+        `SELECT id, parent_id FROM mosaic_revisions
+         WHERE kind = 'form' AND artifact_id = $1 ORDER BY revision`,
+        [formId],
+      );
+      for (let index = 0; index < chain.rows.length; index += 1) {
+        const expected = index === 0 ? null : chain.rows[index - 1]!.id;
+        const current = chain.rows[index]!;
+        if (current.parent_id !== expected) {
+          await tx.query('UPDATE mosaic_revisions SET parent_id = $1 WHERE id = $2', [expected, current.id]);
+        }
+      }
+    }
+    return imported;
+  });
 }
 
 export async function listRevisions(db: Db, kind: ArtifactKind, artifactId: string): Promise<ArtifactRevision[]> {

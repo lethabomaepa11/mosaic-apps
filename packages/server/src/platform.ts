@@ -1,6 +1,7 @@
 /** Bootstrap DDL for Mosaic platform tables (idempotent). */
 
 import type { Db } from './db/driver.js';
+import { migrateLegacyFormVersions } from './modules/revisions.js';
 
 export const PLATFORM_DDL = `
 CREATE TABLE IF NOT EXISTS mosaic_entities (
@@ -160,6 +161,7 @@ export async function ensurePlatformTables(db: Db): Promise<void> {
   for (const sql of statements) {
     await db.query(sql);
   }
+  await migrateLegacyFormVersions(db);
 }
 
 /** Well-known default roles seeded on first boot. */

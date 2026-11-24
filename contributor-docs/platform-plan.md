@@ -233,9 +233,9 @@ making generated clients a required dependency of every Mosaic app.
 - [x] Record page, form, and entity revisions consistently.
 - [x] Add list/get/diff/restore APIs with permission and conflict checks. Entity
   restoration intentionally remains migration-reviewed.
-- [ ] Preserve existing form history during migration; add complete page history.
-- [ ] Add Studio history, semantic diff, message, conflict, and restore UX.
-- [ ] Test on PostgreSQL and PGlite.
+- [x] Preserve existing form history during migration and add complete page history.
+- [x] Add Studio history, semantic diff, message, conflict, and restore UX.
+- [x] Test revision and legacy-history contracts on PostgreSQL and PGlite.
 
 ### 2. Agent support
 
