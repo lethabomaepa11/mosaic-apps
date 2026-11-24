@@ -3,10 +3,11 @@
   import { page } from '$app/state';
   import { CodeEditorField, EntityForm, EntityTable, Icon, Modal, toast } from '@mosaic-apps/ui';
   import EntityFields from '../../../../components/EntityFields.svelte';
-  import type { EntityDef } from '@mosaic-apps/core';
+  import RevisionHistory from '../../../../components/RevisionHistory.svelte';
+  import type { ArtifactRevision, EntityDef } from '@mosaic-apps/core';
   import { client as api } from '#lib/client';
 
-  const name = $derived(page.params.name);
+  const name = $derived(page.params.name ?? '');
 
   let entity = $state<EntityDef | null>(null);
   let loading = $state(true);
@@ -17,6 +18,8 @@
   let recordModal = $state(false);
   let editRecord = $state<Record<string, unknown> | undefined>(undefined);
   let browseKey = $state(0);
+  let revisions = $state<ArtifactRevision[]>([]);
+  let showHistory = $state(false);
 
   onMount(async () => {
     try {
@@ -78,6 +81,15 @@
       toast.error('Delete failed', err instanceof Error ? err.message : String(err));
     }
   }
+
+  async function openHistory() {
+    try {
+      revisions = await api.entityRevisions(name);
+      showHistory = true;
+    } catch (err) {
+      toast.error('Could not load history', err instanceof Error ? err.message : String(err));
+    }
+  }
 </script>
 
 <svelte:head><title>{name} · Entities</title></svelte:head>
@@ -92,6 +104,7 @@
       {#if entity.softDelete}<span class="m-badge m-badge--warning">soft delete</span>{/if}
     </div>
     <div class="m-row">
+      <button class="m-btn m-btn--secondary" onclick={openHistory}><Icon name="history" size={16} /> History</button>
       <button class="m-btn m-btn--secondary" onclick={planMigration}><Icon name="gitBranch" size={16} /> Plan migration</button>
       <button class="m-btn m-btn--primary" disabled={saving} onclick={saveEntity}>Save entity</button>
       <button class="m-btn m-btn--danger" onclick={deleteEntity}>Unregister</button>
@@ -137,4 +150,7 @@
       {/if}
     {/snippet}
   </Modal>
+
+  <RevisionHistory bind:open={showHistory} {revisions} title={`${entity.label ?? entity.name} history`}
+    oninspect={(revision) => api.entityRevisionDiff(name, revision.revision)} />
 {/if}

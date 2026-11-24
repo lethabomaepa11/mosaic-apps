@@ -23,13 +23,17 @@ history.
 
 ## View history
 
-Open a page or form in Studio and choose **History**. The newest revision appears
-first with its author/origin, message, time, and checksum prefix. A checksum is a
-content identity, not a secret.
+Open a page, form, or entity in Studio and choose **History**. The newest revision
+appears first with its author/origin, message, time, and checksum prefix. A checksum
+is a content identity, not a secret.
 
 Select **Review changes** to compare a revision with the current artifact. Page and
 form revisions can be restored from the same panel. The selected snapshot becomes a
 new published revision; history is never rewritten.
+
+Entity history is review-only in Studio because restoring a definition can require
+a physical schema migration. Review the diff, make the forward entity change, then
+inspect and apply the migration plan.
 
 The history API is also available to authenticated tools:
 
