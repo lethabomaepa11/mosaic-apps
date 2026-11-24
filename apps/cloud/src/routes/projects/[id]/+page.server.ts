@@ -2,12 +2,14 @@ import { error, fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { getCloudDb, id } from '#lib/server/db';
 import { isDaisyTheme } from '#lib/themes';
+import type { ProjectBlueprint } from '#lib/server/groq';
 
 async function projectFor(projectId: string, userId: string) {
   const db = await getCloudDb();
   const result = await db.query<{
     id: string; organization_id: string; name: string; slug: string; prompt: string; status: string;
     include_home: boolean; include_login: boolean; app_framework: string; ui_system: string; ui_theme: string;
+    blueprint: ProjectBlueprint | null; planner_model: string | null; planned_at: string | null;
     github_repository: string | null; vercel_project_id: string | null;
   }>(
     `SELECT project.* FROM cloud_projects project

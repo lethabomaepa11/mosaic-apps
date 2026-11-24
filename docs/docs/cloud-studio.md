@@ -12,7 +12,8 @@ application architecture.
 
 ## Intended workflow
 
-1. Sign in and describe a business or passion app.
+1. Sign in and describe a business or passion app. Groq converts the brief into a
+   structured blueprint with routes, business tables, roles, and workflows.
 2. Choose the app framework, UI system, clean starting theme, and whether the
    initial app includes `/` and `/login`. Theme tokens remain editable after
    generation.
@@ -37,7 +38,8 @@ without introducing novelty themes into the default business-app workflow.
 Framework, UI system, and theme are separate project
 properties. SvelteKit is the supported runtime adapter today; additional adapters
 stay unavailable in the UI until generation, preview, and deployment support is
-complete. Creating a project records the brief and queues a generation job.
+complete. Creating a project asks Groq for a strict, typed application blueprint,
+stores it in PostgreSQL, and then queues a generation job with that blueprint.
 
 Project design settings are editable later and remain in PostgreSQL. The global
 theme maps to the generated app's single `mosaic_settings.theme.config` record,

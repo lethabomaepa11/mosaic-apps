@@ -18,3 +18,4 @@ docs/.docusaurus/
 packages/cli/templates/
 example-app/
 apps/cloud/data/
+.neon/

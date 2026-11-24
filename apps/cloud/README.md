@@ -5,13 +5,18 @@ This first vertical slice provides sign-in, organizations, projects, default pag
 choices, framework/UI-system/theme preferences, conversations, environments, durable jobs, provider-connection records,
 and an audit log.
 
+Project creation uses Groq structured output to turn the brief into a typed
+application blueprint (routes, physical business entities, roles, and workflows)
+before the generation job is queued. `GROQ_API_KEY` stays server-side; local
+development uses a deterministic fallback when it is absent.
+
 The Cloud shell stays on a consistent Corporate theme. Each project brief exposes
 the curated DaisyUI themes Corporate, Business, Light, Dark, Nord, Winter, Silk,
 and Lo-fi. The project theme is stored in PostgreSQL so the generator can apply the
 same design tokens to the whole generated app.
 
 It intentionally does not pretend that a queued job is already a generated app.
-The isolated workspace worker, AI operations, GitHub App, Vercel OAuth, database
+The isolated workspace worker, code-generation operations, GitHub App, Vercel OAuth, database
 provisioning, encrypted secret operations, usage, and billing are subsequent
 milestones tracked in `contributor-docs/platform-plan.md`.
 

@@ -1,6 +1,7 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { getCloudDb, id, slugify } from '#lib/server/db';
+import { planProject } from '#lib/server/groq';
 import { isDaisyTheme } from '#lib/themes';
 
 async function organizationFor(userId: string) {
@@ -44,15 +45,24 @@ export const actions: Actions = {
     const requestedUiSystem = String(data.get('uiSystem') ?? 'daisyui');
     const uiSystem = ['daisyui', 'mosaic'].includes(requestedUiSystem) ? requestedUiSystem : 'daisyui';
     if (name.length < 2 || prompt.length < 10) return fail(400, { message: 'Add a project name and a more specific app brief.' });
+    const includeHome = data.get('includeHome') === 'on';
+    const includeLogin = data.get('includeLogin') === 'on';
+    let plan;
+    try {
+      plan = await planProject({ prompt, includeHome, includeLogin, uiSystem, uiTheme });
+    } catch (cause) {
+      console.error('Project planning failed', cause);
+      return fail(502, { message: 'Mosaic could not plan this project. Please try again.' });
+    }
     const db = await getCloudDb();
     const projectId = id();
     const conversationId = id();
     const projectSlug = `${slugify(name)}-${projectId.slice(0, 6)}`;
     await db.tx(async (tx) => {
       await tx.query(
-        `INSERT INTO cloud_projects (id, organization_id, name, slug, prompt, include_home, include_login, app_framework, ui_system, ui_theme)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-        [projectId, organization.id, name, projectSlug, prompt, data.get('includeHome') === 'on', data.get('includeLogin') === 'on', appFramework, uiSystem, uiTheme],
+        `INSERT INTO cloud_projects (id, organization_id, name, slug, prompt, status, include_home, include_login, app_framework, ui_system, ui_theme, blueprint, planner_model, planned_at)
+         VALUES ($1, $2, $3, $4, $5, 'planned', $6, $7, $8, $9, $10, $11::jsonb, $12, now())`,
+        [projectId, organization.id, name, projectSlug, prompt, includeHome, includeLogin, appFramework, uiSystem, uiTheme, JSON.stringify(plan.blueprint), plan.model],
       );
       await tx.query(
         `INSERT INTO cloud_environments (id, project_id, name, kind) VALUES
@@ -61,10 +71,11 @@ export const actions: Actions = {
       );
       await tx.query('INSERT INTO cloud_conversations (id, project_id) VALUES ($1, $2)', [conversationId, projectId]);
       await tx.query('INSERT INTO cloud_messages (id, conversation_id, role, content) VALUES ($1, $2, $3, $4)', [id(), conversationId, 'user', prompt]);
+      await tx.query('INSERT INTO cloud_messages (id, conversation_id, role, content) VALUES ($1, $2, $3, $4)', [id(), conversationId, 'assistant', plan.blueprint.summary]);
       await tx.query(
         `INSERT INTO cloud_jobs (id, project_id, kind, status, progress, stage, metadata)
-         VALUES ($1, $2, 'generate', 'queued', 0, 'Waiting for isolated workspace', $3::jsonb)`,
-        [id(), projectId, JSON.stringify({ source: 'studio', includeHome: data.get('includeHome') === 'on', includeLogin: data.get('includeLogin') === 'on', appFramework, uiSystem, uiTheme })],
+         VALUES ($1, $2, 'generate', 'queued', 15, 'Blueprint ready; waiting for isolated workspace', $3::jsonb)`,
+        [id(), projectId, JSON.stringify({ source: 'studio', includeHome, includeLogin, appFramework, uiSystem, uiTheme, blueprint: plan.blueprint, plannerModel: plan.model })],
       );
       await tx.query(
         `INSERT INTO cloud_audit_log (id, organization_id, user_id, action, target_type, target_id, metadata)

@@ -21,6 +21,20 @@
     <div class="surface p-5"><p class="section-label">Vercel</p><h3 class="font-semibold">{data.project.vercel_project_id ?? 'Not connected'}</h3><p class="mt-2 text-sm muted">{data.project.vercel_project_id ? 'Deployment project connected.' : 'Optional previews and production.'}</p></div>
   </div>
 
+  {#if data.project.blueprint}
+    <section class="surface p-5 md:p-7">
+      <div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
+        <div><p class="section-label">Application blueprint</p><h2 class="text-2xl font-semibold">What Mosaic will build</h2></div>
+        {#if data.project.planner_model}<span class="badge badge-outline">Planned by {data.project.planner_model}</span>{/if}
+      </div>
+      <p class="mt-4 max-w-4xl leading-7 muted">{data.project.blueprint.summary}</p>
+      <div class="mt-6 grid gap-6 lg:grid-cols-2">
+        <div><h3 class="mb-3 font-semibold">Routes</h3><div class="divide-y divide-base-300 rounded-box border border-base-300">{#each data.project.blueprint.routes as route}<div class="flex items-start justify-between gap-4 p-3"><div><code class="text-sm font-semibold">{route.path}</code><p class="mt-1 text-sm muted">{route.purpose}</p></div><span class="badge badge-sm badge-ghost whitespace-nowrap">{route.access}</span></div>{/each}</div></div>
+        <div><h3 class="mb-3 font-semibold">Business data</h3>{#if data.project.blueprint.entities.length}<div class="divide-y divide-base-300 rounded-box border border-base-300">{#each data.project.blueprint.entities as entity}<div class="p-3"><div class="font-semibold">{entity.name}</div><p class="mt-1 text-sm muted">{entity.purpose}</p><div class="mt-2 flex flex-wrap gap-1">{#each entity.fields as field}<span class="badge badge-sm badge-outline">{field}</span>{/each}</div></div>{/each}</div>{:else}<div class="rounded-box border border-dashed border-base-300 p-5 text-sm muted">No persistent business entities were inferred.</div>{/if}</div>
+      </div>
+    </section>
+  {/if}
+
   <details class="surface group p-5">
     <summary class="cursor-pointer list-none font-semibold">Application design settings <span class="float-right muted group-open:rotate-180">⌄</span></summary>
     <form method="POST" action="?/settings" class="mt-5 grid gap-4 border-t border-base-300 pt-5 sm:grid-cols-3">

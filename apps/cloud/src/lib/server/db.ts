@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS cloud_projects (
   include_home boolean NOT NULL DEFAULT true, include_login boolean NOT NULL DEFAULT true,
   app_framework text NOT NULL DEFAULT 'sveltekit', ui_system text NOT NULL DEFAULT 'daisyui',
   ui_theme text NOT NULL DEFAULT 'corporate',
+  blueprint jsonb, planner_model text, planned_at timestamptz,
   github_repository text, vercel_project_id text,
   created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (organization_id, slug)
@@ -68,6 +69,9 @@ CREATE INDEX IF NOT EXISTS cloud_jobs_project_idx ON cloud_jobs (project_id, cre
 ALTER TABLE cloud_projects ADD COLUMN IF NOT EXISTS ui_theme text NOT NULL DEFAULT 'corporate';
 ALTER TABLE cloud_projects ADD COLUMN IF NOT EXISTS app_framework text NOT NULL DEFAULT 'sveltekit';
 ALTER TABLE cloud_projects ADD COLUMN IF NOT EXISTS ui_system text NOT NULL DEFAULT 'daisyui';
+ALTER TABLE cloud_projects ADD COLUMN IF NOT EXISTS blueprint jsonb;
+ALTER TABLE cloud_projects ADD COLUMN IF NOT EXISTS planner_model text;
+ALTER TABLE cloud_projects ADD COLUMN IF NOT EXISTS planned_at timestamptz;
 `;
 
 let database: Promise<Db> | undefined;
