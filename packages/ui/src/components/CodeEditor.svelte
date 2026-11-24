@@ -105,6 +105,6 @@ declare const api: Readonly<{
 {#if loadError}<p class="m-field__error" role="alert">{loadError}</p>{/if}
 
 <style>
-  .code-editor { width:100%; min-height:160px; overflow:hidden; border:1px solid var(--m-border); border-radius:var(--m-radius); background:#fff; }
+  .code-editor { width:100%; min-height:160px; overflow:hidden; border:1px solid var(--m-border); border-radius:var(--m-radius); background:var(--m-surface); }
   .code-editor:focus-within { border-color:var(--m-primary); box-shadow:0 0 0 3px color-mix(in srgb,var(--m-primary) 15%,transparent); }
 </style>

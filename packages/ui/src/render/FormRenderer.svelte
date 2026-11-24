@@ -134,12 +134,13 @@
   function validate(): boolean {
     const errs: Record<string, string> = {};
     walk(root, (node) => {
+      // Skip hidden containers' whole subtree so their required fields cannot block submit.
+      if (!visible(node)) return false;
       const def = getComponent(node.type);
       if (!def?.isField) return;
       const p = node.props ?? {};
       const b = p.binding;
       if (typeof b !== 'string') return;
-      if (!visible(node)) return;
       const msg = validateField(p, data[b]);
       if (msg) errs[b] = msg;
     });
@@ -225,6 +226,6 @@
   .m-form-renderer { display:grid; grid-template-columns:repeat(var(--m-form-columns,1),minmax(0,1fr)); gap:var(--m-space-4,1rem); }
   .m-form-renderer--horizontal, .m-form-renderer--inline { display:flex; align-items:flex-start; flex-wrap:wrap; }
   .m-form-renderer--inline { align-items:flex-end; }
-  .m-form-renderer__actions { grid-column:1 / -1; margin-top:var(--m-space-2,.5rem); }
+  .m-form-renderer__actions { grid-column:1 / -1; gap:var(--m-space-2,.5rem); margin-top:var(--m-space-2,.5rem); padding-top:var(--m-space-4,1rem); border-top:1px solid var(--m-border); }
   @media (max-width:640px) { .m-form-renderer { grid-template-columns:1fr; } }
 </style>

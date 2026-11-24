@@ -33,7 +33,7 @@
 <div style="width:min(380px,92vw)">
   <form class="m-card m-stack" onsubmit={submit}>
     <div class="m-row" style="gap:10px">
-      <span style="width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,#6366f1,#8b5cf6)"></span>
+      <span style="width:26px;height:26px;border-radius:7px;background:var(--m-primary)"></span>
       <strong>Mosaic Studio</strong>
     </div>
     <label class="m-field">

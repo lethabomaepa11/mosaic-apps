@@ -18,7 +18,7 @@
   });
 </script>
 
-<aside class="designer__panel" style="border-left:1px solid var(--m-border);width:100%">
+<aside class="designer__panel" style="width:100%">
   <div class="designer__panel-title">Layers</div>
   <div class="designer__panel-body" style="padding:10px">
     {#each rows as row (row.node.id)}
@@ -32,7 +32,7 @@
           { label: 'Copy ID', icon: 'clipboard', onclick: () => navigator.clipboard?.writeText(row.node.id) },
           { label: 'Copy JSON', icon: 'braces', onclick: () => navigator.clipboard?.writeText(JSON.stringify(row.node, null, 2)) },
           { label: 'Delete', icon: 'trash2', danger: true, onclick: () => designer.remove(row.node.id) },
-        ]} />
+        ]}>{#snippet trigger()}<Icon name="moreVertical" size={14} /><span class="sr-only">Actions for {row.node.type}</span>{/snippet}</Menu>
       </div>
     {/each}
   </div>

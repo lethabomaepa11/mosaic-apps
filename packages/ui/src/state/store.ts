@@ -67,9 +67,8 @@ export class StateStore<T extends object> {
     let cursor = next;
     for (const part of parts.slice(0, -1)) {
       const existing = cursor[part];
-      cursor[part] = existing && typeof existing === 'object' && !Array.isArray(existing)
-        ? { ...(existing as Record<string, unknown>) }
-        : {};
+      // next is already a deep clone, so existing objects/arrays can be written in place.
+      if (!existing || typeof existing !== 'object') cursor[part] = {};
       cursor = cursor[part] as Record<string, unknown>;
     }
     cursor[parts.at(-1)!] = clone(value);

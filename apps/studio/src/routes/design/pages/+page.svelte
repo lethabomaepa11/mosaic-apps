@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
   import { TextField, toast } from '@mosaic-apps/ui';
   import type { PageDef } from '@mosaic-apps/core';
@@ -24,7 +25,7 @@
         name: newName.trim(),
         schema: { type: 'page', children: [] },
       });
-      window.location.href = `/design/pages/${page.id}`;
+      void goto(`/design/pages/${page.id}`);
     } catch (err) {
       toast.error('Create failed', err instanceof Error ? err.message : String(err));
     } finally {

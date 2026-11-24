@@ -113,6 +113,7 @@
   :global(.m-date-picker__weekday) { width:34px; height:30px; color:var(--m-fg-muted); font-size:11px; text-align:center; }
   :global(.m-date-picker__day) { display:grid; place-items:center; width:32px; height:32px; border:0; border-radius:6px; background:transparent; color:var(--m-fg); cursor:pointer; }
   :global(.m-date-picker__day:hover), :global(.m-date-picker__day[data-focused]) { background:var(--m-surface-2); }
-  :global(.m-date-picker__day[data-selected]) { background:var(--m-primary); color:white; }
+  :global(.m-date-picker__day[data-selected]) { background:var(--m-primary); color:var(--m-on-primary); }
+  :global(.m-date-picker__day:focus-visible), :global(.m-date-picker__trigger:focus-visible) { outline:2px solid var(--m-primary); outline-offset:1px; }
   :global(.m-date-picker__day[data-disabled]), :global(.m-date-picker__day[data-outside-month]) { opacity:.35; pointer-events:none; }
 </style>

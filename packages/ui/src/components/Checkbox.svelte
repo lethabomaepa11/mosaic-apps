@@ -30,7 +30,7 @@
 </div>
 
 <style>
-  :global(.m-checkbox) { display:inline-grid; place-items:center; width:17px; height:17px; padding:0; border:1px solid var(--m-border-strong); border-radius:4px; background:var(--m-surface); color:white; cursor:pointer; }
+  :global(.m-checkbox) { display:inline-grid; place-items:center; width:17px; height:17px; padding:0; border:1px solid var(--m-border-strong); border-radius:4px; background:var(--m-surface); color:var(--m-on-primary); cursor:pointer; }
   :global(.m-checkbox[data-state='checked']) { background:var(--m-primary); border-color:var(--m-primary); }
   :global(.m-checkbox:focus-visible) { outline:2px solid var(--m-primary); outline-offset:2px; }
   :global(.m-checkbox:disabled) { opacity:.55; cursor:not-allowed; }

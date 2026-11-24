@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
   import { client } from '#lib/client';
   import { auth } from '#lib/auth.svelte';
@@ -9,7 +10,7 @@
   onMount(async () => {
     if (!auth.ready) await auth.refresh();
     if (!auth.user) {
-      window.location.href = '/login';
+      void goto('/login');
       return;
     }
     try {
@@ -46,5 +47,5 @@
     <a class="m-card" href="/data/migrations"><strong>Migrations</strong><div class="m-small m-muted">Preview SQL, apply safely</div></a>
   </div>
 {:else}
-  <div class="m-card"><span class="m-spinner"></span></div>
+  <div class="studio-state" role="status"><span class="m-spinner"></span> Loading workspace…</div>
 {/if}

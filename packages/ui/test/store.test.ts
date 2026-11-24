@@ -61,3 +61,9 @@ test('reactive proxy values can be stored and isolated from later mutations', ()
   address.city = 'Durban';
   assert.equal(state.form.getPath('address.city'), 'Johannesburg');
 });
+
+test('setPath through an array index keeps the array', () => {
+  const store = new StateStore<{ items: { name: string }[] }>({ items: [{ name: 'a' }, { name: 'b' }] });
+  store.setPath('items.1.name', 'B');
+  assert.deepEqual(store.snapshot(), { items: [{ name: 'a' }, { name: 'B' }] });
+});

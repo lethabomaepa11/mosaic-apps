@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
   import { page } from '$app/state';
   import { CodeEditor, FormRenderer, Modal, toast, Icon } from '@mosaic-apps/ui';
@@ -64,6 +65,7 @@
       dataSource = form.dataSource ?? { kind: 'none' };
       entity = form.entity ?? '';
     } catch (err) {
+      designer.form = null; // don't leave the previously opened form editable under this URL
       toast.error('Could not load form', err instanceof Error ? err.message : String(err));
     } finally {
       loading = false;
@@ -128,7 +130,7 @@
     try {
       await client.deleteForm(designer.form.id);
       toast.success('Form deleted');
-      window.location.href = '/design/forms';
+      void goto('/design/forms');
     } catch (err) {
       toast.error('Delete failed', err instanceof Error ? err.message : String(err));
     }
@@ -211,7 +213,7 @@
 <svelte:head><title>{name || 'Form'} · Mosaic Studio</title></svelte:head>
 
 {#if loading}
-  <div class="m-card"><span class="m-spinner"></span> Loading…</div>
+  <div class="studio-state" role="status"><span class="m-spinner"></span> Loading form…</div>
 {:else if designer.form}
   <header class="app-header">
     <div class="m-row" style="gap:10px">
@@ -227,7 +229,7 @@
       <button class="m-btn m-btn--secondary m-btn--sm" aria-pressed={showPreview} onclick={() => { showPreview = !showPreview; showSettings = false; }} title="Preview"><Icon name={showPreview ? 'pencil' : 'play'} size={14} /> {showPreview ? 'Edit' : 'Preview'}</button>
       <button class="m-btn m-btn--secondary m-btn--sm" aria-pressed={showSettings} onclick={() => { showSettings = !showSettings; showPreview = false; }}><Icon name="settings" size={14} /> Form settings</button>
       <button class="m-btn m-btn--primary m-btn--sm" disabled={saving} onclick={save}>{saving ? 'Saving…' : 'Save'}</button>
-      <button class="m-btn m-btn--danger m-btn--sm" onclick={remove}>Delete</button>
+      <button class="m-btn m-btn--ghost m-btn--sm studio-btn-danger" onclick={remove}><Icon name="trash2" size={14} /> Delete</button>
     </div>
   </header>
 
@@ -270,6 +272,8 @@
       </div>
     </div>
   {/if}
+{:else}
+  <div class="studio-state" role="alert"><strong>This form could not be loaded</strong><p>It may have been deleted, or the API is unreachable.</p><a class="m-btn m-btn--secondary m-btn--sm" href="/studio">Back to forms</a></div>
 {/if}
 
 <Modal bind:open={showJson} title="Form JSON" size="lg">
@@ -286,7 +290,7 @@
   .designer-preview { min-height: calc(100vh - 76px); padding: 24px; overflow: auto; background: var(--m-bg); }
   .designer-preview__toolbar { display:flex; justify-content:flex-end; gap:10px; max-width:960px; margin:0 auto 16px; }
   .preview-widths { display:flex; gap:2px; padding:2px; background:var(--m-surface-2); border:1px solid var(--m-border); border-radius:var(--m-radius); }
-  .designer-preview__page { width:100%; max-width:960px; min-height:65vh; margin:0 auto; padding:clamp(20px,5vw,56px); background:var(--m-surface); border:1px solid var(--m-border); border-radius:var(--m-radius-lg); box-shadow:var(--m-shadow-sm); transition:max-width 160ms ease; }
+  .designer-preview__page { width:100%; max-width:960px; min-height:65vh; margin:0 auto; padding:clamp(20px,5vw,56px); background:var(--m-surface); border:1px solid var(--m-border); border-radius:var(--m-radius-lg); box-shadow:var(--m-shadow); transition:max-width 160ms ease; }
   .designer-preview__page--tablet { max-width:768px; }
   .designer-preview__page--mobile { max-width:390px; }
 </style>

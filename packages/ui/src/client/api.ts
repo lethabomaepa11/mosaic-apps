@@ -57,6 +57,7 @@ export class MosaicClient {
       payload = JSON.stringify(body);
     }
     const res = await fetch(`${this.baseUrl}${path}`, { method, headers, body: payload, signal });
+    if (res.status === 401) this.onUnauthorized?.();
     if (res.status === 204) return undefined as T;
     let json: unknown;
     try {
@@ -66,7 +67,6 @@ export class MosaicClient {
       return undefined as T;
     }
     const parsed = json as Ok<T> | Err;
-    if (res.status === 401) this.onUnauthorized?.();
     if (!res.ok || (parsed && typeof parsed === 'object' && 'success' in parsed && parsed.success === false)) {
       const error = (parsed as Err).error;
       throw new ApiError(error?.message ?? `HTTP ${res.status}`, res.status, error?.code, error?.details);
@@ -331,6 +331,6 @@ export interface MigrationStatement {
 
 /** Create a client (SvelteKit apps proxy /api; studio uses PUBLIC_API_URL). */
 export function createClient(opts?: Partial<ClientOptions>): MosaicClient {
-  return new MosaicClient({ baseUrl: opts?.baseUrl ?? '/api', onUnauthorized: opts?.onUnauthorized });
+  return new MosaicClient({ baseUrl: opts?.baseUrl ?? '/api', token: opts?.token, onUnauthorized: opts?.onUnauthorized });
 }
 

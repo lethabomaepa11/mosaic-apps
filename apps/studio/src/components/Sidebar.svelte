@@ -48,7 +48,7 @@
   {/each}
   <div class="studio-nav__spacer"></div>
   {#if auth.user}
-    <div style="padding:8px 10px;font-size:.72rem;color:#94a3b8">{auth.user.email}</div>
+    <div class="studio-nav__user" title={auth.user.email}>{auth.user.email}</div>
     <a href="/login" onclick={(e) => { e.preventDefault(); auth.logout(); }}><Icon name="logOut" /> Sign out</a>
   {/if}
 </nav>

@@ -9,8 +9,8 @@ const THEME_VARIABLES: Record<keyof ThemePalette, string> = {
 };
 
 const DEFAULT_DARK: Required<Pick<ThemePalette, 'primary' | 'background' | 'surface' | 'surface2' | 'foreground' | 'foregroundMuted' | 'border'>> = {
-  primary: '#818cf8', background: '#0f172a', surface: '#1e293b', surface2: '#334155',
-  foreground: '#f1f5f9', foregroundMuted: '#94a3b8', border: '#475569',
+  primary: '#818cf8', background: '#0b0d12', surface: '#13161d', surface2: '#1b1f28',
+  foreground: '#eceef2', foregroundMuted: '#a3aab8', border: '#262b36',
 };
 const scopeIds = new WeakMap<HTMLElement, string>();
 const systemModeListeners = new WeakMap<HTMLElement, { query: MediaQueryList; listener: (event: MediaQueryListEvent) => void }>();

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
   import { page } from '$app/state';
   import { CodeEditor, Icon, Modal, PageRenderer, toast } from '@mosaic-apps/ui';
@@ -48,6 +49,7 @@
       folder = pageDef.folder ?? '';
       settings = pageDef.settings ?? {};
     } catch (err) {
+      designer.page = null; // don't leave the previously opened page editable under this URL
       toast.error('Could not load page', err instanceof Error ? err.message : String(err));
     } finally {
       loading = false;
@@ -92,7 +94,7 @@
     try {
       await client.deletePage(designer.page.id);
       toast.success('Page deleted');
-      window.location.href = '/design/pages';
+      void goto('/design/pages');
     } catch (err) {
       toast.error('Delete failed', err instanceof Error ? err.message : String(err));
     }
@@ -153,7 +155,7 @@
 <svelte:head><title>{name || 'Page'} · Mosaic Studio</title></svelte:head>
 
 {#if loading}
-  <div class="m-card"><span class="m-spinner"></span> Loading…</div>
+  <div class="studio-state" role="status"><span class="m-spinner"></span> Loading page…</div>
 {:else if designer.page}
   <header class="app-header">
     <div class="m-row" style="gap:10px">
@@ -169,7 +171,7 @@
       <button class="m-btn m-btn--secondary m-btn--sm" aria-pressed={showPreview} onclick={() => { showPreview = !showPreview; showSettings = false; }}><Icon name={showPreview ? 'pencil' : 'play'} size={14} /> {showPreview ? 'Edit' : 'Preview'}</button>
       <button class="m-btn m-btn--secondary m-btn--sm" aria-pressed={showSettings} onclick={() => { showSettings = !showSettings; showPreview = false; }}><Icon name="settings" size={14} /> Page settings</button>
       <button class="m-btn m-btn--primary m-btn--sm" disabled={saving} onclick={save}>{saving ? 'Saving…' : 'Save'}</button>
-      <button class="m-btn m-btn--danger m-btn--sm" onclick={remove}>Delete</button>
+      <button class="m-btn m-btn--ghost m-btn--sm studio-btn-danger" onclick={remove}><Icon name="trash2" size={14} /> Delete</button>
     </div>
   </header>
 
@@ -194,6 +196,8 @@
       <div class="designer__panel"><Inspector /><LayersTree /></div>
     </div>
   {/if}
+{:else}
+  <div class="studio-state" role="alert"><strong>This page could not be loaded</strong><p>It may have been deleted, or the API is unreachable.</p><a class="m-btn m-btn--secondary m-btn--sm" href="/studio?kind=page">Back to pages</a></div>
 {/if}
 
 <Modal bind:open={showJson} title="Page JSON" size="lg">
@@ -209,5 +213,5 @@
 <style>
   .page-preview { min-height:calc(100vh - 76px); padding:24px; overflow:auto; background:var(--m-bg); }
   .page-preview__toolbar { display:flex; justify-content:flex-end; gap:10px; max-width:1200px; margin:0 auto 12px; }
-  .page-preview__surface { max-width:1200px; min-height:65vh; margin:0 auto; padding:clamp(16px,3vw,40px); background:var(--m-surface); border:1px solid var(--m-border); border-radius:var(--m-radius-lg); box-shadow:var(--m-shadow-sm); }
+  .page-preview__surface { max-width:1200px; min-height:65vh; margin:0 auto; padding:clamp(16px,3vw,40px); background:var(--m-surface); border:1px solid var(--m-border); border-radius:var(--m-radius-lg); box-shadow:var(--m-shadow); }
 </style>

@@ -54,8 +54,15 @@
         {#each columns as col (col.key)}
           <th class:sortable={col.sortable && !!onsort} style={col.width ? `width:${col.width}` : ''}
             style:text-align={col.align ?? 'left'}
-            onclick={() => col.sortable && onsort?.(col.key)}>
-            {col.label}{#if sortBy === col.key}<span style="opacity:.6">{sortDir === 'desc' ? ' ↓' : ' ↑'}</span>{/if}
+            aria-sort={sortBy === col.key ? (sortDir === 'desc' ? 'descending' : 'ascending') : undefined}>
+            {#if col.sortable && onsort}
+              <!-- a real button so sorting works from the keyboard -->
+              <button type="button" class="m-table__sort" onclick={() => onsort(col.key)}>
+                {col.label}{#if sortBy === col.key}<span aria-hidden="true" style="opacity:.6">{sortDir === 'desc' ? ' ↓' : ' ↑'}</span>{/if}
+              </button>
+            {:else}
+              {col.label}{#if sortBy === col.key}<span aria-hidden="true" style="opacity:.6">{sortDir === 'desc' ? ' ↓' : ' ↑'}</span>{/if}
+            {/if}
           </th>
         {/each}
         {#if actions}<th style="width:1%"></th>{/if}

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
   import { page } from '$app/state';
   import { CodeEditorField, EntityForm, EntityTable, Icon, Modal, toast } from '@mosaic-apps/ui';
@@ -76,7 +77,7 @@
     try {
       await api.deleteEntityDef(entity.name);
       toast.success('Entity unregistered');
-      window.location.href = '/data/entities';
+      void goto('/data/entities');
     } catch (err) {
       toast.error('Delete failed', err instanceof Error ? err.message : String(err));
     }

@@ -149,7 +149,7 @@
               { label: 'Duplicate', icon: 'copy', onclick: () => duplicate(item, section.kind) },
               { label: 'Move to…', icon: 'folderInput', onclick: () => { const target = prompt('Folder path (blank for root)', item.folder ?? ''); if (target !== null) void moveItem(item, section.kind, target.trim()); } },
               { label: 'Delete', icon: 'trash2', danger: true, onclick: () => remove(item, section.kind) },
-            ]} />
+            ]}>{#snippet trigger()}<Icon name="moreVertical" size={14} /><span class="sr-only">Actions for {item.name}</span>{/snippet}</Menu>
           </div>
         {/each}
         {#each section.folders as folder (folder)}
@@ -169,7 +169,7 @@
                     { label: 'Duplicate', icon: 'copy', onclick: () => duplicate(item, section.kind) },
                     { label: 'Move to…', icon: 'folderInput', onclick: () => { const target = prompt('Folder path (blank for root)', item.folder ?? ''); if (target !== null) void moveItem(item, section.kind, target.trim()); } },
                     { label: 'Delete', icon: 'trash2', danger: true, onclick: () => remove(item, section.kind) },
-                  ]} />
+                  ]}>{#snippet trigger()}<Icon name="moreVertical" size={14} /><span class="sr-only">Actions for {item.name}</span>{/snippet}</Menu>
                 </div>
               {/each}
             </details>
@@ -185,36 +185,41 @@
       <div><h1 class="m-h2" style="margin:0">{kind === 'form' ? 'Forms' : 'Pages'}</h1><p class="m-muted m-small">Browse, organize, and open your {kind === 'form' ? 'forms' : 'pages'}.</p></div>
       <div class="m-row"><div style="width:230px"><TextField placeholder={`New ${kind} name`} bind:value={newName} /></div><button class="m-btn m-btn--primary" disabled={busy || !newName.trim()} onclick={createArtifact}>Create {kind}</button></div>
     </header>
-    {#if loading}<div class="m-card">Loading files…</div>
-    {:else if filteredArtifacts.length === 0}<div class="m-card"><h2 class="m-h3">Nothing here yet</h2><p class="m-muted">Create a {kind}, or drag a file onto a folder to organize it.</p></div>
+    {#if loading}<div class="studio-state" role="status"><span class="m-spinner"></span> Loading files…</div>
+    {:else if filteredArtifacts.length === 0}<div class="studio-state">{#if query.trim()}<strong>No {kind}s match “{query.trim()}”</strong><p>Try a different search term.</p>{:else}<strong>No {kind}s yet</strong><p>Name your first {kind} above and choose “Create {kind}”.</p>{/if}</div>
     {:else}
-      <h2 class="m-h3">Recent {kind === 'form' ? 'forms' : 'pages'}</h2>
+      <h2 class="explorer-heading">Recent {kind === 'form' ? 'forms' : 'pages'}</h2>
       <div class="cards">{#each [...filteredArtifacts].sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? '')).slice(0, 8) as item (item.id)}
-        <a class="m-card explorer-recent" href={href(item, kind)}><div class="m-row" style="justify-content:space-between"><strong>{item.name}</strong><span class="m-badge" class:m-badge--success={item.published}>v{item.version}{item.published ? ' · live' : ''}</span></div><div class="m-small m-muted">{item.folder || 'Root'} · {item.slug}</div></a>
+        <a class="m-card explorer-recent" href={href(item, kind)}><div class="m-row" style="justify-content:space-between"><strong class="explorer-recent__name">{item.name}</strong><span class="m-badge" class:m-badge--success={item.published}>v{item.version}{item.published ? ' · live' : ''}</span></div><div class="m-small m-muted">{item.folder || 'Root'} · {item.slug}</div></a>
       {/each}</div>
     {/if}
   </main>
 </div>
 
 <style>
-  .explorer { display:grid; grid-template-columns:minmax(220px, var(--tree-width, 280px)) 6px minmax(0,1fr); min-height:calc(100vh - 44px); margin:-22px; }
-  .explorer-tree { background:var(--m-surface); border-right:1px solid var(--m-border); padding:12px; overflow:auto; }
+  /* bleed to the edges of .studio-main (padding 24px 28px) */
+  .explorer { display:grid; grid-template-columns:minmax(220px, var(--tree-width, 280px)) 6px minmax(0,1fr); min-height:100vh; margin:-24px -28px; }
+  .explorer-tree { background:var(--m-surface); border-right:1px solid var(--m-border); padding:12px 10px; overflow:auto; }
+  .explorer-tree__header { padding:2px 4px 0 6px; font-size:.85rem; }
   .explorer-tree__header,.explorer-file,.explorer-folder summary { display:flex; align-items:center; justify-content:space-between; gap:8px; }
-  .explorer-tree__search { margin:10px 0 16px; }
+  .explorer-tree__search { margin:10px 0 14px; }
   .explorer-section { margin-bottom:12px; }
   .explorer-section__heading { display:flex; align-items:center; justify-content:space-between; }
-  .explorer-root { display:flex; align-items:center; gap:8px; padding:8px; font-size:.8rem; font-weight:750; }
-  .explorer-root span { margin-left:auto; color:var(--m-fg-muted); font-size:.7rem; }
-  .explorer-file { min-width:0; padding:5px 4px 5px 22px; border-radius:6px; font-size:.78rem; }
+  .explorer-root { flex:1; display:flex; align-items:center; gap:8px; padding:6px; font-size:.72rem; font-weight:600; text-transform:uppercase; letter-spacing:.05em; color:var(--m-fg-muted); }
+  .explorer-root span { margin-left:auto; color:var(--m-fg-faint); font-size:.7rem; font-variant-numeric:tabular-nums; }
+  .explorer-file { min-width:0; padding:3px 2px 3px 22px; border-radius:var(--m-radius-sm); font-size:.8rem; color:var(--m-fg); }
+  .explorer-file a:focus-visible,.explorer-root:focus-visible { outline:2px solid var(--m-primary); outline-offset:-2px; border-radius:var(--m-radius-sm); }
   .explorer-file:hover,.explorer-folder summary:hover { background:var(--m-surface-2); }
   .explorer-file a { min-width:0; display:flex; align-items:center; gap:7px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; }
   .explorer-folder { padding-left:calc(var(--depth) * 12px); }
-  .explorer-folder summary { padding:6px 4px; list-style:none; cursor:pointer; font-size:.78rem; }
+  .explorer-folder summary { padding:5px 4px; border-radius:var(--m-radius-sm); list-style:none; cursor:pointer; font-size:.8rem; }
   .explorer-folder summary::-webkit-details-marker { display:none; }
   .explorer-folder__actions { display:flex; justify-content:flex-end; gap:3px; }
   .explorer-folder__actions button { background:none; border:0; cursor:pointer; color:var(--m-fg-muted); }
-  .explorer-home { min-width:0; padding:22px; }
-  .explorer-recent { display:flex; flex-direction:column; gap:8px; }
+  .explorer-home { min-width:0; padding:24px 28px; }
+  .explorer-heading { margin:0 0 12px; font-size:.72rem; font-weight:600; text-transform:uppercase; letter-spacing:.05em; color:var(--m-fg-muted); }
+  .explorer-recent { display:flex; flex-direction:column; gap:6px; }
+  .explorer-recent__name { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600; }
   @media(max-width:760px) { .explorer { grid-template-columns:1fr; } .explorer-tree { max-height:42vh; border-right:0; border-bottom:1px solid var(--m-border); } .explorer > :global(.resize-handle) { display:none; } }
 </style>
 
