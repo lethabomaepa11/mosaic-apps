@@ -15,10 +15,15 @@ the curated DaisyUI themes Corporate, Business, Light, Dark, Nord, Winter, Silk,
 and Lo-fi. The project theme is stored in PostgreSQL so the generator can apply the
 same design tokens to the whole generated app.
 
-It intentionally does not pretend that a queued job is already a generated app.
-The isolated workspace worker, code-generation operations, GitHub App, Vercel OAuth, database
-provisioning, encrypted secret operations, usage, and billing are subsequent
-milestones tracked in `contributor-docs/platform-plan.md`.
+Creating a project or sending a change only queues a durable job in `cloud_jobs`
+and returns immediately. The runner (`src/lib/server/jobs.ts`) runs after the
+response via `waitUntil`, plans with Groq, writes a versioned source release, and,
+for each connected provider, provisions Neon and applies the migration, commits
+the release to GitHub, and deploys it to Vercel while polling the deployment.
+Reopening the builder resumes queued or stalled jobs; failed jobs can be retried.
+Provider tokens and the Neon connection string are AES-GCM encrypted at rest.
+Usage and billing are subsequent milestones tracked in
+`contributor-docs/platform-plan.md`.
 
 ## Local development
 

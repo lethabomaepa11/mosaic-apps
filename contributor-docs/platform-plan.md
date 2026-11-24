@@ -219,6 +219,74 @@ making generated clients a required dependency of every Mosaic app.
 
 ## Task ledger
 
+### P0 takeover: real prompt-to-running-app pipeline
+
+This is the highest-priority, stop-the-line work. The hosted product is not complete
+while a generation job can remain queued without producing and deploying an app.
+Do not describe the control plane or blueprint-only flow as end to end.
+
+Required product flow:
+
+1. Accept one natural-language prompt and navigate immediately into the builder.
+2. Generate and show an editable plan (routes, physical entities, roles, workflows).
+3. Scaffold a complete, ordinary SvelteKit repository with framework agent skills.
+4. Create a clean hosted preview and expose both app and API URLs.
+5. Run later prompts as durable jobs. Apply database/artifact changes through APIs
+   when possible; for source changes, update files, verify, commit, and redeploy.
+6. If GitHub is connected, create/push the repository and commit every code change.
+7. If Neon is connected, provision/branch PostgreSQL and apply migrations.
+8. If Vercel is connected, create/link the project, set secrets, deploy, and track
+   status. Provider connections must be real, validated, encrypted, and revocable.
+9. Keep the deployed preview visible in an iframe while the job is running. Show
+   stages, logs, URLs, failures, and recovery without leaving the builder.
+
+UX contract (informed by Lovable/v0): a focused prompt-first landing screen, then a
+two-pane chat/plan + preview workspace with code/files as an optional view. Use
+SvelteKit client navigation and enhanced forms/fetch; ordinary calls must not cause
+document reloads or hard navigation. Poll or stream durable job state and refresh
+only affected data. The user should never need to understand JSON or deployment
+internals.
+
+Acceptance gates:
+
+- [ ] One prompt produces a plan, source release, working app URL, and working API URL.
+- [ ] A visible preview loads in an iframe before the job completes and refreshes on deploy.
+- [ ] No normal create/edit/connect action causes a full document reload.
+- [ ] Generated source passes install, check, build, and browser smoke tests.
+- [ ] GitHub creates a repo and commit from the exact verified release.
+- [ ] Neon provisions durable data and applies the generated migration.
+- [ ] Vercel deploys that release and reports preview/production status and logs.
+- [ ] A follow-up artifact change publishes through the API; a code change creates a
+  new verified release, Git commit, and preview deployment.
+- [ ] Closing/reopening the browser resumes the same durable job and preview state.
+- [ ] none/GitHub-only/Vercel-only/Neon-only/all-provider paths are tested.
+
+Takeover state on 2026-11-24: the production Cloud control plane, Neon control DB,
+Groq planning, accounts, and custom domain exist. A worktree implementation is in
+progress for encrypted provider-token connections, generated release/file tables,
+deterministic SvelteKit source generation, tar.gz export, and generation tests.
+These changes are uncommitted and must be reviewed, completed, and tested. The
+current action flow still performs work synchronously and the provider delivery
+actions/background runner/live iframe are not complete. Preserve this work; do not
+revert it or mark the P0 complete prematurely.
+
+Review on 2026-11-25: the worktree changes were reviewed and fixed (duplicate
+dependency, Svelte-markup escaping of model text, long tar paths, preview pages
+rendering inside the Cloud chrome, generated app still using the removed
+`svelte.config.js`). Cloud tests, check, and build pass; a generated sample app
+passes install and check and compiles (the Vercel adapter step needs Linux or the
+Windows symlink workaround).
+
+Update on 2026-11-25: create/iterate now enqueue durable jobs and return at once;
+`src/lib/server/jobs.ts` claims jobs (one per project, stalled jobs requeued, retry
+action) and runs generate → deliver (Neon provision + migration, GitHub commit,
+Vercel project/env/deployment) → Vercel status polling. The builder iframe switches
+to the Vercel URL once ready and reloads per release. Covered by PGlite tests with
+stubbed provider APIs and a local smoke run (no providers). Still unverified
+against live GitHub/Neon/Vercel accounts, so the provider acceptance gates stay
+open. Known limits: Vercel personal scope only (no team selection), migrations
+replay the idempotent initial SQL, generated app does not yet read DATABASE_URL.
+
 ### 0. Specification and visibility
 
 - [x] Record the product specification and visible task ledger.

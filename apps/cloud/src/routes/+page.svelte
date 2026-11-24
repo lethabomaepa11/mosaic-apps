@@ -1,64 +1,99 @@
 <script lang="ts">
+  import { enhance } from '$app/forms';
+  import { ArrowUp, GitBranch, Cloud, Database, Settings2, LoaderCircle, Sparkles } from '@lucide/svelte';
   import { DAISY_THEME_CHOICES } from '#lib/themes';
   let { data, form } = $props();
-  const statusClass = (status: string) => status === 'connected' ? 'badge-success' : status === 'queued' ? 'badge-warning' : 'badge-outline';
+
+  let prompt = $state('');
+  let submitting = $state(false);
+  const ideas = [
+    { label: 'Solar installer CRM', text: 'A CRM for a solar installer with leads, site surveys, quotes, installation milestones, invoices, and a client login to track progress.' },
+    { label: 'Clinic bookings', text: 'An appointment system for a small clinic: practitioners, patients, bookable slots, reminders, and a daily schedule view for reception.' },
+    { label: 'Equipment loans', text: 'Track company equipment loans: inventory with serial numbers, who has what, due dates, overdue alerts, and a return checklist.' },
+    { label: 'Book club', text: 'A book club app with members, a reading schedule, meeting RSVPs, book votes, and discussion notes for each meeting.' },
+  ];
+  const providerIcons = { github: GitBranch, vercel: Cloud, neon: Database };
+  const tone = (status: string) => ['ready', 'completed'].includes(status) ? 'is-ready' : status === 'failed' ? 'is-failed' : ['queued', 'generating', 'delivering', 'running'].includes(status) ? 'is-busy' : '';
+  const ago = (iso: string) => {
+    const minutes = Math.round((Date.now() - new Date(iso).getTime()) / 60_000);
+    if (minutes < 1) return 'just now';
+    if (minutes < 60) return `${minutes}m ago`;
+    if (minutes < 1440) return `${Math.round(minutes / 60)}h ago`;
+    return new Date(iso).toLocaleDateString();
+  };
 </script>
 
-<svelte:head><title>Projects · Mosaic Cloud</title><meta name="description" content="Generate, own, and deploy Mosaic applications." /></svelte:head>
+<svelte:head><title>Projects · Mosaic Cloud</title><meta name="description" content="Describe an app and Mosaic plans, builds, and deploys it." /></svelte:head>
 
-<section class="space-y-10">
-  <header class="max-w-3xl">
-    <p class="section-label">{data.organization?.name ?? 'Workspace'}</p>
-    <h1 class="page-title mb-3">Create an application your team can own.</h1>
-    <p class="muted text-base leading-7">Describe the business or passion app. Mosaic prepares editable pages, a physical data model, source code, and a single-project deployment.</p>
-  </header>
-
-  <div class="grid gap-5 lg:grid-cols-[minmax(0,1.45fr)_minmax(280px,.55fr)]">
-    <form method="POST" action="?/create" class="surface space-y-5 p-5 md:p-7">
-      <div><h2 class="text-xl font-semibold">Start a project</h2><p class="mt-1 muted text-sm">This brief starts the project conversation. You can refine it at any time.</p></div>
-      <fieldset class="fieldset"><legend class="fieldset-legend">Project name</legend><input class="input input-bordered w-full" id="name" name="name" placeholder="Northstar CRM" required /></fieldset>
-      <fieldset class="fieldset"><legend class="fieldset-legend">What should it do?</legend><textarea class="textarea textarea-bordered min-h-36 w-full" id="prompt" name="prompt" placeholder="Build a customer portal for a solar installer with leads, quotes, installation milestones, invoices, and client login…" required></textarea></fieldset>
-      <div class="grid gap-4 sm:grid-cols-3">
-        <fieldset class="fieldset"><legend class="fieldset-legend">Framework</legend><select class="select select-bordered w-full" name="appFramework"><option value="sveltekit">SvelteKit</option><option disabled>Next.js — planned</option><option disabled>Astro — planned</option></select></fieldset>
-        <fieldset class="fieldset"><legend class="fieldset-legend">UI system</legend><select class="select select-bordered w-full" name="uiSystem"><option value="daisyui">DaisyUI</option><option value="mosaic">Mosaic native</option></select></fieldset>
-        <fieldset class="fieldset"><legend class="fieldset-legend">Theme</legend><select class="select select-bordered w-full" name="uiTheme">{#each DAISY_THEME_CHOICES as theme}<option value={theme.value}>{theme.label}</option>{/each}</select></fieldset>
-      </div>
-      <p class="-mt-3 text-xs muted">Framework, component system, and design tokens are stored independently so the app can evolve without rewriting its data model.</p>
-      <div class="flex flex-wrap gap-5">
-        <label class="label cursor-pointer gap-2"><input class="checkbox checkbox-sm checkbox-primary" name="includeHome" type="checkbox" checked /> Homepage</label>
-        <label class="label cursor-pointer gap-2"><input class="checkbox checkbox-sm checkbox-primary" name="includeLogin" type="checkbox" checked /> Login</label>
-      </div>
-      {#if form?.message}<div class="alert alert-error text-sm" role="alert">{form.message}</div>{/if}
-      <button class="btn btn-primary" type="submit">Create project</button>
-    </form>
-
-    <aside class="surface h-fit p-5 md:p-7">
-      <p class="section-label">Optional</p><h2 class="mb-5 text-xl font-semibold">Delivery providers</h2>
-      <div class="divide-y divide-base-300">
-        {#each ['github', 'vercel'] as provider}
-          {@const connection = data.connections.find((item) => item.provider === provider)}
-          <div class="flex items-center justify-between gap-4 py-4 first:pt-0">
-            <div><strong class="capitalize">{provider}</strong><div class="mt-0.5 text-xs muted">{connection?.label ?? 'Not connected'}</div></div>
-            <span class={`badge badge-sm ${statusClass(connection?.status ?? 'optional')}`}>{connection?.status ?? 'Optional'}</span>
-          </div>
-        {/each}
-      </div>
-      <p class="mt-3 text-sm leading-6 muted">Connect GitHub for source delivery and Vercel for managed previews and production. Neither is required to start.</p>
-    </aside>
+<section class="hero-glow -mx-4 -mt-8 px-4 pb-4 pt-10 md:-mt-12 md:pt-16">
+  <div class="mx-auto max-w-3xl text-center">
+    <span class="chip mb-5"><Sparkles size={14} class="text-primary" /> {data.organization?.name ?? 'Your workspace'}</span>
+    <h1 class="page-title mb-4">What do you want to build?</h1>
+    <p class="mx-auto mb-8 max-w-xl text-base leading-7 muted">Describe it in plain words. Mosaic plans the pages and data, writes a real SvelteKit app, and shows it live while it builds.</p>
   </div>
 
-  <section>
-    <div class="mb-4 flex items-end justify-between"><div><p class="section-label">Workspace</p><h2 class="text-2xl font-semibold">Projects</h2></div><span class="badge badge-neutral">{data.projects.length}</span></div>
-    {#if data.projects.length}
-      <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {#each data.projects as project}
-          <a class="surface block p-5 transition-colors hover:border-primary focus:outline-2 focus:outline-primary" href={`/projects/${project.id}`}>
-            <div class="mb-3 flex items-start justify-between gap-3"><strong>{project.name}</strong><span class={`badge badge-sm ${statusClass(project.status)}`}>{project.status}</span></div>
-            <p class="mb-5 text-sm leading-6 muted">{project.prompt.length > 130 ? `${project.prompt.slice(0,127)}…` : project.prompt}</p>
-            <small class="muted">{project.slug}</small>
-          </a>
-        {/each}
-      </div>
-    {:else}<div class="surface p-10 text-center muted">Your first application will appear here.</div>{/if}
-  </section>
+  <form method="POST" action="?/create" class="surface-raised mx-auto max-w-3xl p-2 text-left"
+    use:enhance={() => { submitting = true; return async ({ update }) => { await update(); submitting = false; }; }}>
+    <label class="sr-only" for="prompt">Describe your app</label>
+    <textarea class="block min-h-32 w-full resize-none rounded-xl bg-transparent px-4 pt-4 text-base leading-7 outline-none placeholder:text-base-content/40"
+      id="prompt" name="prompt" bind:value={prompt} required minlength="10"
+      placeholder="A customer portal for a solar installer with leads, quotes, installation milestones and invoices…"
+      onkeydown={(event) => { if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) event.currentTarget.form?.requestSubmit(); }}></textarea>
+
+    <div class="flex flex-wrap items-center gap-2 border-t border-base-300 px-2 pt-2">
+      <label class="sr-only" for="name">Project name</label>
+      <input class="input input-sm input-ghost w-44 focus:bg-base-200" id="name" name="name" placeholder="Project name (optional)" maxlength="60" />
+      <details class="dropdown">
+        <summary class="btn btn-ghost btn-sm gap-1.5 font-normal muted"><Settings2 size={15} /> Options</summary>
+        <div class="dropdown-content z-20 mt-2 w-80 space-y-3 rounded-box border border-base-300 bg-base-100 p-4 shadow-lg">
+          <label class="block text-xs font-medium">Framework<select class="select select-sm select-bordered mt-1 w-full" name="appFramework"><option value="sveltekit">SvelteKit</option><option disabled>Next.js (planned)</option><option disabled>Astro (planned)</option></select></label>
+          <label class="block text-xs font-medium">Components<select class="select select-sm select-bordered mt-1 w-full" name="uiSystem"><option value="daisyui">DaisyUI</option><option value="mosaic">Mosaic native</option></select></label>
+          <label class="block text-xs font-medium">Theme<select class="select select-sm select-bordered mt-1 w-full" name="uiTheme">{#each DAISY_THEME_CHOICES as theme}<option value={theme.value}>{theme.label}</option>{/each}</select></label>
+          <div class="flex gap-5 pt-1 text-sm">
+            <label class="flex cursor-pointer items-center gap-2"><input class="checkbox checkbox-xs checkbox-primary" name="includeHome" type="checkbox" checked /> Homepage</label>
+            <label class="flex cursor-pointer items-center gap-2"><input class="checkbox checkbox-xs checkbox-primary" name="includeLogin" type="checkbox" checked /> Sign-in</label>
+          </div>
+        </div>
+      </details>
+      <span class="ml-auto hidden text-xs muted sm:inline">Ctrl + Enter</span>
+      <button class="btn btn-primary btn-sm btn-circle" type="submit" disabled={submitting || prompt.trim().length < 10} aria-label="Create project">
+        {#if submitting}<LoaderCircle size={16} class="animate-spin" />{:else}<ArrowUp size={16} />{/if}
+      </button>
+    </div>
+  </form>
+  {#if form?.message}<div class="alert alert-error mx-auto mt-4 max-w-3xl text-sm" role="alert">{form.message}</div>{/if}
+
+  <div class="mx-auto mt-5 flex max-w-3xl flex-wrap justify-center gap-2">
+    {#each ideas as idea}<button class="chip" type="button" onclick={() => { prompt = idea.text; document.getElementById('prompt')?.focus(); }}>{idea.label}</button>{/each}
+  </div>
+
+  <div class="mx-auto mt-6 flex max-w-3xl flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs muted">
+    {#each ['github', 'vercel', 'neon'] as provider}
+      {@const connection = data.connections.find((item) => item.provider === provider)}
+      {@const Icon = providerIcons[provider as keyof typeof providerIcons]}
+      <span class="inline-flex items-center gap-1.5"><Icon size={13} /> <span>{({ github: 'GitHub', vercel: 'Vercel', neon: 'Neon' } as Record<string, string>)[provider]}</span> <span class={`status-dot ${connection ? 'is-ready' : ''}`}></span></span>
+    {/each}
+    <a class="link link-hover text-primary" href="/settings/connections">{data.connections.length ? 'Manage connections' : 'Connect providers (optional)'}</a>
+  </div>
+</section>
+
+<section class="mt-14">
+  <div class="mb-4 flex items-baseline justify-between">
+    <h2 class="text-lg font-semibold">Your projects</h2>
+    {#if data.projects.length}<span class="text-sm muted">{data.projects.length} {data.projects.length === 1 ? 'project' : 'projects'}</span>{/if}
+  </div>
+  {#if data.projects.length}
+    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      {#each data.projects as project}
+        <a class="surface group flex flex-col p-4 transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md" href={`/projects/${project.id}`}>
+          <div class="mb-3 grid h-24 place-items-center rounded-lg bg-gradient-to-br from-primary/10 via-base-200 to-accent/10 text-2xl font-bold text-primary/70">{project.name.slice(0, 1).toUpperCase()}</div>
+          <div class="flex items-center justify-between gap-3"><strong class="truncate">{project.name}</strong><span class="flex shrink-0 items-center gap-1.5 text-xs muted"><span class={`status-dot ${tone(project.status)}`}></span>{project.status}</span></div>
+          <p class="mb-3 mt-1 line-clamp-2 text-sm leading-6 muted">{project.prompt}</p>
+          <small class="mt-auto muted">Edited {ago(project.updated_at)}</small>
+        </a>
+      {/each}
+    </div>
+  {:else}
+    <div class="surface grid place-items-center gap-2 p-12 text-center"><Sparkles size={22} class="text-primary" /><p class="mb-0 font-medium">No projects yet</p><p class="mb-0 text-sm muted">Describe an app above, or start from one of the ideas.</p></div>
+  {/if}
 </section>

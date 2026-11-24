@@ -1,13 +1,13 @@
 import type { Cookies } from '@sveltejs/kit';
 import { hashPassword, signJwt, verifyJwt, verifyPassword } from '@mosaic-apps/server';
-import { getCloudDb, id, slugify } from './db';
+import { getCloudDb, hosted, id, slugify } from './db';
 
 const env = process.env;
 
 const COOKIE = 'mosaic_cloud_session';
 
 function secret(): string {
-  const value = env.CLOUD_SESSION_SECRET ?? env.MOSAIC_JWT_SECRET ?? (env.VERCEL ? '' : 'local-cloud-secret-change-before-production-1234');
+  const value = env.CLOUD_SESSION_SECRET ?? env.MOSAIC_JWT_SECRET ?? (hosted ? '' : 'local-cloud-secret-change-before-production-1234');
   if (value.length < 32) throw new Error('CLOUD_SESSION_SECRET must contain at least 32 characters.');
   return value;
 }
@@ -46,7 +46,7 @@ export async function registerAccount(name: string, email: string, password: str
 
 export function setSession(cookies: Cookies, user: { id: string; email: string }): void {
   const token = signJwt({ sub: user.id, email: user.email, roles: ['cloud'] }, secret(), 60 * 60 * 24 * 7);
-  cookies.set(COOKIE, token, { path: '/', httpOnly: true, sameSite: 'lax', secure: Boolean(env.VERCEL), maxAge: 60 * 60 * 24 * 7 });
+  cookies.set(COOKIE, token, { path: '/', httpOnly: true, sameSite: 'lax', secure: hosted, maxAge: 60 * 60 * 24 * 7 });
 }
 
 export function clearSession(cookies: Cookies): void {

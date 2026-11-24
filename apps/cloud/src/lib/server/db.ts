@@ -3,6 +3,14 @@ import { createDb, hashPassword, type Db } from '@mosaic-apps/server';
 
 const env = process.env;
 
+/** Built servers on any host refuse local defaults; only `vite dev` and tests get them. */
+export const hosted = Boolean(env.VERCEL) || (typeof import.meta.env === 'object' ? !import.meta.env.DEV : env.NODE_ENV === 'production');
+
+// `vite dev` does not put .env into process.env; load it locally (never under tests, which pin their own env).
+if (!hosted && !env.NODE_TEST_CONTEXT) {
+  try { process.loadEnvFile('.env'); } catch { /* no local .env */ }
+}
+
 const CONTROL_DDL = `
 CREATE TABLE IF NOT EXISTS cloud_users (
   id uuid PRIMARY KEY, email text NOT NULL UNIQUE, name text NOT NULL,
@@ -42,6 +50,17 @@ CREATE TABLE IF NOT EXISTS cloud_jobs (
   progress integer NOT NULL DEFAULT 0, stage text, error text, metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
   created_at timestamptz NOT NULL DEFAULT now(), started_at timestamptz, finished_at timestamptz
 );
+CREATE TABLE IF NOT EXISTS cloud_releases (
+  id uuid PRIMARY KEY, project_id uuid NOT NULL REFERENCES cloud_projects(id),
+  version integer NOT NULL, status text NOT NULL DEFAULT 'ready', checksum text NOT NULL,
+  file_count integer NOT NULL, created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (project_id, version)
+);
+CREATE TABLE IF NOT EXISTS cloud_release_files (
+  release_id uuid NOT NULL REFERENCES cloud_releases(id) ON DELETE CASCADE,
+  path text NOT NULL, content text NOT NULL, mode text NOT NULL DEFAULT '100644',
+  PRIMARY KEY (release_id, path)
+);
 CREATE TABLE IF NOT EXISTS cloud_conversations (
   id uuid PRIMARY KEY, project_id uuid NOT NULL REFERENCES cloud_projects(id),
   created_at timestamptz NOT NULL DEFAULT now()
@@ -66,20 +85,29 @@ CREATE TABLE IF NOT EXISTS cloud_audit_log (
 );
 CREATE INDEX IF NOT EXISTS cloud_projects_org_idx ON cloud_projects (organization_id, updated_at DESC);
 CREATE INDEX IF NOT EXISTS cloud_jobs_project_idx ON cloud_jobs (project_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS cloud_releases_project_idx ON cloud_releases (project_id, version DESC);
 ALTER TABLE cloud_projects ADD COLUMN IF NOT EXISTS ui_theme text NOT NULL DEFAULT 'corporate';
 ALTER TABLE cloud_projects ADD COLUMN IF NOT EXISTS app_framework text NOT NULL DEFAULT 'sveltekit';
 ALTER TABLE cloud_projects ADD COLUMN IF NOT EXISTS ui_system text NOT NULL DEFAULT 'daisyui';
 ALTER TABLE cloud_projects ADD COLUMN IF NOT EXISTS blueprint jsonb;
 ALTER TABLE cloud_projects ADD COLUMN IF NOT EXISTS planner_model text;
 ALTER TABLE cloud_projects ADD COLUMN IF NOT EXISTS planned_at timestamptz;
+ALTER TABLE cloud_projects ADD COLUMN IF NOT EXISTS neon_project_id text;
+ALTER TABLE cloud_projects ADD COLUMN IF NOT EXISTS database_secret jsonb;
+ALTER TABLE cloud_jobs ADD COLUMN IF NOT EXISTS attempts integer NOT NULL DEFAULT 0;
+ALTER TABLE cloud_jobs ADD COLUMN IF NOT EXISTS run_after timestamptz NOT NULL DEFAULT now();
+ALTER TABLE cloud_jobs ADD COLUMN IF NOT EXISTS log jsonb NOT NULL DEFAULT '[]'::jsonb;
+CREATE INDEX IF NOT EXISTS cloud_jobs_queue_idx ON cloud_jobs (status, run_after);
 `;
 
-let database: Promise<Db> | undefined;
+// Kept on globalThis so a dev hot-reload of this module reuses the open database: a second
+// embedded PGlite instance on the same data directory corrupts it.
+const cache = globalThis as typeof globalThis & { __mosaicCloudDb?: Promise<Db> };
 
 function databaseUrl(): string {
   const value = env.CLOUD_DATABASE_URL ?? env.DATABASE_URL ?? 'pglite://./data/cloud';
-  if (env.VERCEL && !/^postgres(ql)?:\/\//.test(value)) {
-    throw new Error('Mosaic Cloud requires CLOUD_DATABASE_URL or DATABASE_URL on Vercel.');
+  if (hosted && !/^postgres(ql)?:\/\//.test(value)) {
+    throw new Error('Mosaic Cloud requires a PostgreSQL CLOUD_DATABASE_URL or DATABASE_URL when hosted.');
   }
   return value;
 }
@@ -94,8 +122,8 @@ async function initialize(): Promise<Db> {
 }
 
 async function bootstrap(db: Db): Promise<void> {
-  const email = (env.CLOUD_ADMIN_EMAIL ?? (env.VERCEL ? '' : 'admin@mosaic.local')).trim().toLowerCase();
-  const password = env.CLOUD_ADMIN_PASSWORD ?? (env.VERCEL ? '' : 'admin1234');
+  const email = (env.CLOUD_ADMIN_EMAIL ?? (hosted ? '' : 'admin@mosaic.local')).trim().toLowerCase();
+  const password = env.CLOUD_ADMIN_PASSWORD ?? (hosted ? '' : 'admin1234');
   if (!email || password.length < 8) return;
   const existing = await db.query<{ id: string }>('SELECT id FROM cloud_users WHERE email = $1', [email]);
   if (existing.rows.length) return;
@@ -113,11 +141,11 @@ async function bootstrap(db: Db): Promise<void> {
 }
 
 export function getCloudDb(): Promise<Db> {
-  database ??= initialize().catch((cause) => {
-    database = undefined;
+  cache.__mosaicCloudDb ??= initialize().catch((cause) => {
+    cache.__mosaicCloudDb = undefined;
     throw cause;
   });
-  return database;
+  return cache.__mosaicCloudDb;
 }
 
 export function id(): string { return randomUUID(); }
