@@ -20,6 +20,7 @@ Then compose UIs visually in the Studio and publish them as routes in your web a
 |---|---|
 | `packages/` | `core`, `server`, `cli`, `ui` |
 | `apps/studio` | the visual designer (forms, pages, entities, migrations) |
+| `apps/cloud` | the hosted SaaS control plane and vibe-coding workspace |
 | `templates/fullstack` | the project `mosaic create` scaffolds from |
 | `docs/` | Docusaurus site (`npm run docs:start`) |
 | `infra/` | `docker compose` Postgres (`npm run db:up`) |
@@ -47,6 +48,7 @@ npm run e2e          # boot the API on PGlite and exercise it over HTTP
 npm run dev           # API (:3001) + Studio (:3000), with the API proxy available
 npm run dev:api      # API on :3001 (PGlite)
 npm run dev:studio   # designer on :3000
+npm run dev -w @mosaic-apps/cloud # hosted control plane on :3010
 npm run db:up        # Postgres 16 on :5432
 ```
 

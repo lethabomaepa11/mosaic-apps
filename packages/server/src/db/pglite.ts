@@ -2,6 +2,8 @@
  *  Enabled via DATABASE_URL `pglite://memory` (default) or `pglite://<dir>`. */
 
 import { PGlite } from '@electric-sql/pglite';
+import { mkdirSync } from 'node:fs';
+import { resolve } from 'node:path';
 import type { Db, QueryResultLike } from './driver.js';
 
 class PgliteDriver implements Db {
@@ -36,6 +38,7 @@ class PgliteDriver implements Db {
 /** Parse a pglite URL: `pglite://memory` (default) or `pglite://./data-dir`. */
 export function createPgliteDriver(url = 'pglite://memory'): Promise<Db> {
   const dir = url.replace(/^pglite:\/\//, '');
+  if (dir !== 'memory') mkdirSync(resolve(dir), { recursive: true });
   const pg = new PGlite(dir === 'memory' ? undefined : dir);
   return Promise.resolve(new PgliteDriver(pg));
 }

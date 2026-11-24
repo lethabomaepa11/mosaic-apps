@@ -32,6 +32,8 @@ export function applyThemeConfig(config: ThemeConfig, target: HTMLElement | null
 
   const mode = config.mode ?? 'light';
   target.dataset.themeMode = mode;
+  if (config.activeTheme) target.dataset.theme = config.activeTheme;
+  else delete target.dataset.theme;
   const previousListener = systemModeListeners.get(target);
   if (previousListener) {
     previousListener.query.removeEventListener('change', previousListener.listener);
@@ -59,10 +61,16 @@ export function applyThemeConfig(config: ThemeConfig, target: HTMLElement | null
     ? ':root'
     : `[data-mosaic-theme-scope="${target.dataset.mosaicThemeScope}"]`;
   const light = { ...config, ...(config.themes?.[config.activeTheme ?? ''] ?? {}) };
+  const appliedLight = config.activeTheme ? {
+    space1: light.space1, space2: light.space2, space3: light.space3,
+    space4: light.space4, space5: light.space5, space6: light.space6,
+    radius: light.radius, font: light.font, mono: light.mono,
+  } : light;
   const dark = { ...DEFAULT_DARK, font: light.font, mono: light.mono, ...(config.dark ?? {}) };
-  const css = `${selector}[data-theme-mode="light"]{${declarations(light)}}\n` +
-    `${selector}[data-theme-mode="dark"]{${declarations(dark)}}\n` +
-    `@media(prefers-color-scheme:dark){${selector}[data-theme-mode="system"]{${declarations(dark)}}}`;
+  const appliedDark = config.activeTheme ? appliedLight : dark;
+  const css = `${selector}[data-theme-mode="light"]{${declarations(appliedLight)}}\n` +
+    `${selector}[data-theme-mode="dark"]{${declarations(appliedDark)}}\n` +
+    `@media(prefers-color-scheme:dark){${selector}[data-theme-mode="system"]{${declarations(appliedDark)}}}`;
   const id = selector === ':root' ? 'mosaic-theme-config' : `${target.dataset.mosaicThemeScope}-style`;
   let style = target.ownerDocument.getElementById(id) as HTMLStyleElement | null;
   if (!style) {

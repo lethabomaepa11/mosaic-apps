@@ -273,9 +273,17 @@ making generated clients a required dependency of every Mosaic app.
 
 ### 6. SaaS control plane
 
-- [ ] Add organizations, projects, environments, jobs, usage, billing, and audit.
-- [ ] Add conversations, AI change operations, isolated workspaces, and previews.
-- [ ] Add encrypted provider connections and tenant-isolation/recovery tests.
+- [x] Add the hosted SvelteKit control-plane shell with authentication,
+  organizations/memberships, projects, environments, durable job records,
+  conversations, provider-connection records, and audit events.
+- [x] Add the first prompt-to-project workspace with homepage/login choices and a
+  responsive conversation, delivery, and job-status experience. Project intent
+  records framework, UI system, and theme independently; only implemented runtime
+  adapters are selectable.
+- [ ] Add AI change operations, isolated workspaces, generation workers, and live
+  previews.
+- [ ] Add encrypted provider secret operations and tenant-isolation/recovery tests.
+- [ ] Add metered usage, plans, billing, quotas, and administrative operations.
 
 ### 7. GitHub, database, and Vercel delivery
 

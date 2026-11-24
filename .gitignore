@@ -3,6 +3,7 @@ dist/
 build/
 .svelte-kit/
 .vite/
+.vercel/
 *.tsbuildinfo
 .env
 .env.local
@@ -16,3 +17,4 @@ docs/.docusaurus/
 .tmp-generated/
 packages/cli/templates/
 example-app/
+apps/cloud/data/

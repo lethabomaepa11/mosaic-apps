@@ -4,8 +4,15 @@ sidebar_position: 11
 
 # Theming
 
-`@mosaic-apps/ui` components use Mosaic CSS variables. Import the package styles,
-then override the tokens in your application:
+Every generated app stores its global theme in the `theme.config` row of
+`mosaic_settings`. The runtime loads that one JSON value from `/api/theme` and
+applies it at the document root, so navigation, pages, forms, and DaisyUI
+components change together. Page artifacts do not duplicate application colors.
+
+The Studio theme picker includes the curated DaisyUI themes Corporate, Business,
+Light, Dark, Nord, Winter, Silk, and Lo-fi. Choosing one sets `activeTheme` in the
+database-backed configuration. Choose **Custom tokens** to override semantic
+Mosaic variables instead:
 
 ```css
 :root {
@@ -19,13 +26,11 @@ then override the tokens in your application:
 }
 ```
 
-The Studio Theme editor currently provides light/dark/system mode, independent
-light and dark semantic colors, radius, spacing, font tokens, transition
-settings, a live preview, and four presets. Theme settings are saved through
-`theme.config` and applied by generated runtime layouts.
+The Studio Theme editor also provides light/dark/system mode, independent light
+and dark semantic colors for custom-token mode, radius, spacing, font tokens,
+transition settings, a live preview, and four custom-color presets. Saving writes
+the complete configuration as one audited settings update.
 
-`ThemeConfig` also has fields for named palettes, but Studio does not yet expose
-a complete named-theme gallery, custom theme import/export, user preference
-persistence, or contrast validation. Logo upload and generated-app branding are
-also pending. The CSS token bridge and current theme editor are compatible with
-those planned additions.
+`ThemeConfig` also supports project-defined named palettes. Custom theme
+import/export, per-end-user preference persistence, and contrast validation are
+still pending. Logo upload and generated-app branding are also pending.

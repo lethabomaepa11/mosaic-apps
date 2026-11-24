@@ -38,6 +38,7 @@ export const DEFAULT_SETTINGS: SettingRecord[] = [
   { key: 'app.logo', value: '', description: 'Logo URL (empty = text logo)' },
   { key: 'theme.primary', value: '#6366f1', description: 'Primary brand color' },
   { key: 'theme.radius', value: '10', description: 'Corner radius in px' },
+  { key: 'theme.config', value: { mode: 'light', activeTheme: 'corporate' }, description: 'Global application theme and design tokens' },
   { key: 'auth.allowRegistration', value: false, description: 'Allow self-service sign up' },
   { key: 'forms.successRedirect', value: '', description: 'Global redirect after form submit' },
   { key: 'data.pageSize', value: 20, description: 'Default table page size' },

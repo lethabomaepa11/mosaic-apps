@@ -11,12 +11,13 @@
     foreground: '#16202c', foregroundMuted: '#5d6b7e', border: '#dde3ec', radius: '10px',
     space1: '4px', space2: '8px', space3: '12px', space4: '16px', space5: '24px', space6: '32px',
     font: "Inter, ui-sans-serif, system-ui, sans-serif", mono: "ui-monospace, monospace",
-    mode: 'system',
+    mode: 'system', activeTheme: 'corporate',
     dark: { primary: '#818cf8', background: '#0f172a', surface: '#1e293b', surface2: '#334155', foreground: '#f1f5f9', foregroundMuted: '#94a3b8', border: '#475569' },
     transition: { kind: 'fade', duration: 180, delay: 0 },
   };
   let config = $state<ThemeConfig>({ ...defaults });
   let saving = $state(false);
+  const frameworkThemes = ['corporate', 'business', 'light', 'dark', 'nord', 'winter', 'silk', 'lofi'];
 
   onMount(async () => {
     try {
@@ -38,7 +39,7 @@
       Forest: { primary: '#15803d', background: '#f0fdf4', surface: '#ffffff' },
       Rose: { primary: '#e11d48', background: '#fff1f2', surface: '#ffffff' },
     };
-    config = { ...config, ...palettes[name] };
+    config = { ...config, ...palettes[name], activeTheme: undefined };
     apply(config);
   }
 
@@ -56,7 +57,8 @@
 
 <section class="m-card theme-editor">
   <header class="m-card__header"><div><strong class="m-card__title">Theme</strong><p class="m-muted m-small">Shared design tokens for the Studio and generated apps.</p></div><button class="m-btn m-btn--primary" disabled={saving} onclick={save}>{saving ? 'Saving…' : 'Save theme'}</button></header>
-  <div class="m-row"><strong>Presets</strong>{#each ['Indigo', 'Ocean', 'Forest', 'Rose'] as name (name)}<button class="m-btn m-btn--secondary m-btn--sm" onclick={() => preset(name)}>{name}</button>{/each}</div>
+  <label class="framework-theme">Application theme<select class="m-select" bind:value={config.activeTheme} onchange={() => apply(config)}>{#each frameworkThemes as name}<option value={name}>{name[0].toUpperCase() + name.slice(1)}</option>{/each}<option value="">Custom tokens</option></select><span class="m-muted m-small">One database-backed setting applies the framework theme across every route.</span></label>
+  <div class="m-row"><strong>Custom colors</strong>{#each ['Indigo', 'Ocean', 'Forest', 'Rose'] as name (name)}<button class="m-btn m-btn--secondary m-btn--sm" onclick={() => preset(name)}>{name}</button>{/each}</div>
   <div class="theme-grid">
     <label>Color mode<select class="m-select" bind:value={config.mode} onchange={() => apply(config)}><option value="system">System preference</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
     <label>Primary<input type="color" bind:value={config.primary} oninput={() => apply(config)} /></label>
@@ -87,6 +89,7 @@
 
 <style>
   .theme-editor { display:grid; gap:18px; }
+  .framework-theme { display:grid; gap:6px; max-width:420px; font-size:.78rem; font-weight:650; }
   .theme-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:12px; }
   .theme-grid label { display:grid; gap:5px; font-size:.78rem; font-weight:650; }
   .theme-grid input[type=color] { width:100%; height:38px; padding:3px; border:1px solid var(--m-border); border-radius:var(--m-radius-sm); background:var(--m-surface); }

@@ -1,3 +1,9 @@
+@import "tailwindcss";
+@plugin "daisyui" {
+  themes: corporate --default, business --prefersdark, light, dark, nord, winter, silk, lofi;
+  logs: false;
+}
+
 /* Mosaic Studio shell */
 
 .studio {
