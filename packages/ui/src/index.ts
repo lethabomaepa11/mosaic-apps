@@ -24,9 +24,13 @@ export {
   isContainerType,
   isFieldType,
   createNode,
+  registerComponent,
+  unregisterComponent,
+  isCustomComponent,
   paletteCategories,
   TOTAL_COMPONENT_TYPES,
 } from './registry/index.js';
+export type { RegisterComponentOptions } from './registry/index.js';
 export { CATEGORIES, FIELD_PROPS, type ComponentDef, type ComponentCategory, type PropDesc, type PropKind } from './registry/types.js';
 
 // dnd engine

@@ -1,5 +1,6 @@
 <script lang="ts">
   import '../app.css';
+  import '#lib/mosaic-components';
   import { page } from '$app/state';
   import { applyThemeConfig, Toaster } from '@mosaic-apps/ui';
   import { client } from '#lib/client';

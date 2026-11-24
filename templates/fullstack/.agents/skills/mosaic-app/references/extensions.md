@@ -6,6 +6,10 @@ public extension contract.
 
 - Keep the component usable outside the builder; registration supplies Studio
   metadata, inspector fields, bindings, events, and defaults.
+- Register package components with `registerComponent` from `@mosaic-apps/ui` in
+  both `apps/web/src/lib/mosaic-components.ts` and
+  `apps/studio/src/lib/mosaic-components.ts`. Use a stable namespaced lowercase
+  type such as `acme.metric-card`; keep both registrations identical.
 - Use Svelte for the default runtime. A framework-neutral Web Component is the
   interoperability boundary when a non-Svelte library must render UI.
 - Keep secrets and privileged SDK calls server-side.

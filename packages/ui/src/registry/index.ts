@@ -10,8 +10,9 @@ import { LAYOUT_ENTRIES } from './entries-layout.js';
 import { DISPLAY_ENTRIES } from './entries-display.js';
 import { FEEDBACK_ENTRIES } from './entries-feedback.js';
 import { NAV_ENTRIES, CHART_ENTRIES } from './entries-nav.js';
+import { createComponentRegistry, type RegisterComponentOptions } from './store.js';
 
-export const COMPONENTS: ComponentDef[] = [
+const REGISTRY = createComponentRegistry([
   ...INPUT_ENTRIES_A,
   ...INPUT_ENTRIES_B,
   ...DATA_ENTRIES,
@@ -20,25 +21,39 @@ export const COMPONENTS: ComponentDef[] = [
   ...FEEDBACK_ENTRIES,
   ...NAV_ENTRIES,
   ...CHART_ENTRIES,
-];
+]);
+export const COMPONENTS = REGISTRY.components;
+export type { RegisterComponentOptions } from './store.js';
 
-const BY_TYPE = new Map(COMPONENTS.map((c) => [c.type, c]));
+/** Register a package or project component for the renderer, palette, and inspector. */
+export function registerComponent(definition: ComponentDef, options: RegisterComponentOptions = {}): () => void {
+  return REGISTRY.register(definition, options);
+}
+
+/** Remove a custom registration. An overridden built-in returns to its original definition. */
+export function unregisterComponent(type: string, expected?: ComponentDef): boolean {
+  return REGISTRY.unregister(type, expected);
+}
+
+export function isCustomComponent(type: string): boolean {
+  return REGISTRY.isCustom(type);
+}
 
 export function getComponent(type: string): ComponentDef | undefined {
-  return BY_TYPE.get(type);
+  return REGISTRY.get(type);
 }
 
 export function isContainerType(type: string): boolean {
-  return Boolean(BY_TYPE.get(type)?.container);
+  return Boolean(REGISTRY.get(type)?.container);
 }
 
 export function isFieldType(type: string): boolean {
-  return Boolean(BY_TYPE.get(type)?.isField);
+  return Boolean(REGISTRY.get(type)?.isField);
 }
 
 /** Create a new FormNode of the given type (with default props). */
 export function createNode(type: string, patch?: Partial<FormNode>): FormNode {
-  const def = BY_TYPE.get(type);
+  const def = REGISTRY.get(type);
   const node: FormNode = {
     id: patch?.id ?? newId('c'),
     type,

@@ -73,6 +73,10 @@ nested or parameterized routes such as `/customers/:id`. The seeded `/404` page 
 editable, and page settings can require login. Concrete SvelteKit route files override
 database routes.
 
+For package-backed visual components, install the package in the web and Studio
+workspaces and call `registerComponent` from both `src/lib/mosaic-components.ts`
+files. The generated agent skill contains the same takeover guidance.
+
 ## PWA
 
 The web app is installable (manifest + service worker). Its shell and static assets

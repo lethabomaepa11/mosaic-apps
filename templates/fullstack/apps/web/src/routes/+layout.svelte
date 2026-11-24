@@ -3,6 +3,7 @@
   import { page } from '$app/state';
   import { onNavigate } from '$app/navigation';
   import '../app.css';
+  import '#lib/mosaic-components';
   import { applyThemeConfig, Icon, Toaster } from '@mosaic-apps/ui';
   import type { NavItemDef, ThemeConfig } from '@mosaic-apps/core';
   import { client } from '#lib/client';

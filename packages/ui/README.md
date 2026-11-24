@@ -20,6 +20,22 @@ tokens. Components use Mosaic CSS variables and Bits UI/shadcn-svelte wrappers.
 <FormRenderer {form} {client} />
 ```
 
+Package-backed Svelte components can join the runtime, Studio palette, and
+generated inspector through `registerComponent`:
+
+```ts
+import Widget from '@acme/widgets/Widget.svelte';
+import { registerComponent } from '@mosaic-apps/ui';
+
+registerComponent({
+  type: 'acme.widget', label: 'Widget', category: 'Display', icon: 'box',
+  component: Widget, pages: true,
+  inspector: [{ key: 'title', label: 'Title', kind: 'string' }],
+});
+```
+
+Register the same stable type in the application and Studio entry points.
+
 Custom JavaScript and TypeScript execute in a QuickJS WebAssembly worker and
 return validated declarative actions. See the Mosaic documentation for the
 sandbox limits, state scope ownership, persistence limits, and nested form
