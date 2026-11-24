@@ -82,7 +82,12 @@ export async function createMosaicServer(config: MosaicServerConfig): Promise<Mo
   await ensurePlatformTables(db);
 
   const authEnabled = config.auth?.enabled ?? true;
-  const jwtSecret = config.auth?.jwtSecret ?? process.env.MOSAIC_JWT_SECRET ?? randomBytes(32).toString('hex');
+  const configuredSecret = config.auth?.jwtSecret ?? process.env.MOSAIC_JWT_SECRET;
+  // A per-process random secret logs users out on restart and breaks multi-instance deploys.
+  if (!configuredSecret && authEnabled && process.env.NODE_ENV === 'production') {
+    throw new Error('MOSAIC_JWT_SECRET is required in production.');
+  }
+  const jwtSecret = configuredSecret ?? randomBytes(32).toString('hex');
   const tokenTtl = config.auth?.tokenTtlSeconds ?? 60 * 60 * 12;
   const allowRegistration = config.auth?.allowRegistration ?? false;
   const uploadsDir = config.uploadsDir ?? './uploads';
@@ -158,7 +163,7 @@ export async function createMosaicServer(config: MosaicServerConfig): Promise<Mo
   app.route('/api/migrations', migrationRoutes(db));
   app.route('/api/audit', auditRoutes(db));
   app.route('/api/files', fileRoutes({ db, uploadsDir, publicRead: config.publicFiles ?? false }));
-  app.route('/files', fileRoutes({ db, uploadsDir, publicRead: config.publicFiles ?? true }));
+  app.route('/files', fileRoutes({ db, uploadsDir, publicRead: config.publicFiles ?? false }));
   app.route('/api/endpoints', endpointRegistryRoutes(db, config.endpoints));
   app.route('/api/extensions', registeredEndpointRoutes(db, config.endpoints, authEnabled));
   app.route('/api', metaRoutes(db));

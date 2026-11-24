@@ -47,6 +47,13 @@ function checkAccess(c: { get: (k: 'user') => AuthUser | null }, entity: EntityD
   return user;
 }
 
+/** Soft-deleted rows are admin-only on every read path. */
+function withDeleted(c: { get: (k: 'user') => AuthUser | null; req: { query: (k: string) => string | undefined } }): boolean {
+  const includeDeleted = c.req.query('withDeleted') === 'true';
+  if (includeDeleted && !isAdmin(c.get('user'))) throw new HttpError(403, 'withDeleted requires admin', 'FORBIDDEN');
+  return includeDeleted;
+}
+
 function mustBeUuid(id: string): void {
   if (!UUID_RE.test(id)) throw new HttpError(404, 'Record not found', 'NOT_FOUND');
 }
@@ -121,7 +128,7 @@ export function crudRoutes(deps: CrudDeps): Hono<AuthEnv> {
     const { sql, params } = buildOptionsSql(entity, {
       q: c.req.query('q'),
       limit: Number(c.req.query('limit') ?? 50),
-      includeDeleted: c.req.query('withDeleted') === 'true',
+      includeDeleted: withDeleted(c),
     });
     const res = await deps.db.query<{ value: string; label: string }>(sql, params);
     return ok(c, res.rows);
@@ -131,8 +138,7 @@ export function crudRoutes(deps: CrudDeps): Hono<AuthEnv> {
   app.get('/:name', async (c) => {
     const entity = entityOr404(c.req.param('name'));
     checkAccess(c, entity, 'read');
-    const includeDeleted = c.req.query('withDeleted') === 'true';
-    if (includeDeleted && !isAdmin(c.get('user'))) throw new HttpError(403, 'withDeleted requires admin', 'FORBIDDEN');
+    const includeDeleted = withDeleted(c);
     const spec = parseQuery(c.req.query() as RawQuery, { defaultSort: entity.list?.defaultSort });
     const { sql, countSql, params } = buildListSql(entity, spec, {
       includeDeleted,
@@ -159,7 +165,7 @@ export function crudRoutes(deps: CrudDeps): Hono<AuthEnv> {
     checkAccess(c, entity, 'read');
     const id = c.req.param('id');
     mustBeUuid(id);
-    const includeDeleted = c.req.query('withDeleted') === 'true';
+    const includeDeleted = withDeleted(c);
     const include = (c.req.query('include') ?? '').split(',').filter(Boolean);
     const spec: QuerySpec = {
       page: 1,

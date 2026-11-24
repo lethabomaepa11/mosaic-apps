@@ -7,6 +7,7 @@ import { newId } from '@mosaic-apps/core';
 import type { Db } from '../db/driver.js';
 import { HttpError, fail, ok } from './http.js';
 import type { AuthEnv } from './auth.js';
+import { isAdmin } from './rbac.js';
 
 export interface FilesDeps {
   db: Db;
@@ -76,7 +77,10 @@ export function fileRoutes(deps: FilesDeps): Hono<AuthEnv> {
       return c.body(new Uint8Array(buf), 200, {
         'Content-Type': row.mime,
         'Content-Disposition': `inline; filename="${encodeURIComponent(row.filename)}"`,
-        'Cache-Control': 'public, max-age=86400',
+        // Uploads carry a user-chosen type; never let an uploaded HTML/SVG run script on this origin.
+        'Content-Security-Policy': "sandbox; default-src 'none'; img-src 'self' data:; media-src 'self'; style-src 'unsafe-inline'",
+        'X-Content-Type-Options': 'nosniff',
+        'Cache-Control': deps.publicRead ? 'public, max-age=86400' : 'private, max-age=86400',
       });
     } catch {
       throw new HttpError(404, 'File content missing on disk', 'NOT_FOUND');
@@ -86,9 +90,11 @@ export function fileRoutes(deps: FilesDeps): Hono<AuthEnv> {
   app.delete('/:id', async (c) => {
     const user = c.get('user');
     if (!user) throw new HttpError(401, 'Authentication required', 'UNAUTHENTICATED');
-    const res = await deps.db.query<{ path: string }>('DELETE FROM mosaic_files WHERE id = $1 RETURNING path', [
-      c.req.param('id'),
-    ]);
+    // Only the uploader or an admin may delete a file.
+    const res = await deps.db.query<{ path: string }>(
+      'DELETE FROM mosaic_files WHERE id = $1 AND (uploaded_by = $2 OR $3) RETURNING path',
+      [c.req.param('id'), user.id, isAdmin(user)],
+    );
     const row = res.rows[0];
     if (!row) throw new HttpError(404, 'File not found', 'NOT_FOUND');
     await unlink(join(deps.uploadsDir, row.path)).catch(() => undefined);
