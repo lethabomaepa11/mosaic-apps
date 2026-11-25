@@ -4,6 +4,20 @@ import { aiJson, parseWait } from '../src/lib/server/ai';
 
 const request = { name: 'test', system: '', user: '', schema: {}, config: { provider: 'openai' as const, apiKey: 'test-key' } };
 
+test('a Gemini 503 falls back to another Flash-Lite model using the same key', async (t) => {
+  const models: string[] = [];
+  t.mock.method(globalThis, 'fetch', async (url: string, init: RequestInit) => {
+    assert.equal(new Headers(init.headers).get('x-goog-api-key'), 'own-test-key');
+    models.push(url.split('/').at(-1)!.split(':')[0]!);
+    if (models.length === 1) return new Response(null, { status: 503 });
+    return Response.json({ candidates: [{ finishReason: 'STOP', content: { parts: [{ text: '{"ok":true}' }] } }] });
+  });
+  const onModel = t.mock.fn();
+  assert.deepEqual(await aiJson({ ...request, config: { provider: 'gemini', apiKey: 'own-test-key', onModel } }), { ok: true });
+  assert.deepEqual(models, ['gemini-3.5-flash-lite', 'gemini-3.1-flash-lite']);
+  assert.equal(onModel.mock.calls[0]?.arguments[0], 'gemini-3.1-flash-lite');
+});
+
 test('provider reset headers can specify hours', () => {
   assert.equal(parseWait('1h2m3.5s'), 3_723_500);
   assert.equal(parseWait('1800'), 1_800_000);

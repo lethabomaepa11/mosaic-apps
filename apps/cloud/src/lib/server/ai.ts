@@ -73,13 +73,26 @@ export async function aiJson<T>(input: AiRequest & { config?: AiConfig }): Promi
   if (config.provider === 'mosaic') return sharedJson<T>(input, config);
   if (config.provider === 'gemini') {
     if (!config.apiKey) throw new AiError('Add your Gemini key in Settings → AI.');
-    const result = await geminiReply<T>(input, aiModel(config), config.apiKey, AbortSignal.timeout(90_000));
-    if (!result.ok) {
-      if (result.response.status === 429) throw rateLimitError('gemini', parseWait(result.response.headers.get('retry-after')));
-      throw new AiError(`Gemini request failed (${result.response.status}). Check your key and model in Settings → AI.`);
+    const preferred = aiModel(config);
+    const fallback = preferred === 'gemini-3.1-flash-lite' ? AI_PROVIDERS.gemini.defaultModel : 'gemini-3.1-flash-lite';
+    let failure: AiError | undefined;
+    for (const model of [preferred, fallback]) {
+      const result = await geminiReply<T>(input, model, config.apiKey, AbortSignal.timeout(45_000)).catch(() => null);
+      if (result?.ok) {
+        await config.onModel?.(result.model);
+        return result.value;
+      }
+      if (!result) {
+        failure = new AiError('Gemini did not return a usable response. Try again shortly.');
+        continue;
+      }
+      const { response } = result;
+      await response.body?.cancel().catch(() => {});
+      if (response.status === 429) failure = rateLimitError('gemini', parseWait(response.headers.get('retry-after')));
+      else if (response.status >= 500) failure = new AiError(`Gemini is temporarily unavailable (${response.status}). Try again shortly.`);
+      else throw new AiError(`Gemini rejected the request (${response.status}). Check your key and model in Settings → AI.`);
     }
-    await config.onModel?.(result.model);
-    return result.value;
+    throw failure ?? new AiError('Gemini is temporarily unavailable.');
   }
   return chatCompletionsJson<T>(input, config);
 }
