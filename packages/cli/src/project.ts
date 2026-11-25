@@ -76,7 +76,6 @@ export interface ProjectConfig {
   demo: boolean;
   api: { port: number };
   web: { port: number };
-  studio?: { port: number };
 }
 
 export async function loadProjectEnvironment(dir: string): Promise<Record<string, string | undefined>> {
@@ -94,7 +93,6 @@ export async function loadProjectConfig(dir: string): Promise<ProjectConfig> {
   const env = await loadProjectEnvironment(dir);
   const api = (raw.api ?? {}) as { port?: number };
   const web = (raw.web ?? {}) as { port?: number };
-  const studio = (raw.studio ?? {}) as { port?: number };
   let databaseUrl = process.env.DATABASE_URL ?? env.DATABASE_URL ?? String(raw.databaseUrl ?? 'pglite://./data');
   if (databaseUrl.startsWith('pglite://') && databaseUrl !== 'pglite://memory') {
     databaseUrl = `pglite://${resolve(dir, databaseUrl.slice('pglite://'.length))}`;
@@ -108,7 +106,6 @@ export async function loadProjectConfig(dir: string): Promise<ProjectConfig> {
     demo: raw.demo !== false,
     api: { port: Number(process.env.PORT ?? env.PORT ?? api.port ?? 3001) },
     web: { port: Number(process.env.MOSAIC_WEB_PORT ?? env.MOSAIC_WEB_PORT ?? web.port ?? 3000) },
-    studio: { port: Number(process.env.MOSAIC_STUDIO_PORT ?? env.MOSAIC_STUDIO_PORT ?? studio.port ?? 3002) },
   };
 }
 

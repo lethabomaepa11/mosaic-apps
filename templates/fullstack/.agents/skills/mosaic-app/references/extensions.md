@@ -7,9 +7,9 @@ public extension contract.
 - Keep the component usable outside the builder; registration supplies Studio
   metadata, inspector fields, bindings, events, and defaults.
 - Register package components with `registerComponent` from `@mosaic-apps/ui` in
-  both `apps/web/src/lib/mosaic-components.ts` and
-  `apps/studio/src/lib/mosaic-components.ts`. Use a stable namespaced lowercase
-  type such as `acme.metric-card`; keep both registrations identical.
+  `apps/web/src/lib/mosaic-components.ts`. Studio runs inside the same app at
+  `/studio`, so this one registration feeds both the palette and published pages.
+  Use a stable namespaced lowercase type such as `acme.metric-card`.
 - Use Svelte for the default runtime. A framework-neutral Web Component is the
   interoperability boundary when a non-Svelte library must render UI.
 - Keep secrets and privileged SDK calls server-side.
@@ -21,6 +21,9 @@ public extension contract.
   update both `package.json` and the lockfile and explain its runtime location.
 - Do not install arbitrary packages into a hosted Studio process; generation and
   builds belong in an isolated workspace.
+- Studio is part of the app: routes in `apps/web/src/routes/studio`, code in
+  `apps/web/src/lib/studio`. Public routes live in the `(app)` route group, so
+  `/studio` keeps its own layout. Do not add public routes under `/studio`.
 - A concrete SvelteKit route may override the database catch-all route. Keep shared
   Mosaic route and API logic in framework packages, not copied generated files.
 

@@ -3,8 +3,7 @@
 Choose checks proportional to the change:
 
 ```bash
-npm test
-npm run typecheck
+npm run check   # svelte-check for the app and Studio (apps/web)
 npm run build
 ```
 
@@ -17,6 +16,7 @@ Deployment invariants:
 - Production uses durable PostgreSQL, not PGlite or function-local files.
 - Keep the database and function region close and use serverless-safe pooling.
 - Set a stable signing secret and explicit origins when origins differ.
+- One deployment serves the app, `/api` and Studio at `/studio`.
 - Preview environments use isolated data or provider branches.
 - Page/form publishes can promote artifact revisions without rebuilding. Source,
   dependency, and schema changes require a verified build/deployment.

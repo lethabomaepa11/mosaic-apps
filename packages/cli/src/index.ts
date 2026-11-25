@@ -18,8 +18,8 @@ Commands:
   migrate                Plan + apply pending migrations (dry-run preview)
   seed [--demo]          Seed roles, settings, admin user (and demo data)
   entity <Name>          Scaffold an entity class in the app's server directory
-  dev                    Run the application and local Studio together
-  studio                 Open the Mosaic drag & drop studio against this project
+  dev                    Run the app, its /api and Studio (/studio) on one server
+  studio                 Same as dev; prints the Studio URL (/studio)
   info                   Show project info (config + live server status)
   help                   Show this help
 
@@ -31,7 +31,6 @@ create options:
   --pwa | --no-pwa       PWA-enabled web app (default pwa)
   --port <n>             Legacy API port setting (retained for older projects)
   --web-port <n>         Web port (default 3000)
-  --studio-port <n>      Studio port (default 3002)
   --db-port <n>          Docker Postgres host port (default 5432)
   --pm npm|pnpm|yarn     Package manager (default npm)
   --install | --no-install   Run package install (default install)
@@ -79,7 +78,6 @@ async function main(): Promise<void> {
           'no-pwa': { type: 'boolean', default: false },
           port: { type: 'string', default: '3001' },
           'web-port': { type: 'string', default: '3000' },
-          'studio-port': { type: 'string', default: '3002' },
           'db-port': { type: 'string', default: '5432' },
           pm: { type: 'string', default: 'npm' },
           install: { type: 'boolean', default: true },
@@ -106,7 +104,6 @@ async function main(): Promise<void> {
         pwa: Boolean(values.pwa) && !values['no-pwa'],
         apiPort: Number(values.port),
         webPort: Number(values['web-port']),
-        studioPort: Number(values['studio-port']),
         dbPort: Number(values['db-port']),
         pm: values.pm as 'npm' | 'pnpm' | 'yarn',
         install: Boolean(values.install) && !values['no-install'],
@@ -152,7 +149,7 @@ async function main(): Promise<void> {
       } else if (command === 'info') {
         await info({ dir });
       } else if (command === 'studio') {
-        await studio({ dir, port: values.port ? Number(values.port) : undefined });
+        await studio({ dir });
       } else {
         await loadProjectConfig(dir); // validates we're in a project
         const child = spawn('npm', ['run', 'dev'], {

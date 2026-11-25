@@ -5,7 +5,7 @@ import { mkdir, readdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { spawn } from 'node:child_process';
 import { humanize, snakeCase, validateEntity, type EntityDef, type FieldDef } from '@mosaic-apps/core';
-import { entitiesDirOf, findRepoRoot, loadProjectConfig, titleCase } from './project.js';
+import { entitiesDirOf, loadProjectConfig, titleCase } from './project.js';
 
 function parseFields(spec: string): FieldDef[] {
   return spec
@@ -153,9 +153,9 @@ export async function info(opts: { dir: string }): Promise<void> {
   console.log(`  auth     : ${config.auth ? 'on' : 'off'}`);
   console.log(`  pwa      : ${config.pwa ? 'on' : 'off'}`);
   console.log(`  api port : ${config.api.port}`);
-  console.log(`  web port : ${config.web.port}`);
+  console.log(`  web port : ${config.web.port} (Studio at /studio)`);
   try {
-    const res = await fetch(`http://localhost:${config.api.port}/api/health`);
+    const res = await fetch(`http://localhost:${config.web.port}/api/health`);
     const json = (await res.json()) as { data?: { ok: boolean; version: string; db: boolean } };
     if (json.data?.ok) console.log(`  server   : up (v${json.data.version}, db: ${json.data.db ? 'connected' : 'DOWN'})`);
     else console.log('  server   : unhealthy');
@@ -165,24 +165,16 @@ export async function info(opts: { dir: string }): Promise<void> {
   console.log('');
 }
 
-export async function studio(opts: { dir: string; port?: number }): Promise<void> {
+/** Studio is served by the project's own app at /studio, so this starts the app. */
+export async function studio(opts: { dir: string }): Promise<void> {
   const config = await loadProjectConfig(opts.dir);
-  const localStudio = existsSync(join(opts.dir, 'apps', 'studio', 'package.json'));
-  const repo = localStudio ? opts.dir : findRepoRoot(opts.dir);
-  if (!repo || !existsSync(join(repo, 'apps', 'studio'))) {
-    console.error(
-      'Mosaic Studio not found. It ships with the mosaic-apps monorepo:\n' +
-        '  clone the repo, npm install, then: npm run dev:studio\n' +
-        `  then point it at this project's API: http://localhost:${config.api.port}`,
-    );
-    process.exit(1);
-  }
-  console.log(`\n▦ Starting Mosaic Studio → http://localhost:${config.api.port}\n`);
-  const child = spawn('npm', ['run', 'dev', '-w', localStudio ? 'apps/studio' : 'studio'], {
-    cwd: repo,
+  console.log(`
+▦ Starting ${config.name} → Studio at http://localhost:${config.web.port}/studio
+`);
+  const child = spawn('npm', ['run', 'dev'], {
+    cwd: opts.dir,
     stdio: 'inherit',
     shell: process.platform === 'win32',
-    env: { ...process.env, MOSAIC_API_TARGET: `http://127.0.0.1:${config.web.port}`, PUBLIC_API_URL: `http://localhost:${config.web.port}/api`, MOSAIC_STUDIO_PORT: String(opts.port ?? config.studio?.port ?? 3002), PORT: String(opts.port ?? config.studio?.port ?? 3002) },
   });
   child.on('exit', (code) => process.exit(code ?? 0));
 }

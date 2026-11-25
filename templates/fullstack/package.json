@@ -8,10 +8,9 @@
   ],
   "scripts": {
     "dev": "node scripts/dev.mjs",
-    "dev:api": "npm run dev -w @__PROJECT_SLUG__/web",
     "dev:web": "npm run dev -w @__PROJECT_SLUG__/web",
-    "dev:studio": "npm run dev -w @__PROJECT_SLUG__/studio",
-    "build": "npm run build -w apps/web && npm run build -w apps/studio",
+    "build": "npm run build -w apps/web",
+    "check": "npm run check -w apps/web",
     "db:up": "docker compose up -d --wait",
     "db:down": "docker compose down",
     "migrate": "mosaic migrate",

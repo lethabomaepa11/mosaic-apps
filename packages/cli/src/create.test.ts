@@ -32,7 +32,7 @@ test('plain create works with spaces, commits one message and ignores secrets an
   assert.ok(existsSync(join(app, '.gitattributes')));
   assert.ok(existsSync(join(app, 'AGENTS.md')));
   assert.ok(existsSync(join(app, 'apps/web/src/routes/api/[...path]/+server.ts')));
-  assert.ok(existsSync(join(app, 'apps/web/src/routes/[...route]/+page.server.ts')));
+  assert.ok(existsSync(join(app, 'apps/web/src/routes/(app)/[...route]/+page.server.ts')));
   assert.doesNotMatch(await readFile(join(app, 'apps/web/vite.config.ts'), 'utf8'), /proxy:/);
   assert.match(await readFile(join(app, 'apps/web/package.json'), 'utf8'), /@mosaic-apps\/sveltekit/);
   assert.match(
@@ -46,25 +46,29 @@ test('plain create works with spaces, commits one message and ignores secrets an
   assert.ok(!tracked.stdout.split(/\r?\n/).includes('.env'));
   const ignored = spawnSync('git', ['check-ignore', '.env', 'data/db', 'uploads/logo.png'], { cwd: app, encoding: 'utf8', shell: false });
   assert.equal(ignored.status, 0);
-  for (const path of ['package.json', 'apps/web/package.json', 'apps/studio/package.json']) {
+  for (const path of ['package.json', 'apps/web/package.json']) {
     assert.doesNotMatch(await readFile(join(app, path), 'utf8'), /file:/);
   }
-  assert.doesNotMatch(await readFile(join(app, 'apps/studio/vite.config.ts'), 'utf8'), /__\w+__/);
-  for (const name of ['web', 'studio']) {
-    assert.match(await readFile(join(app, `apps/${name}/vite.config.ts`), 'utf8'), /exclude: \['@mosaic-apps\/ui'\]/);
+  // Studio is part of the one web app, served at /studio.
+  assert.equal(existsSync(join(app, 'apps/studio')), false);
+  assert.ok(existsSync(join(app, 'apps/web/src/routes/studio/+layout.svelte')));
+  assert.ok(existsSync(join(app, 'apps/web/src/routes/(app)/+layout.svelte')));
+  for (const path of ['apps/web/vite.config.ts', 'mosaic.config.json', '.env', '.env.example', 'README.md']) {
+    assert.doesNotMatch(await readFile(join(app, path), 'utf8'), /__\w+__|STUDIO_PORT/, path);
   }
+  assert.match(await readFile(join(app, 'apps/web/vite.config.ts'), 'utf8'), /exclude: \['@mosaic-apps\/ui'\]/);
+  assert.match(await readFile(join(app, 'apps/web/package.json'), 'utf8'), /monaco-editor/);
 });
 
 test('no-demo, custom ports and explicit PostgreSQL are honored', async (t) => {
   const root = await fixture(t);
   await create(options(root, { db: 'postgres://mosaic:mosaic@127.0.0.1:5433/my-crm', demo: false, git: false, pwa: false,
-    apiPort: 3101, webPort: 3100, studioPort: 3102 }));
+    apiPort: 3101, webPort: 3100 }));
   const app = join(root, 'my-crm');
   assert.match(await readFile(join(app, '.env'), 'utf8'), /^SEED_DEMO=false$/m);
   const config = await loadProjectConfig(app);
   assert.equal(config.api.port, 3101);
   assert.equal(config.web.port, 3100);
-  assert.equal(config.studio?.port, 3102);
   assert.match(config.databaseUrl, /^postgres:/);
 });
 
@@ -78,7 +82,7 @@ test('published template is not mistaken for a source checkout', async (t) => {
 test('CLI reads .env and resolves embedded data relative to the project', async (t) => {
   const root = await fixture(t);
   await writeFile(join(root, 'mosaic.config.json'), JSON.stringify({ databaseUrl: 'postgres://unused/old', api: { port: 9999 } }));
-  await writeFile(join(root, '.env'), 'DATABASE_URL=pglite://./data\nPORT=3101\nMOSAIC_WEB_PORT=3100\nMOSAIC_STUDIO_PORT=3102\n');
+  await writeFile(join(root, '.env'), 'DATABASE_URL=pglite://./data\nPORT=3101\nMOSAIC_WEB_PORT=3100\n');
   const config = await loadProjectConfig(root);
   assert.equal(config.databaseUrl, `pglite://${resolve(root, 'data')}`);
   assert.equal(config.api.port, 3101);

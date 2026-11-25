@@ -15,33 +15,26 @@ async function freePort() {
   return port;
 }
 
-async function fixture(t: { after: (fn: () => Promise<void>) => void }, mode: 'normal' | 'fail-web' | 'fail-studio' = 'normal') {
+async function fixture(t: { after: (fn: () => Promise<void>) => void }, mode: 'fail-web' | 'crash-after-ready') {
   const root = await mkdtemp(join(tmpdir(), 'mosaic launcher '));
   t.after(async () => {
     assert.ok(resolve(root).startsWith(resolve(tmpdir()) + sep));
     await rm(root, { recursive: true, force: true, maxRetries: 8, retryDelay: 100 });
   });
-  const ports = [await freePort(), await freePort(), await freePort()];
+  const ports = [await freePort(), await freePort()];
   await mkdir(join(root, 'scripts'));
   await copyFile(fileURLToPath(new URL('../../../templates/fullstack/scripts/dev.mjs', import.meta.url)), join(root, 'scripts/dev.mjs'));
   await writeFile(join(root, 'package.json'), JSON.stringify({ private: true, workspaces: ['apps/*'] }));
-  await writeFile(join(root, 'mosaic.config.json'), JSON.stringify({ api: { port: ports[0] }, web: { port: ports[1] }, studio: { port: ports[2] } }));
-  for (const name of ['web', 'studio']) {
-    const directory = join(root, 'apps', name);
-    await mkdir(directory, { recursive: true });
-    await writeFile(join(directory, 'package.json'), JSON.stringify({ name: `fixture-${name}`, private: true, scripts: { dev: 'node fixture.mjs' } }));
-    const fail = mode === `fail-${name}`;
-    await writeFile(join(directory, 'fixture.mjs'), fail ? 'setTimeout(() => process.exit(7), 800);' : `
-      import { createServer } from 'node:http';
-      // Managed Windows test sandboxes can deny taskkill; do not leave a fixture
-      // listener behind when validating that cleanup path.
-      setTimeout(() => process.exit(0), 3000);
-      createServer((req, res) => {
-        if (req.url === '/crash') { process.exit(7); }
-        res.end('ready');
-      }).listen(Number(process.env.${name === 'web' ? 'MOSAIC_WEB_PORT' : 'MOSAIC_STUDIO_PORT'}), '127.0.0.1');
-    `);
-  }
+  await writeFile(join(root, 'mosaic.config.json'), JSON.stringify({ api: { port: ports[0] }, web: { port: ports[1] } }));
+  const directory = join(root, 'apps', 'web');
+  await mkdir(directory, { recursive: true });
+  await writeFile(join(directory, 'package.json'), JSON.stringify({ name: 'fixture-web', private: true, scripts: { dev: 'node fixture.mjs' } }));
+  await writeFile(join(directory, 'fixture.mjs'), mode === 'fail-web' ? 'setTimeout(() => process.exit(7), 800);' : `
+    import { createServer } from 'node:http';
+    // Serve health long enough for the launcher to report ready, then crash.
+    setTimeout(() => process.exit(7), 2500);
+    createServer((req, res) => res.end('ready')).listen(Number(process.env.MOSAIC_WEB_PORT), '127.0.0.1');
+  `);
   const env = { ...process.env };
   for (const key of ['PORT', 'MOSAIC_WEB_PORT', 'MOSAIC_STUDIO_PORT']) delete env[key];
   const child = spawn(process.execPath, ['scripts/dev.mjs'], { cwd: root, env, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -74,21 +67,19 @@ async function portAvailable(port: number): Promise<boolean> {
   });
 }
 
-test('application failure stops startup before launching Studio', async (t) => {
+test('application failure stops startup before reporting ready', async (t) => {
   const app = await fixture(t, 'fail-web');
   await waitFor(() => app.child.exitCode !== null, app.output);
   assert.notEqual(app.child.exitCode, 0);
-  assert.doesNotMatch(app.output(), /Application ready|fixture-studio/);
+  assert.doesNotMatch(app.output(), /Application ready/);
 });
 
-test('Studio failure cleans up the application process tree', async (t) => {
-  const app = await fixture(t, 'fail-studio');
+test('application crash after startup stops the launcher and frees the port', async (t) => {
+  const app = await fixture(t, 'crash-after-ready');
   await waitFor(() => app.child.exitCode !== null, app.output);
-  assert.match(app.output(), /Application ready/);
+  assert.match(app.output(), /Application ready on http:\/\/localhost:\d+ \(Studio: http:\/\/localhost:\d+\/studio\)/);
   assert.notEqual(app.child.exitCode, 0);
-  for (const port of app.ports.slice(1)) {
-    await waitFor(() => portAvailable(port), app.output);
-  }
+  await waitFor(() => portAvailable(app.ports[1]!), app.output);
 });
 
 test('occupied application port is rejected before trusting another application health', async (t) => {
@@ -100,7 +91,7 @@ test('occupied application port is rejected before trusting another application 
   t.after(async () => { assert.ok(resolve(root).startsWith(resolve(tmpdir()) + sep)); await rm(root, { recursive: true, force: true }); });
   await mkdir(join(root, 'scripts'));
   await copyFile(fileURLToPath(new URL('../../../templates/fullstack/scripts/dev.mjs', import.meta.url)), join(root, 'scripts/dev.mjs'));
-  await writeFile(join(root, 'mosaic.config.json'), JSON.stringify({ api: { port: await freePort() }, web: { port }, studio: { port: await freePort() } }));
+  await writeFile(join(root, 'mosaic.config.json'), JSON.stringify({ api: { port: await freePort() }, web: { port } }));
   const cleanEnv = { ...process.env }; delete cleanEnv.PORT;
   const child = spawn(process.execPath, ['scripts/dev.mjs'], { cwd: root, env: cleanEnv, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
   let output = '';

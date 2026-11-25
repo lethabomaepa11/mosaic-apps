@@ -22,7 +22,6 @@ export interface CreateOptions {
   pwa: boolean;
   apiPort: number;
   webPort: number;
-  studioPort?: number;
   dbPort: number;
   pm: 'npm' | 'pnpm' | 'yarn';
   install: boolean;
@@ -38,10 +37,9 @@ export async function create(opts: CreateOptions): Promise<void> {
   const slug = slugify(opts.name);
   const target = join(opts.cwd, slug);
   const databaseUrl = opts.db ?? 'pglite://./data';
-  const studioPort = opts.studioPort ?? 3002;
-  const ports = [opts.apiPort, opts.webPort, studioPort];
+  const ports = [opts.apiPort, opts.webPort];
   if (ports.some((port) => !Number.isInteger(port) || port < 1 || port > 65535) || new Set(ports).size !== ports.length) {
-    throw new Error('API, web and Studio ports must be different integers between 1 and 65535.');
+    throw new Error('API and web ports must be different integers between 1 and 65535.');
   }
   if (opts.link && opts.npmMode) throw new Error('Choose either --link or --npm-mode.');
   if (opts.link && !existsSync(join(opts.link, 'packages', 'server', 'package.json'))) {
@@ -78,13 +76,12 @@ export async function create(opts: CreateOptions): Promise<void> {
     __DEMO__: String(opts.demo),
     __API_PORT__: String(opts.apiPort),
     __WEB_PORT__: String(opts.webPort),
-    __STUDIO_PORT__: String(studioPort),
     __DB_PORT__: String(opts.dbPort),
     __JWT_SECRET__: jwtSecret,
   });
 
   // .env with generated secret
-  await writeEnv(target, databaseUrl, opts.webPort, studioPort, jwtSecret, opts.auth, opts.demo);
+  await writeEnv(target, databaseUrl, opts.webPort, jwtSecret, opts.auth, opts.demo);
 
   // Published dependencies are the default; local links are explicit.
   if (opts.link) {
@@ -124,21 +121,21 @@ export async function create(opts: CreateOptions): Promise<void> {
 
   cd ${slug}
   ${opts.install ? '' : `${opts.pm} install\n  `}${databaseUrl.startsWith('pglite') ? '# Embedded PostgreSQL: no database service needed' : '# Start the PostgreSQL service configured in DATABASE_URL'}
-  npm run dev                   # app + same-origin API (:${opts.webPort}) + Studio (:${studioPort})
+  npm run dev                   # one server: app + /api + /studio on :${opts.webPort}
 
-  App   → http://localhost:${opts.webPort}
-  API   → http://localhost:${opts.webPort}/api
-  Studio → http://localhost:${studioPort}
-  Admin → admin@mosaic.local / admin1234${opts.demo ? '' : '\n\n  (demo seeding disabled)'}
+  App    → http://localhost:${opts.webPort}
+  API    → http://localhost:${opts.webPort}/api
+  Studio → http://localhost:${opts.webPort}/studio
+  Admin  → admin@mosaic.local / admin1234${opts.demo ? '' : '\n\n  (demo seeding disabled)'}
 
 Next:
   • mosaic entity Product --fields "name:string,price:decimal"   # model
   • npm run migrate                                              # migrate
-  • mosaic studio                                                # design forms & pages
+  • open /studio                                                 # design forms & pages
 `);
 }
 
-async function writeEnv(target: string, db: string, webPort: number, studioPort: number, secret: string, auth: boolean, demo: boolean): Promise<void> {
+async function writeEnv(target: string, db: string, webPort: number, secret: string, auth: boolean, demo: boolean): Promise<void> {
   const env = `# Database
 DATABASE_URL=${db}
 
@@ -148,7 +145,6 @@ MOSAIC_JWT_SECRET=${secret}
 
 # Boot
 MOSAIC_WEB_PORT=${webPort}
-MOSAIC_STUDIO_PORT=${studioPort}
 SEED=true
 SEED_DEMO=${demo}
 `;

@@ -9,11 +9,8 @@ if (existsSync(resolve(project, '.env'))) process.loadEnvFile(resolve(project, '
 const config = JSON.parse(readFileSync(resolve(project, 'mosaic.config.json'), 'utf8'));
 const apiPort = Number(process.env.PORT ?? config.api?.port ?? 3001);
 const webPort = Number(process.env.MOSAIC_WEB_PORT ?? config.web?.port ?? 3000);
-const studioPort = Number(process.env.MOSAIC_STUDIO_PORT ?? config.studio?.port ?? 3002);
-const targets = [
-  { name: 'web', port: webPort, color: '\x1b[35m', workspace: 'apps/web' },
-  { name: 'studio', port: studioPort, color: '\x1b[33m', workspace: 'apps/studio' },
-];
+// One SvelteKit server serves the app, its same-origin /api and Studio at /studio.
+const target = { name: 'web', port: webPort, color: '\x1b[35m', workspace: 'apps/web' };
 const children = [];
 let shuttingDown = false;
 
@@ -26,7 +23,7 @@ async function requireFreePort(target) {
       socket.once('error', (error) => {
         if (host === '::1' && ['EADDRNOTAVAIL', 'EAFNOSUPPORT'].includes(error.code)) { accept(); return; }
         reject(new Error(
-          `${target.name} port ${target.port} is unavailable (${error.code}). Stop the application using it, or set ${target.name === 'api' ? 'PORT' : target.name === 'web' ? 'MOSAIC_WEB_PORT' : 'MOSAIC_STUDIO_PORT'} in .env.`,
+          `${target.name} port ${target.port} is unavailable (${error.code}). Stop the application using it, or set MOSAIC_WEB_PORT in .env.`,
         ));
       });
       socket.listen({ port: target.port, host, exclusive: true }, () => socket.close(accept));
@@ -40,8 +37,6 @@ function startTarget(target) {
     ...process.env,
     PORT: String(apiPort),
     MOSAIC_WEB_PORT: String(webPort),
-    MOSAIC_STUDIO_PORT: String(studioPort),
-    MOSAIC_API_TARGET: `http://127.0.0.1:${webPort}`,
   };
   const options = { cwd: project, env, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true, detached: process.platform !== 'win32' };
   const child = process.env.npm_execpath?.endsWith('npm-cli.js')
@@ -71,12 +66,11 @@ function startTarget(target) {
 }
 
 async function main() {
-  const ports = targets.map((target) => target.port);
-  if (ports.some((port) => !Number.isInteger(port) || port < 1 || port > 65535) || new Set(ports).size !== ports.length) {
-    throw new Error('API, web and Studio ports must be different integers between 1 and 65535.');
+  if (!Number.isInteger(webPort) || webPort < 1 || webPort > 65535) {
+    throw new Error('MOSAIC_WEB_PORT must be an integer between 1 and 65535.');
   }
-  for (const target of targets) await requireFreePort(target);
-  const web = startTarget(targets[0]);
+  await requireFreePort(target);
+  const web = startTarget(target);
   const health = `http://127.0.0.1:${webPort}/api/health`;
   const deadline = Date.now() + 60_000;
   while (Date.now() < deadline && !shuttingDown) {
@@ -84,8 +78,7 @@ async function main() {
     try {
       const response = await fetch(health, { signal: AbortSignal.timeout(1500) });
       if (response.ok) {
-        console.log(`[mosaic] Application ready on :${webPort}; starting Studio on :${studioPort}`);
-        startTarget(targets[1]);
+        console.log(`[mosaic] Application ready on http://localhost:${webPort} (Studio: http://localhost:${webPort}/studio)`);
         return;
       }
     } catch { /* The API may still be initializing its database. */ }
