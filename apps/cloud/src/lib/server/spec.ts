@@ -175,16 +175,21 @@ export function autoRepair(input: AppSpec): { spec: AppSpec; repairs: string[] }
     for (const value of submission.managed) {
       if (value.source === 'profile') value.value = camel(value.value.replace(/^profile\./, ''));
     }
-    const ownRef = profile && entity.fields.filter((field) => field.type === 'ref' && field.refEntity === profile.entity);
-    if (!profile || ownRef?.length !== 1 || submission.selectable?.includes(ownRef[0]!.name)) continue;
-    const field = ownRef[0]!;
-    const current = submission.managed.find((item) => item.field === field.name);
-    if (current?.source === 'profile' && (current.value === 'id' || spec.entities.find((item) => item.name === profile.entity)?.fields.some(
-      (from) => from.name === current.value && from.type === 'ref' && from.refEntity === field.refEntity,
-    ))) continue;
-    if (current?.source === 'constant') continue;
-    submission.managed = [...submission.managed.filter((item) => item.field !== field.name), { field: field.name, source: 'profile', value: 'id' }];
-    repairs.push(`${entity.name}.${field.name}: linked to the signed-in profile ID`);
+    const profileEntity = spec.entities.find((item) => item.name === profile?.entity);
+    if (!profileEntity) continue;
+    const ownRefs = entity.fields.filter((field) => field.type === 'ref' && field.refEntity === profileEntity.name);
+    for (const field of entity.fields) {
+      if (field.type !== 'ref' || submission.selectable?.includes(field.name)) continue;
+      const values = submission.managed.filter((item) => item.field === field.name);
+      const current = values[0];
+      if (values.length > 1 || current?.source === 'constant' || (!current && !(ownRefs.length === 1 && ownRefs[0] === field))) continue;
+      const sources = profileReferenceFields(profileEntity, field);
+      if (current?.source === 'profile' && sources.includes(current.value)) continue;
+      if (sources.length !== 1) continue;
+      if (current) Object.assign(current, { source: 'profile', value: sources[0]! });
+      else submission.managed.push({ field: field.name, source: 'profile', value: sources[0]! });
+      repairs.push(`${entity.name}.${field.name}: linked to ${profileEntity.name}.${sources[0]} from the signed-in profile`);
+    }
   }
   spec.sampleData = spec.sampleData.filter((sample) => names.has(sample.entity));
   for (const page of spec.pages) {
@@ -212,6 +217,13 @@ const ENTITY_NAME = /^[a-z][a-z0-9_]{1,40}$/;
 const FIELD_NAME = /^[a-z][a-zA-Z0-9]{0,40}$/;
 const SYSTEM_FIELDS = new Set(['id', 'createdAt', 'updatedAt', 'deletedAt']);
 const reservedPageRoute = (route: string) => /^\/(api|f|login|signup|logout|studio)(\/|$)/.test(route);
+
+function profileReferenceFields(profile: SpecEntity, target: SpecField): string[] {
+  return [
+    ...(target.refEntity === profile.name ? ['id'] : []),
+    ...profile.fields.filter((field) => field.type === 'ref' && field.refEntity === target.refEntity).map((field) => field.name),
+  ];
+}
 
 function protectedSubmissionEntities(spec: AppSpec): Set<string> {
   return new Set(spec.entities.flatMap((entity) => entity.submission ? [

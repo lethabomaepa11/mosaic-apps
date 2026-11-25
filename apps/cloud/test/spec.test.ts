@@ -30,6 +30,32 @@ test('a link to an entity that does not exist becomes a text field instead of fa
   assert.deepEqual(validateSpec(spec), []);
 });
 
+test('user organization repair follows the signed-in membership only when the source is unambiguous', () => {
+  const draft = normalizeSpec({
+    entities: [
+      { name: 'organization', fields: [{ name: 'name' }] },
+      { name: 'membership', fields: [
+        { name: 'account_email', unique: true },
+        { name: 'company', type: 'ref', refEntity: 'organization' },
+      ] },
+      { name: 'user', fields: [{ name: 'organization', type: 'ref', refEntity: 'organization' }], submission: {
+        profile: { entity: 'membership', emailField: 'account_email' },
+        managed: [{ field: 'organization', source: 'profile', value: 'id' }],
+      } },
+    ],
+  });
+  const repaired = autoRepair(draft).spec;
+  assert.deepEqual(validateSpec(repaired), []);
+  assert.deepEqual(repaired.entities[2]?.submission?.managed, [{ field: 'organization', source: 'profile', value: 'company' }]);
+  assert.deepEqual(compileSpec(repaired).workflows?.[0]?.input.properties, {});
+
+  const membership = draft.entities[1]!;
+  membership.fields.push({ ...membership.fields[1]!, name: 'billingCompany' });
+  assert.match(validateSpec(autoRepair(draft).spec).join('\n'), /user\.organization: invalid server-managed value/);
+  membership.fields.splice(1);
+  assert.match(validateSpec(autoRepair(draft).spec).join('\n'), /user\.organization: invalid server-managed value/);
+});
+
 test('sample records are understood in every shape models produce', () => {
   const shapes = [
     [{ fullName: 'Thandi Nkosi', email: 't@example.com' }],                                  // record objects (asked for)
