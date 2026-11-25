@@ -4,16 +4,18 @@
   let { data, form } = $props();
   // svelte-ignore state_referenced_locally
   let provider = $state(data.settings.provider); // editable form state, seeded from the saved choice
-  const providers = [
-    { id: 'mosaic', name: 'Mosaic default', tag: 'Free', note: 'Shared Groq · GPT-OSS 120B and 20B' },
+  const providers = $derived([
+    { id: 'mosaic', name: 'Mosaic default', tag: 'Free', note: data.geminiFallback ? 'Shared Groq with Gemini backup' : 'Shared Groq' },
+    { id: 'gemini', name: 'Gemini', tag: 'Your key', note: 'Google AI Studio · free tier available' },
     { id: 'openai', name: 'ChatGPT', tag: 'Your key', note: 'OpenAI API' },
     { id: 'anthropic', name: 'Claude', tag: 'Your key', note: 'Anthropic API' },
     { id: 'deepseek', name: 'DeepSeek', tag: 'Your key', note: 'DeepSeek API' },
-  ] as const;
+  ] as const);
   const keyHelp: Record<string, { url: string; text: string }> = {
     openai: { url: 'https://platform.openai.com/api-keys', text: 'A ChatGPT Plus or Pro subscription does not include API access. Create an API key on the OpenAI platform; usage there is billed separately.' },
     anthropic: { url: 'https://console.anthropic.com/settings/keys', text: 'A Claude Pro or Max subscription does not include API access. Create an API key in the Anthropic Console. The default is Claude Opus 5.5 (best quality); claude-sonnet-5-5 or claude-haiku-5-5 cost less.' },
     deepseek: { url: 'https://platform.deepseek.com/api_keys', text: 'A low-cost API. Create a key on the DeepSeek platform.' },
+    gemini: { url: 'https://aistudio.google.com/apikey', text: 'Use a Google AI Studio key. Google may use prompts and responses from free-tier requests to improve its products.' },
   };
 </script>
 
@@ -42,9 +44,9 @@
       <div class="surface space-y-2 p-4 text-sm">
         <p class="mb-0 flex items-center gap-2 font-medium"><Gauge size={16} class="text-warning" /> What to expect from the free default</p>
         <ul class="mb-0 list-disc space-y-1 pl-5 muted">
-          <li>Runs on Groq's free tier, <strong>shared by everyone</strong> on this Cloud: about <strong>8,000 tokens per minute</strong> and <strong>1,000 requests per day</strong>.</li>
-          <li>A build makes 4 to 10 AI calls, so it usually takes <strong>3 to 6 minutes</strong>, longer when others are building. You'll see "waiting for the AI rate limit" in the chat when that happens.</li>
-          <li>If the daily limit runs out, builds pause until it resets. Quality is good for straightforward business apps; your own key gives faster, stronger results.</li>
+          <li>Cloud shares Groq's model limits across builds and switches to another available model when one is busy.</li>
+          {#if data.geminiFallback}<li>When Groq is unavailable, builds can use Gemini. Google may use free-tier prompts and responses to improve its products.</li>{/if}
+          <li>If shared capacity runs out, Cloud reports the failure promptly. Your own key uses your provider's quota.</li>
         </ul>
       </div>
     {:else}

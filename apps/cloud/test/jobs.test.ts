@@ -207,7 +207,14 @@ test('the planner asks once; a chat reply resumes the same job and it never asks
   agentQuestions = [];
 });
 
-test('a generated app is the verified spec with real Mosaic artifacts in the release', async () => {
+test('a verified app still publishes real Mosaic artifacts when the reviewer is unavailable', async (t) => {
+  const previous = globalThis.fetch;
+  t.mock.method(globalThis, 'fetch', async (input: string | URL, init?: RequestInit) => {
+    if (String(input).includes('api.groq.com') && JSON.parse(String(init?.body)).response_format.json_schema.name === 'mosaic_review') {
+      return new Response(null, { status: 503 });
+    }
+    return previous(input, init);
+  });
   const { projectId } = await createProject();
   await enqueueJob(db, { projectId, kind: 'generate', metadata: { prompt: 'Track equipment loans' } });
   await runJobs(db, 10_000);
@@ -218,4 +225,5 @@ test('a generated app is the verified spec with real Mosaic artifacts in the rel
   for (const path of ['mosaic/spec.json', 'apps/web/src/lib/server/entities/loan.entity.json', 'apps/web/src/lib/server/mosaic-app.json', 'apps/web/src/routes/studio/+layout.svelte']) assert.ok(paths.includes(path), path);
   const log = (await db.query<{ log: Array<{ agent?: string }> }>('SELECT log FROM cloud_jobs WHERE project_id = $1', [projectId])).rows[0]!.log;
   for (const agent of ['Developer', 'Verifier', 'Reviewer']) assert.ok(log.some((entry) => entry.agent === agent), `${agent} shows its thinking`);
+  assert.match(JSON.stringify(log), /AI review is unavailable/);
 });

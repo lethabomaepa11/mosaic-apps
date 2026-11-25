@@ -2,7 +2,7 @@ import { getCloudDb } from './db';
 import { decryptProviderSecret, encryptProviderSecret } from './providers';
 import { AI_PROVIDERS, type AiConfig, type AiProvider } from './ai';
 
-export const isAiProvider = (value: string): value is AiProvider => value in AI_PROVIDERS;
+export const isAiProvider = (value: string): value is AiProvider => Object.hasOwn(AI_PROVIDERS, value);
 
 /** What the settings page may show: never the key itself. */
 export async function getAiSettings(userId: string): Promise<{ provider: AiProvider; model: string; hasKey: boolean }> {

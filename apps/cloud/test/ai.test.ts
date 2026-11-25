@@ -28,11 +28,14 @@ test('a short AI cooldown is retried only once', async (t) => {
 test('Groq switches models immediately and avoids a throttled model for subsequent calls', async (t) => {
   const saved = process.env.GROQ_API_KEY;
   const savedModel = process.env.GROQ_MODEL;
+  const savedGemini = process.env.GEMINI_FALLBACK_API_KEY;
+  delete process.env.GEMINI_FALLBACK_API_KEY;
   process.env.GROQ_API_KEY = 'test-key';
   process.env.GROQ_MODEL = 'openai/gpt-oss-120b';
   t.after(() => {
     if (saved === undefined) delete process.env.GROQ_API_KEY; else process.env.GROQ_API_KEY = saved;
     if (savedModel === undefined) delete process.env.GROQ_MODEL; else process.env.GROQ_MODEL = savedModel;
+    if (savedGemini !== undefined) process.env.GEMINI_FALLBACK_API_KEY = savedGemini;
   });
   const requested: string[] = [];
   let limitPrimary = false;
@@ -71,4 +74,41 @@ test('Groq switches models immediately and avoids a throttled model for subseque
   await assert.rejects(aiJson(groq), /Groq rate limit reached/);
   assert.equal(requested.length, calls);
   assert.equal(onWait.mock.callCount(), 0);
+});
+
+test('shared builds use Gemini when Groq fails and keep credentials and schema scoped to each provider', async (t) => {
+  const now = Date.now() + 3_600_000;
+  t.mock.method(Date, 'now', () => now);
+  const saved = { GROQ_API_KEY: process.env.GROQ_API_KEY, GROQ_MODEL: process.env.GROQ_MODEL, GEMINI_FALLBACK_API_KEY: process.env.GEMINI_FALLBACK_API_KEY };
+  Object.assign(process.env, { GROQ_API_KEY: 'groq-test', GROQ_MODEL: 'qwen/qwen3.8-27b', GEMINI_FALLBACK_API_KEY: 'gemini-test' });
+  t.after(() => { for (const [name, value] of Object.entries(saved)) { if (value === undefined) delete process.env[name]; else process.env[name] = value; } });
+  const attempted: string[] = [];
+  const schema = { type: 'object', properties: { ok: { type: 'boolean' } }, additionalProperties: false, required: ['ok'] };
+  t.mock.method(globalThis, 'fetch', async (url: string, init: RequestInit) => {
+    const headers = new Headers(init.headers);
+    const body = JSON.parse(String(init.body));
+    if (url.startsWith('https://api.groq.com/')) {
+      attempted.push(body.model);
+      assert.equal(headers.get('authorization'), 'Bearer groq-test');
+      assert.equal(headers.has('x-goog-api-key'), false);
+      if (body.model.startsWith('qwen/')) {
+        assert.equal(body.reasoning_effort, undefined);
+        return new Response(null, { status: 429, headers: { 'retry-after': '1800' } });
+      }
+      if (body.model.endsWith('20b')) throw new TypeError('network failure');
+      return new Response(null, { status: 503 });
+    }
+    assert.match(url, /generativelanguage\.googleapis\.com\/v1beta\/models\/gemini-3\.5-flash-lite:generateContent$/);
+    attempted.push('gemini');
+    assert.equal(headers.get('x-goog-api-key'), 'gemini-test');
+    assert.equal(headers.has('authorization'), false);
+    assert.deepEqual(body.generationConfig.responseJsonSchema, schema);
+    return Response.json({ modelVersion: 'gemini-3.5-flash-lite', candidates: [{ finishReason: 'STOP', content: { parts: [{ thought: true, text: 'hidden' }, { text: '{"ok":true}' }] } }] });
+  });
+  const onModel = t.mock.fn();
+  const build = { ...request, schema, config: { provider: 'mosaic' as const, onModel } };
+  assert.deepEqual(await aiJson(build), { ok: true });
+  assert.deepEqual(await aiJson(build), { ok: true });
+  assert.deepEqual(attempted, ['qwen/qwen3.8-27b', 'openai/gpt-oss-20b', 'openai/gpt-oss-120b', 'gemini', 'gemini']);
+  assert.equal(onModel.mock.calls[0]?.arguments[0], 'gemini-3.5-flash-lite');
 });

@@ -1,11 +1,11 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
-import { AI_PROVIDERS, testAiKey } from '#lib/server/ai';
+import { AI_PROVIDERS, hasGeminiFallback, testAiKey } from '#lib/server/ai';
 import { getAiSettings, isAiProvider, saveAiSettings } from '#lib/server/ai-settings';
 
 export const load: PageServerLoad = async ({ locals }) => {
   if (!locals.user) throw redirect(303, '/login');
-  return { settings: await getAiSettings(locals.user.id), defaults: Object.fromEntries(Object.entries(AI_PROVIDERS).map(([id, item]) => [id, item.defaultModel])) };
+  return { settings: await getAiSettings(locals.user.id), geminiFallback: hasGeminiFallback(), defaults: Object.fromEntries(Object.entries(AI_PROVIDERS).map(([id, item]) => [id, item.defaultModel])) };
 };
 
 export const actions: Actions = {

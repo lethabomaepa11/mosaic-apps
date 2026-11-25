@@ -2,7 +2,7 @@ import type { Db } from '@mosaic-apps/server';
 import { waitUntil } from '@vercel/functions';
 import { getCloudDb, id } from './db';
 import type { ProjectBlueprint } from './groq';
-import { aiModel } from './ai';
+import { AI_PROVIDERS, aiModel } from './ai';
 import { aiConfigFor } from './ai-settings';
 import type { Answer } from './agents';
 import { buildApp } from './build-app';
@@ -175,7 +175,9 @@ const generate: JobHandler = async ({ db, job, stage, think, pause, enqueue }) =
     // Ask at most once per project; after that the agents decide and state their assumptions.
     const askedBefore = await db.query("SELECT 1 FROM cloud_jobs WHERE project_id = $1 AND metadata ? 'questions' AND id <> $2 LIMIT 1", [project.id, job.id]);
     const ai = await aiConfigFor(job.metadata.userId as string | undefined);
-    if (ai.provider !== 'mosaic') await think('Planner', `Using your own ${ai.provider === 'anthropic' ? 'Claude' : ai.provider === 'openai' ? 'OpenAI' : 'DeepSeek'} key (${aiModel(ai)})`);
+    let respondingModel = aiModel(ai);
+    ai.onModel = (model) => { respondingModel = model; };
+    if (ai.provider !== 'mosaic') await think('Planner', `Using your own ${AI_PROVIDERS[ai.provider].label} key (${respondingModel})`);
     const result = await buildApp({
       ai, brief, answers, options,
       current: revising ? project.app_spec! : undefined, change: revising ? String(job.metadata.prompt ?? '') : undefined,
@@ -187,7 +189,7 @@ const generate: JobHandler = async ({ db, job, stage, think, pause, enqueue }) =
       return;
     }
     ({ spec, app } = result);
-    await db.query('UPDATE cloud_projects SET app_spec = $2::jsonb, blueprint = $3::jsonb, planner_model = $4, planned_at = now(), updated_at = now() WHERE id = $1', [project.id, JSON.stringify(spec), JSON.stringify(blueprintFromSpec(spec)), aiModel(ai)]);
+    await db.query('UPDATE cloud_projects SET app_spec = $2::jsonb, blueprint = $3::jsonb, planner_model = $4, planned_at = now(), updated_at = now() WHERE id = $1', [project.id, JSON.stringify(spec), JSON.stringify(blueprintFromSpec(spec)), respondingModel]);
     await addMessage(db, project.id, `${spec.summary}\n\nBuilt ${spec.entities.length} entities (${spec.entities.map((entity) => entity.labelPlural).join(', ')}) with ${spec.pages.length} pages, verified with real create/list/edit checks${result.reviewApproved ? ' and approved by the reviewer' : ''}.`);
   }
   await think('Verifier', 'Publishing the live preview…');
