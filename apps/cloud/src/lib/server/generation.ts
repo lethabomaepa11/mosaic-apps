@@ -137,7 +137,7 @@ export function generateProjectFiles(input: { name: string; slug: string; spec: 
     const marker = '  return createMosaicServer({';
     if (!mosaic?.includes(marker)) throw new Error('The Next.js scaffold cannot attach the generated-app importer.');
     put('lib/mosaic.js', `import { importGeneratedApp } from './import-generated.js';\n` + mosaic.replace(marker,
-      `  const bootstrap = process.env.MOSAIC_IMPORT_GENERATED !== 'false';\n  if (bootstrap && NODE_ENV === 'production' && (!ADMIN_EMAIL || !ADMIN_PASSWORD)) throw new Error('Set ADMIN_EMAIL and ADMIN_PASSWORD to initialize the generated app.');\n  const email = ADMIN_EMAIL ?? 'admin@mosaic.local';\n  const password = ADMIN_PASSWORD ?? 'admin1234';\n  const server = await createMosaicServer({`)
+      `  const bootstrap = process.env.MOSAIC_IMPORT_GENERATED !== 'false';\n  if (bootstrap && NODE_ENV === 'production' && (!ADMIN_EMAIL || !ADMIN_PASSWORD)) throw new Error('Set ADMIN_EMAIL and ADMIN_PASSWORD to initialize the generated app.');\n  const email = ADMIN_EMAIL || 'admin@mosaic.local';\n  const password = ADMIN_PASSWORD || 'admin1234';\n  const server = await createMosaicServer({`)
       .replace("databaseUrl: DATABASE_URL ?? 'pglite://./.mosaic-data',", "databaseUrl: DATABASE_URL ?? 'pglite://./data',\n    database: { poolMax: Number(process.env.MOSAIC_DB_POOL_MAX) || 2 },")
       .replace("seed: ADMIN_EMAIL && ADMIN_PASSWORD ? { admin: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD }, demo: SEED_DEMO === 'true' } : false,", 'seed: bootstrap || (ADMIN_EMAIL && ADMIN_PASSWORD) ? { admin: { email, password }, demo: false } : false,')
       .replace(/\n  \}\);\n\}\s*$/, '\n  });\n  return importGeneratedApp(server, email, password);\n}\n'));
