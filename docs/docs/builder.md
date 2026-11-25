@@ -1,94 +1,37 @@
 ---
-sidebar_position: 9
+title: Visual Studio
 ---
 
-# Builder guide (Studio)
+# Design pages and forms
 
-Start your generated application from its project root:
+Open `/studio` in a SvelteKit app with permission to manage pages or forms. In Cloud, open **Preview → Open Studio** for the selected project. The deployed Next.js scaffold has Page Studio for page JSON and sidebar editing. [Mosaic Cloud](./cloud-studio.md#edit-the-preview)
 
-```bash
-npm run dev
-```
+![Customer form in SvelteKit Studio](/img/screenshots/form-studio.png)
 
-Open Studio at `http://localhost:3000/studio` and sign in as an administrator or
-editor. Studio is part of the app, which also serves the API at `/api`. Open **Forms** or **Pages** to create or edit a definition.
+## Use the canvas
 
-![Customer form in Studio](/img/screenshots/form-studio.png)
+1. Open **Forms** or **Pages** and choose a definition.
+2. Drag components from **Palette**. Select one in the canvas or **Layers** and edit its **Properties**.
+3. Set field bindings to the names your entity or endpoint expects.
+4. Try the current draft with **Preview**. Select **Save** to publish it to the app database.
 
-## Forms and pages
-
-- The **Palette** provides 59 components. Drag fields and containers onto the
-  canvas, then configure the selected node in **Properties**.
-- **Layers** shows the component tree and field bindings.
-- Preview is inline canvas mode with desktop, tablet, and mobile widths.
-  Returning to edit keeps the designer mounted.
-- Form identity, entity, layout, columns, motion, initial data source,
-  submission behavior, and SEO values belong in **Form settings**.
-- Page identity, route, access, application-shell layout, sidebar navigation,
-  motion, SEO, and social metadata belong in **Page settings**.
-- Save on a form persists and publishes its current definition.
-- `Ctrl/Cmd+S` saves from anywhere in Form Studio. If edits arrive while a
-  publish is in flight, Studio queues another version instead of marking those
-  edits as saved.
-- `EntityTable` supports configured columns, create/edit/delete, and optional
-  row drill-down to its inline detail view when connected to an API client.
-- Entity field suggestions assist bindings, and custom binding strings remain
-  allowed.
-
-Every component has a common **Actions** editor. Actions can show a message,
-call the configured API, navigate to a searchable form/page target, update an
-application/page/form/component state path, or run custom JavaScript/TypeScript.
-Choose **Execute script**, then **Edit script** to open Monaco in a modal with
-JavaScript/TypeScript selection and runtime state/API autocomplete. **Apply script**
-adds the changes to the designer; **Cancel**, Escape, or closing the modal discards
-them. Save the form or page to publish the applied script.
-
-`visibleIf` and `disabledIf` use Mosaic's restricted expression interpreter by
-default. Choose JavaScript/TypeScript to open its modal editor when a condition
-needs custom logic. Script conditions run in the same isolated, limited browser
-sandbox as script actions. See [Runtime state management](./state-management.md).
-
-## Code and JSON editors
-
-Every code or JSON field opens Monaco in a modal. This includes component
-options and props, static form records, API request bodies, state values,
-conditions, code blocks, role permissions, settings, and form/page definitions.
-Use **Apply** to update the field or **Cancel** to discard the editor draft.
-Invalid JSON shows an error and stays open until corrected. API responses and
-migration SQL open in read-only Monaco modals.
-
-![JSON editing in a Monaco modal](/img/screenshots/json-editor.png)
-
-![Execute script in a Monaco modal](/img/screenshots/execute-script.png)
+Use **Appearance** to set spacing and typography where supported by your UI version. For whole-page spacing, select **Page root**. Edit global navigation separately in Studio **Settings → Navigation**, or use **Edit sidebar** in Cloud Preview Studio.
 
 ## Form and page settings
 
-Select **Form settings** for the form's identity, entity, layout, data source,
-submission behavior, and search/social metadata. Return to the canvas after
-editing, then **Save** to publish the complete definition.
+| Settings | What to configure |
+| --- | --- |
+| Form | Entity, layout, submission behavior, and metadata. Check the runtime's support before relying on a non-entity data source. |
+| Page | Route, access, navigation, layout, and metadata. A route can have parameters such as `/orders/:id`. |
 
-![Form settings](/img/screenshots/form-settings.png)
+A published entity form can be opened at `/f/<slug>`. Use an authenticated [server endpoint](./extensions.md#server-extensions) for sensitive business actions and server-managed fields.
 
-**Page settings** follows the same pattern, with route, layout, navigation,
-access, and metadata options. See the [roadmap](./roadmap.md) for current limits
-on data-source loading and page access enforcement.
+## Events and logic
 
-![Page settings](/img/screenshots/page-settings.png)
+Use **Events** on supported components to connect button clicks, field changes, and table row clicks to actions. An action can call the Mosaic API, navigate, show a message, change state, or run a sandboxed script. **Logic** controls visibility and disabled state. Server permissions still apply. [Runtime state and actions](./state-management.md)
+
+Code and JSON editors open in modals. **Apply** updates the designer. **Save** publishes the definition.
 
 ## Embedded forms
 
-Add **Embedded form**, search for a form, and select it. Configure JSON initial
-props and a parent data binding (default `childFormData`). Nested input changes
-are written to that object. The child omits submit controls and document
-metadata, inherits view mode, prevents recursive inclusion, and is limited to
-eight embedded levels. Nested required-field errors are not yet combined with
-the parent form's validation.
-
-## State management
-
-`@mosaic-apps/ui` exports `createMosaicState`, `MosaicState`, and `StateStore`.
-PageRenderer owns or accepts application/page scopes. FormRenderer creates a
-form scope; nested forms share application/page stores and isolate form stores.
-State is instance-owned and serializable. Component actions and custom code use
-the same scopes. Persistence adapters remain opt in future work. See
-[Runtime state management](./state-management.md).
+Add **Embedded form** and select an existing child form. Set its initial props and parent binding to reuse a group of fields. The child writes values back under that binding. The renderer prevents recursive embedding and limits nesting to eight levels. Validate the complete request on the server. [Form JSON](./form-json.md#embedded-forms)

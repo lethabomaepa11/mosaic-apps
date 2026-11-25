@@ -1,66 +1,26 @@
 ---
-sidebar_position: 3
+title: Local and hosted workflows
 ---
 
 # Local and hosted workflows
 
-Mosaic has two entry points that produce the same portable application: a local
-developer project and hosted Mosaic Studio.
+Use the [CLI](./quickstart.md) when you want to start with a repository and design your own entities. Use [Mosaic Cloud](./cloud-studio.md) when you want to start with a brief, review a generated preview, and download or deliver the project.
 
-## Local development
+## Where changes go
 
-```bash
-npx @mosaic-apps/cli create my-app
-cd my-app
-npm run dev
-```
+| Change | Save it in | How it takes effect |
+| --- | --- | --- |
+| Page or form in a local or deployed app | That app's Studio or Mosaic API | Publishing updates that app's database. |
+| Page, form, or sidebar in Cloud Preview Studio | The Cloud preview | Saving updates the preview database. |
+| AI-generated change in Cloud chat | A new Cloud release | Cloud builds and verifies the change before packaging and optional delivery. |
+| Entity source, custom endpoint, component, or dependency | The application repository | Review schema changes, build, and deploy the code. |
 
-PGlite supplies durable embedded PostgreSQL locally. Pages, forms, navigation,
-theme, and entity definitions are edited through Studio and stored in the database;
-every business entity has its own physical table. Users work visually rather than
-editing JSON.
+A Cloud preview and a production application have separate data and credentials. If you edit live artifacts, review the next Cloud release before delivery because Cloud publishes the generated definitions to the live app. Version history is available for [published artifacts](./history.md). Use Git for source changes and database backups for production data.
 
-Developers can add ordinary Svelte routes and components, Hono server commands, and
-npm dependencies. Registered custom components appear in the builder. Visual
-artifact changes publish without rebuilding; source, dependency, and schema changes
-go through checks, migration review, build, and deployment.
+## Take over an application
 
-## Hosted Studio
+Download the source under **Source & delivery** or open the connected GitHub repository. Run the downloaded project locally with its own database. Add [server endpoints](./extensions.md#server-extensions) for business actions. Add Svelte components to SvelteKit or React code to Next.js for app-specific interfaces.
 
-Describe an application or choose a template. Mosaic creates a private workspace,
-preview database, homepage, login, application shell, entities, forms, and routes.
-Continue through chat, direct canvas editing, Data, and Logic views.
+## Choose a deployment
 
-| Connections | Outcome |
-| --- | --- |
-| Neither | Hosted preview and source download |
-| GitHub only | Repository and source history |
-| Vercel only | Direct preview and production deployments |
-| Both | Repository-backed continuous deployment |
-
-A public data-backed deployment also needs PostgreSQL. Mosaic can provision Neon,
-connect Supabase, or use an existing PostgreSQL connection.
-
-## Application history
-
-Studio autosaves drafts. Save creates an immutable revision with an author, message,
-parent, checksum, and snapshot. Publish selects a committed revision. Restore creates
-a new forward revision rather than deleting history. Visual users see semantic and
-canvas differences; developers can inspect structural diffs or export a release.
-
-## Developer takeover
-
-Generated projects use standard SvelteKit, TypeScript, Hono, PostgreSQL, npm, and
-Git. They include local agent instructions describing safe Mosaic extension points.
-Developers can work without hosted Studio and can embed database pages/forms by name
-inside custom Svelte.
-
-## Deployment
-
-The target deployment is one Vercel project containing SvelteKit pages and Mosaic
-API functions. Neon is the default automated database provider; Supabase and generic
-PostgreSQL are supported. Hosted Studio is a separate control plane and does not own
-customer business records.
-
-The active [platform plan](https://github.com/lethabomaepa11/mosaic-apps/blob/main/contributor-docs/platform-plan.md)
-contains the complete specification, delivery tasks, and acceptance criteria.
+[Cloud delivery](./cloud-studio.md#deliver-a-release) uses GitHub for source, Neon for PostgreSQL, and Vercel for hosting. The connections serve different purposes. For another PostgreSQL provider, a manual Git deployment, or a self-hosted server, use the [deployment guide](./deployment.md).

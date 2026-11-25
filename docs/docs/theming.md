@@ -4,10 +4,11 @@ sidebar_position: 11
 
 # Theming
 
-Every generated app stores its global theme in the `theme.config` row of
+The SvelteKit runtime reads the global theme from the `theme.config` row of
 `mosaic_settings`. The runtime loads that one JSON value from `/api/theme` and
 applies it at the document root, so navigation, pages, forms, and DaisyUI
-components change together. Page artifacts do not duplicate application colors.
+components share tokens. The Next.js scaffold uses the theme in `lib/site.js`
+with its own stylesheet. In Cloud, choose the generated theme in project settings.
 
 The Studio theme picker includes the curated DaisyUI themes Corporate, Business,
 Light, Dark, Nord, Winter, Silk, and Lo-fi. Choosing one sets `activeTheme` in the

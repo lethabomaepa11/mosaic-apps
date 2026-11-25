@@ -1,58 +1,36 @@
 ---
-sidebar_position: 11
+title: Deployment overview
 ---
 
-# Deployment
+# Deploy a Mosaic application
 
-Mosaic's generated runtime has two durable parts:
+Deploy one web service for the app and its same-origin `/api`, backed by durable PostgreSQL. SvelteKit serves the visual Studio in that service. Next.js serves the React runtime and Page Studio.
 
-1. one SvelteKit application serving UI and the Hono `/api` routes;
-2. one PostgreSQL database for artifacts, users, metadata, and business tables.
-
-Studio is built into the same application at `/studio` (sign-in required), so there is
-no separate Studio deployment. Visual
-publishes update PostgreSQL without rebuilding; Svelte, dependency, adapter, and
-schema-source changes go through Git and a normal application deployment.
-
-## Required configuration
-
-| Variable | Purpose |
+| Where you are starting | Follow |
 | --- | --- |
-| `DATABASE_URL` | Neon, Supabase, or compatible PostgreSQL connection |
-| `MOSAIC_JWT_SECRET` | Stable signing key, at least 32 characters in production |
-| `AUTH` | `on` unless the application is intentionally public |
-| `SEED` | `false` after controlled bootstrap |
-| `SEED_DEMO` | `false` in production |
-| `MOSAIC_DEPLOY_TARGET` | `vercel`, `netlify`, or omitted for Node |
+| A release in Mosaic Cloud | [Cloud delivery](./cloud-studio.md#deliver-a-release) |
+| A repository you manage on Vercel | [Manual Vercel deployment](./deployment-vercel.md) |
+| An older project with a separate Studio app | [Studio upgrade](./deployment-studio.md#upgrade-from-a-separate-studio-app) |
 
-`PUBLIC_API_URL` is unnecessary for the unified app because the API is same-origin.
-Never expose database credentials or the signing key through `PUBLIC_*` variables.
+For a long-running Node host, build and start the SvelteKit web workspace or the Next.js project root. SvelteKit also has a Netlify adapter selected by `MOSAIC_DEPLOY_TARGET=netlify`. Use a host that runs server code.
 
-## Release sequence
+## Production configuration
 
-1. Build and test the exact commit.
-2. Back up production data and artifact revisions.
-3. Run `npm run migrate` with the production database URL and review its plan.
-4. Deploy `apps/web`.
-5. Verify `/api/health`, login, a database page, and a write path.
-6. Record the commit, artifact revisions, migration, and deployment URL as one
-   release unit.
+| Setting | Purpose |
+| --- | --- |
+| `DATABASE_URL` | Durable PostgreSQL connection. Use your provider's pooler for serverless traffic if recommended. |
+| `MOSAIC_JWT_SECRET` | Stable random session signing key. Use at least 32 characters and keep it server-side. |
+| `ADMIN_EMAIL`, `ADMIN_PASSWORD` | Initial administrator for a fresh database. Set these before bootstrap. |
+| `SEED`, `SEED_DEMO` | In SvelteKit, `SEED=true` enables bootstrap. Set `SEED_DEMO=false` in production. |
+| `MOSAIC_DEPLOY_TARGET` | SvelteKit adapter choice. Set `vercel` or `netlify` on those hosts. |
 
-For a long-running Node host, build `apps/web` and run its generated Node adapter
-output. For Vercel, follow the dedicated Vercel guide. For Netlify, set
-`MOSAIC_DEPLOY_TARGET=netlify`. In all cases the host must support server-side Node
-code; a static-only export cannot run Mosaic's API.
+Keep preview and production database URLs and secrets separate. A manual installation can use compatible PostgreSQL such as Neon or Supabase. Cloud-managed database provisioning uses Neon.
 
-## Database providers
+## Release checklist
 
-- Neon: use a pooled URL for serverless requests; use branches for preview data.
-- Supabase: use its Postgres connection or pooler; Supabase Auth is optional and is
-  not automatically substituted for Mosaic auth.
-- Generic PostgreSQL: use TLS, backups, a restricted application role, and a
-  separate migration/operator role when possible.
+1. Test the commit against a staging database and back up production.
+2. Review the migration plan before applying it. Confirm the command targets the intended database and uses the intended definitions.
+3. Deploy the application. Check `/api/health`, sign in with each relevant role, and exercise a real database read and write.
+4. Record the commit, published artifact revisions, database migration, and deployment URL.
 
-## Files and observability
-
-Local disk uploads require persistent Node storage. Serverless deployments should
-use an object-storage adapter. Keep request, job, deployment, and release IDs in
-logs; redact connection strings, tokens, form secrets, and record payloads.
+A filesystem upload directory needs persistent storage. For production uploads on an ephemeral host, implement an object-storage integration. Restoring a previous deployment requires checking database and artifact compatibility as well as code. [Migrations](./migrations.md) · [History](./history.md)

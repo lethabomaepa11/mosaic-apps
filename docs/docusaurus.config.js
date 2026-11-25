@@ -11,9 +11,10 @@ const config = {
   projectName: 'mosaic-apps',
 
   onBrokenLinks: 'throw',
+  onBrokenAnchors: 'throw',
 
   markdown: {
-    hooks: { onBrokenMarkdownLinks: 'warn' },
+    hooks: { onBrokenMarkdownLinks: 'throw' },
   },
 
   i18n: {
@@ -44,14 +45,13 @@ const config = {
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
     ({
       image: 'img/mosaic-social.png',
+      docs: { sidebar: { autoCollapseCategories: true } },
       navbar: {
         title: 'Mosaic',
         logo: { alt: 'Mosaic logo', src: 'img/logo.svg' },
         items: [
           { type: 'docSidebar', sidebarId: 'guide', position: 'left', label: 'Docs' },
-          { to: '/docs/components/catalog', label: 'Components', position: 'left' },
-          { to: '/docs/auto-crud', label: 'API reference', position: 'left' },
-          { to: '/blog', label: 'Blog', position: 'left' },
+          { to: '/api', label: 'API', position: 'left' },
           { href: 'https://cloud.mosaictalent.co.za', label: 'Cloud', position: 'right' },
           {
             href: 'https://github.com/lethabomaepa11/mosaic-apps',
@@ -63,20 +63,11 @@ const config = {
       footer: {
         links: [
           {
-            title: 'Docs',
+            title: 'Mosaic',
             items: [
-              { label: 'Quickstart', to: '/docs/intro' },
+              { label: 'Documentation', to: '/docs/intro' },
               { label: 'Mosaic Cloud', to: '/docs/cloud-studio' },
-              { label: 'CLI', to: '/docs/cli' },
-              { label: 'Migrations', to: '/docs/migrations' },
-            ],
-          },
-          {
-            title: 'Guides',
-            items: [
-              { label: 'Form JSON spec', to: '/docs/form-json' },
-              { label: 'Builder guide', to: '/docs/builder' },
-              { label: 'PWA guide', to: '/docs/pwa' },
+              { label: 'Road to v1', to: '/docs/roadmap' },
             ],
           },
           {

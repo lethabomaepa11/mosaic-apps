@@ -1,36 +1,25 @@
 ---
-sidebar_position: 15
+title: Recipes
 ---
 
 # Recipes
 
-## Approval dashboard page
+## Show a field conditionally
 
-1. Studio → Pages → Create "Approvals".
-2. Drop a `statRow` with three `statCard`s (`entity: order`, trends).
-3. Drop an `entityTable` (`entity: order`, columns `["orderNumber","status","total"]`).
-4. Add a `menu` with an "Approve" item — wire `onclick` later, or open the
-   record via `onrowclick` into an `EntityForm` modal.
-5. Publish → `/p/approvals`.
+Set the field's `visibleIf` to an expression such as `data.status === "active" && data.total > 1000`. This changes the UI. Enforce any required business rule in the API as well. [Form JSON](./form-json.md#node-anatomy)
 
-## Conditional field
+## Submit a request with server-managed fields
 
-On a field's `visibleIf`: `status === "active" && total > 1000`. Expressions
-evaluate against `{ data, ctx }` with the core interpreter (no `eval`).
+Define the dates and reason as form inputs. In the [server handler](./extensions.md#server-extensions), read the signed-in user, find their employee profile, and assign the organization and initial status during the database write. A Cloud release with a generated submission endpoint uses this pattern. [Mosaic Cloud](./cloud-studio.md)
 
-## Enum from a reference list
+## Add a review screen
 
-Instead of hard-coding options, keep statuses in **Settings → Reference
-lists** and consume via API in custom components (`GET /api/ref-lists/:name`).
+Create a page at `/approvals` with a live table or a custom list endpoint. Use a dedicated authenticated endpoint for each decision. Check the caller's authority and the request's current state, then update the record and related balances in one transaction.
 
-## Seeding per-environment data
+## Use shared reference values
 
-Keep `SEED=false` in prod; run `mosaic seed` once after first deploy, then
-manage users in **Settings → Users**. Demo content (`--demo`) is for local
-dev only.
+Keep list values under **Settings → Reference lists**. Read them through `GET /api/ref-lists/:name` from a custom component.
 
-## Multi-tenant-ish scoping (simple)
+## Scope records by organization
 
-Add an `org` ref field to entities, gate `permissions.create/update` to
-`admin,editor`, and filter lists with `?filter=[{"field":"org","op":"eq",
-"value":"<id>"}]` in a custom page scope. (Native tenancy is roadmap.)
+Enforce organization membership on the server using the authenticated actor. Apply that scope to reads, writes, and related record lookups. A browser-supplied filter can narrow an authorized result for display. [Security and access](./security.md)

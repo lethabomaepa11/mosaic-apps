@@ -1,41 +1,25 @@
 ---
-sidebar_position: 1
+title: Overview
 ---
 
-# Build business applications with Mosaic
+# Build with Mosaic
 
-Mosaic helps you create internal applications around your business data: customer
-directories, service requests, inventory, and operational dashboards. Define
-entities, design forms and pages in Studio, and run them in your own web application.
+Mosaic is a framework for modeling business records, exposing them through an API, and designing database-backed pages and forms. Mosaic Cloud is the hosted product that generates projects built on the framework.
 
-Use [Mosaic Cloud](./cloud-studio.md) to build from a brief and deploy with your own
-GitHub, Neon and Vercel accounts. [Open Cloud](https://cloud.mosaictalent.co.za).
+| Start here | What you get |
+| --- | --- |
+| [Local quickstart](./quickstart.md) | Your own SvelteKit or Next.js repository, with the Mosaic API and local database. |
+| [Mosaic Cloud](./cloud-studio.md) | A brief-to-preview workspace with editable generated source and optional delivery to your provider accounts. |
 
-![A customer form in Mosaic Studio](/img/screenshots/form-studio.png)
+## Choose a frontend
 
-## What you can do
+- **SvelteKit** includes the visual Studio for pages, forms, and navigation.
+- **Next.js** uses a React renderer for supported published components and includes Page Studio for editing page JSON. Cloud Preview Studio is available for both targets.
 
-- Model records and relations, review schema changes, and expose entity CRUD APIs.
-- Drag components onto forms and pages, then configure fields, layouts, and actions.
-- Use tables for record lists and drill down into a selected record's detail view.
-- Reuse forms inside other forms or pages and pass initial values through props.
-- Connect buttons to API calls, navigation, messages, or scoped state updates.
-- Write JavaScript or TypeScript in a Monaco modal when you need custom behavior.
-- Configure form and page settings, including SEO metadata, in their settings views.
+## Where to go next
 
-**Save** persists and publishes a form or page. **Preview** opens inside Studio,
-with desktop, tablet, and mobile widths. Code and JSON open in modal editors;
-Apply updates the designer and Cancel discards the editor draft.
+- [Model business records](./entities.md) and [review migrations](./migrations.md).
+- [Design a screen in Studio](./builder.md) or [write a server endpoint](./extensions.md#server-extensions).
+- [Deploy the application](./deployment.md) with its own database and secrets.
 
-## Your first workflow
-
-1. [Create and start an application](./quickstart.md).
-2. [Define the records it manages](./entities.md).
-3. [Design a form and page](./builder.md).
-4. [Choose components](./components/gallery.md) and connect actions to your data.
-5. [Deploy your database, API, and frontend](./deployment.md).
-
-Generated applications contain editable source for the API, frontend, and Studio.
-You can extend the generated code with your own server endpoints and Svelte components.
-
-See the [v1 roadmap](./roadmap.md) for planned capabilities and current limits.
+Use the [roadmap](./roadmap.md) for planned work and the [integration guide](./app-integrations.md) for features that need newer framework builds.

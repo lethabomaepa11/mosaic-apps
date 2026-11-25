@@ -23,7 +23,7 @@ const groups = [
       ['GET', '/api/entities/:e/:id', 'Single record'],
       ['POST', '/api/entities/:e', 'Create (201; invalid → 422)'],
       ['PATCH', '/api/entities/:e/:id', 'Partial update (audit diff)'],
-      ['DELETE', '/api/entities/:e/:id', 'Soft delete (`?force=true` hard)'],
+      ['DELETE', '/api/entities/:e/:id', 'Delete a record'],
       ['PUT', '/api/entities/:e', 'Replace definition (admin)'],
       ['DELETE', '/api/entities/:e', 'Unregister definition (admin)'],
       ['POST', '/api/entities/validate', 'Validate definition only'],
@@ -34,7 +34,7 @@ const groups = [
     endpoints: [
       ['GET', '/api/health', 'Health probe `{ ok, version, db }`'],
       ['GET', '/api/migrations', 'Migration history'],
-      ['GET', '/api/forms/:slug', 'Published form revision'],
+      ['GET', '/api/forms/:slug', 'Form definition'],
       ['GET', '/api/ref-lists/:name', 'Reference list'],
     ],
   },
@@ -43,27 +43,28 @@ const groups = [
 export default function ApiReference() {
   return (
     <Layout title="API reference" description="REST endpoints exposed by a Mosaic app.">
-      <main className="container" style={{ padding: '3rem 0' }}>
+      <main className="container docs-home docs-api">
         <h1>API reference</h1>
         <p>
-          Every Mosaic app exposes the same REST surface under <code>/api</code>.
-          See the <Link to="/docs/auto-crud">auto CRUD guide</Link> for query
-          parameters, envelopes and error codes.
+          Mosaic exposes standard routes under <code>/api</code>. See the
+          {' '}<Link to="/docs/auto-crud">data API guide</Link> for query parameters and errors,
+          or <Link to="/docs/extensions#server-extensions">server extensions</Link> for custom endpoints.
         </p>
         {groups.map((group) => (
-          <section key={group.title} style={{ marginBottom: '2rem' }}>
+          <section key={group.title}>
             <h2>{group.title}</h2>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <table>
+              <thead><tr><th scope="col">Method</th><th scope="col">Path</th><th scope="col">Purpose</th></tr></thead>
               <tbody>
                 {group.endpoints.map(([method, path, desc]) => (
-                  <tr key={path} style={{ borderBottom: '1px solid var(--ifm-table-border-color)' }}>
-                    <td style={{ padding: '6px 12px', whiteSpace: 'nowrap', width: 80 }}>
+                  <tr key={`${method} ${path}`}>
+                    <td>
                       <code>{method}</code>
                     </td>
-                    <td style={{ padding: '6px 12px', whiteSpace: 'nowrap' }}>
+                    <td>
                       <code>{path}</code>
                     </td>
-                    <td style={{ padding: '6px 12px' }}>{desc}</td>
+                    <td>{desc}</td>
                   </tr>
                 ))}
               </tbody>

@@ -4,9 +4,10 @@ sidebar_position: 5
 
 # Entities
 
-An entity is a **TypeScript class** decorated with `@Entity` / `@Field` / `@Relation`
-(a `*.entity.json` file works too). Mosaic turns it into a table, a CRUD API,
-validation, pickers and forms.
+An entity is a decorated TypeScript class or a `*.entity.json` definition.
+The registry uses it to derive validation, CRUD, and field metadata. Apply a
+reviewed migration to create or change its table. Studio uses the metadata
+when you build forms, pickers, and tables.
 
 ```ts
 import { Entity, Field, Relation } from '@mosaic-apps/core';
@@ -40,9 +41,10 @@ export class Customer {
 }
 ```
 
-Classes live in `apps/web/src/lib/server/entities/*.entity.ts`, are typechecked with your app,
-and are synced into `mosaic_entities` at boot (a class wins over a JSON file with the
-same `name`).
+In SvelteKit, keep entity files under `apps/web/src/lib/server/entities/`. Cloud's
+Next.js releases include an `entities/` directory and a first-start manifest under
+`lib/`. When using the Next.js scaffold without Cloud, register definitions
+through the server or the API. [Server extensions](./extensions.md#server-extensions)
 
 ## @Entity options
 
@@ -135,7 +137,8 @@ export class Invoice extends Base {
 
 ## Permissions
 
-`read/create/update/delete` accept role names; `["*"]` means public.
+`read/create/update/delete` accept role names. With authentication enabled,
+`["*"]` allows any signed-in user for that operation.
 Entity-level role gates beat broad `entity:*` grants; exact
 `entity:<name>:*` grants override gates; `admin` bypasses all. See
 [Security](./security.md).

@@ -4,6 +4,10 @@ title: App integrations
 
 # App integrations
 
+:::note Framework version
+OAuth, notification delivery, and the Svelte Map and OAuth components are documented for the current source tree. The published server `0.4.1` and UI `0.4.2` packages predate these additions. Use a build from source or a published release that includes them. Cloud project connections for GitHub, Neon, and Vercel are separate from these app integrations.
+:::
+
 OAuth and notification credentials belong in your app's server environment. Use
 the environment variables in your scaffold's `.env.example` or pass
 `auth.oauth` and `notifications` to `createMosaicServer()`. Configure each

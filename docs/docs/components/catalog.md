@@ -4,14 +4,14 @@ sidebar_position: 1
 
 # Component catalog
 
-All 59 registry types (`getComponent(type)`), grouped by palette category.
+Common Svelte registry types (`getComponent(type)`), grouped by palette category.
 Field components bind to form data via `binding`; containers render `children`.
 
 See the [component gallery](./gallery.md) for screenshots and usage examples.
 Code and JSON properties open Monaco modals with Apply/Cancel. The JSON input
 component uses that same modal interaction in published forms.
 
-## Inputs (19)
+## Inputs
 
 | type | renders | key props |
 |---|---|---|
@@ -23,6 +23,7 @@ component uses that same modal interaction in published forms.
 | `multiSelect` | checkbox list | `label, binding, required, options` |
 | `radioGroup` | radios | `label, binding, required, options, mode: radio` |
 | `checkboxGroup` | checkboxes | `label, binding, options, mode: checkbox` |
+| `checkbox` | checkbox | `label, binding` |
 | `switch` | toggle | `label, binding` |
 | `slider` | range | `label, binding, min, max, step, showValue` |
 | `datePicker` | date | `label, binding, required, min, max` |
@@ -34,10 +35,10 @@ component uses that same modal interaction in published forms.
 | `fileUpload` | file → `POST /files` | `label, binding, accept` (+ `client`) |
 | `searchField` | debounced search box | `placeholder, debounceMs, onSearch` |
 
-`options` shape: `[{ "value": "a", "label": "A", "color?": "#…" }]`.
+`options` example: `[{ "value": "a", "label": "A" }]`.
 Framework props on any field: `binding, required, visibleIf, disabledIf, colSpan, helpText`.
 
-## Data (6)
+## Data
 
 | type | renders | key props |
 |---|---|---|
@@ -48,7 +49,7 @@ Framework props on any field: `binding, required, visibleIf, disabledIf, colSpan
 | `toolbar` | action row (container) | — |
 | `filterBar` | filter chips (container) | `activeCount` |
 
-## Layout (11)
+## Layout
 
 `card` (`title, subtitle, flush`), `panel` (`title, subtitle`), `tabs`
 (`tabs [{id,label}]`, container, max 6), `accordion` (`items`, `multiple`,
@@ -66,21 +67,24 @@ static or `entity` live count, `trend, trendDir, icon`; + `client` for live),
 `codeBlock` (`code`), `jsonView` (`value, collapsed`), `treeView`
 (`nodes [{id,label,children?}]`), `breadcrumbs` (`items [{label,href?}]`).
 
-## Feedback (7)
+## Feedback
 
 `alert` (`variant info|success|warning|danger, title, text`), `badge`/`tag`
 (`text, variant, color`), `progress` (`value 0–100, variant, showLabel`),
 `spinner` (`size`), `skeleton` (`lines, width`), `tooltip` (`text`).
 
-## Navigation (3)
+## Navigation
 
 `button` (`label, variant primary|secondary|ghost|danger, size, block`),
 `iconButton` (`label, icon: true`), `menu`
 (`items [{label,icon?,danger?,separator?}], align`).
 
-## Charts (1)
+## Charts
 
 `chart` (`type bar|line|pie|donut`, `series [{name,color?,data:[{label,value}]}]`, `height, showLegend`) — dependency-free inline SVG.
+
+See [App integrations](../app-integrations.md) for Map and OAuth sign-in, including
+which builds provide those components.
 
 ## Using the registry in code
 

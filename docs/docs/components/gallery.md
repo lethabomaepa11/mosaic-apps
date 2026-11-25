@@ -6,7 +6,8 @@ sidebar_position: 2
 
 Use these examples to choose components for your application. In Studio, drag a
 component from the palette, select it on the canvas, then edit its properties.
-For the complete list and property reference, see the [catalog](./catalog.md).
+These examples use the Svelte Studio. See the [catalog](./catalog.md) for the
+component types and important properties.
 
 ## Forms and inputs
 
@@ -64,7 +65,7 @@ recursive inclusion; aggregate nested validation remains planned.
 
 ![JavaScript and TypeScript authoring in the Execute script modal](/img/screenshots/execute-script.png)
 
-Select a component's **Actions** tab to add messages, API calls, navigation, or
+Select **Events** on a supported component to add messages, API calls, navigation, or
 state updates. Choose **Execute script** and **Edit script** for custom code.
 Monaco offers runtime `state` and `api` autocomplete. Apply the editor draft,
 then save the form or page to publish it.
@@ -76,10 +77,6 @@ then save the form or page to publish it.
 The **Logic** tab contains visibility and disabled conditions. Safe expressions
 open in Monaco, and custom JavaScript/TypeScript conditions open in a script modal.
 
-![TypeScript condition in its modal editor](/img/screenshots/condition-script.png)
-
-![Form definition editing in a Monaco JSON modal](/img/screenshots/json-editor.png)
-
-All editable JSON uses the same modal flow: **Edit**, change the draft, then
+Editable JSON uses the same modal flow: **Edit**, change the draft, then
 **Apply** or **Cancel**. Invalid JSON stays open with an error. See the
 [Studio guide](../builder.md) for settings and publishing.

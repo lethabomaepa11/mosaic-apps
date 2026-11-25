@@ -1,101 +1,53 @@
 ---
-sidebar_position: 2
+title: Local quickstart
 ---
 
 # Create your first application
 
-## Requirements
+Use Node.js 22.17 or newer and npm 11 or newer. The CLI uses persistent embedded PostgreSQL for local development by default. For hosted generation, use [Mosaic Cloud](./cloud-studio.md).
 
-- Node.js 22.17 or newer and npm 11 or newer.
-- A terminal and a browser.
-
-Use embedded PostgreSQL for local development, or supply a PostgreSQL connection
-string with `--db`. The example below stores local data in a directory so it
-survives application restarts.
-
-## 1. Create the project
+## Create and start the app
 
 ```bash
 npx @mosaic-apps/cli@latest create my-crm
 cd my-crm
-```
-
-The CLI creates one SvelteKit app with a same-origin API and Studio built in at `/studio`. It also creates `.env`
-with your database URL and a generated JWT secret. Keep that file private.
-It installs dependencies automatically. Use `--no-install` if you prefer to run
-`npm install` yourself. Local data persists in the project's `data/` directory.
-
-## 2. Start the application
-
-```bash
 npm run dev
 ```
 
-| Application | Local address |
-| --- | --- |
-| Application | `http://localhost:3000` |
-| API | `http://localhost:3000/api/health` |
-| Studio | `http://localhost:3000/studio` |
+This creates a SvelteKit app. Add `--framework nextjs` to create a Next.js app. Both expose the same-origin API at `/api`. The CLI writes `.env` with a database URL and a session secret and installs dependencies unless you pass `--no-install`.
 
-The development command starts one server for the app, API, and Studio. Studio
-requires an administrator or editor account. With demo seeding enabled, sign in
-using `admin@mosaic.local` and `admin1234`. Replace the demo account before deploying.
+| | SvelteKit | Next.js |
+| --- | --- | --- |
+| App | `http://localhost:3000` | `http://localhost:3000` |
+| Health | `/api/health` | `/api/health` |
+| Studio | Visual pages and forms at `/studio` | Page JSON at `/studio` |
+| Local admin | `admin@mosaic.local` / `admin1234` with `SEED=true`, unless you configured credentials | Set `ADMIN_EMAIL` and `ADMIN_PASSWORD` in `.env` to seed your admin |
 
-### Resolve startup conflicts
+These are local setup instructions. Cloud-created deployments provide generated credentials in [Source & delivery](./cloud-studio.md#deliver-a-release).
 
-The launcher checks that the app port is free before starting. If another
-application is using it, stop that application or choose a different port in `.env`:
+## Create an entity and form
 
-```dotenv
-MOSAIC_WEB_PORT=3100
-```
+This example uses the SvelteKit Studio.
 
-Restart `npm run dev` after editing `.env`. Studio moves with the app port;
-the app and Studio use same-origin `/api` and does not need CORS configuration.
+1. Stop the development server before using the CLI against its embedded database. Scaffold a product entity and inspect its migration.
 
-Embedded PostgreSQL does not use port 5432. If you explicitly chose external
-PostgreSQL and see `database does not exist` or `ECONNREFUSED`, create/start the
-database configured in `DATABASE_URL`. For the generated Docker service, use
-`npm run db:up`. If its database port is occupied, choose another `MOSAIC_DB_PORT`
-and use that port in `DATABASE_URL`; keep other databases running.
+   ```bash
+   npx @mosaic-apps/cli entity Product --fields "name:string,price:decimal,active:boolean"
+   npx @mosaic-apps/cli migrate --dry-run
+   npx @mosaic-apps/cli migrate
+   ```
 
-## 3. Create a form
+2. Restart the app so it loads the new entity source. Open `/studio` and sign in.
+3. Open **Forms**, create a form named **Product**, and choose the **Product** entity in **Form settings**.
+4. Add a text field bound to `name` and a number or currency field bound to `price`. Match bindings to the entity's field names.
+5. Choose **Save** to publish and **Preview** to try the form. Open its published route at `/f/<slug>` to test a record write.
 
-1. In Studio, open **Forms** and create a form named **Customer intake**.
-2. Drag a **Text field** onto the canvas. Select it and set its label to **Name**
-   and its data binding to `name`.
-3. Add another text field bound to `email` and a **Date picker** bound to `startDate`.
-4. Open **Form settings** to choose the entity, layout, and submit labels.
-5. Click **Save**. Studio saves and publishes the definition.
-6. Click **Preview** to try the fields inside Studio.
+The SvelteKit entity file lives in `apps/web/src/lib/server/entities/`. Published pages use their configured routes directly. You can also register your own concrete app routes.
 
-![Customer intake form in Studio](/img/screenshots/form-studio.png)
+## Resolve startup conflicts
 
-The generated web application renders published forms at `/f/<slug>`. Pages use
-their configured routes directly: `/`, `/about`, `/customers/:id`, or any other
-available path. The seeded `/404` page is editable too. Concrete SvelteKit files
-still win when a developer needs a fully custom route. Choose an entity when the
-form should create or update a record.
+Set a free port at creation with `--web-port` or change the SvelteKit launcher port with `MOSAIC_WEB_PORT` in `.env`. In a generated Next.js project, change the port in the `dev` script.
 
-## 4. Add a business entity
+Embedded PostgreSQL starts with the app and stores SvelteKit project data under `data/` by default. If you supplied an external `DATABASE_URL`, start that database and confirm the host, port, and database name. The generated SvelteKit Docker service can be started with `npm run db:up`.
 
-```bash
-npx mosaic entity Product --fields "name:string,sku:string,price:decimal,stock:int,active:boolean"
-npx mosaic migrate --dry-run
-npx mosaic migrate
-```
-
-Review the generated entity in `apps/web/src/lib/server/entities/product.entity.ts` and the
-migration preview before applying changes. Restart the app after adding entity
-source files. Then choose the entity in Studio for field-binding suggestions
-and entity-backed tables.
-
-## Continue building
-
-- [Studio guide](./builder.md): settings, actions, scripts, and reusable forms.
-- [Component gallery](./components/gallery.md): screenshots and configuration examples.
-- [Runtime state](./state-management.md): how inputs and actions share values.
-- [Deployment](./deployment.md): database first, then one application deployment.
-
-The PWA can cache its application shell. Online API access is still needed for
-record writes; do not assume offline submissions are synchronized automatically.
+Continue with the [Studio guide](./builder.md), [CLI reference](./cli.md), or [deployment guide](./deployment.md).

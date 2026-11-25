@@ -4,9 +4,9 @@ sidebar_position: 10
 
 # Install your application
 
-Generated web applications include a web manifest, service worker, icons, and an
-offline fallback page. Deploy over HTTPS, then use your browser's install action
-to launch the application in its own window.
+SvelteKit's optional PWA scaffold includes a web manifest, service worker,
+icons, and an offline fallback. Create the app with `--pwa`, deploy over HTTPS,
+and use your browser's install action.
 
 ## What is cached
 

@@ -4,8 +4,8 @@ sidebar_position: 7
 
 # Auto CRUD reference
 
-Every registered entity exposes the same REST surface at
-`/api/entities/:entity`. All responses use the envelope
+Registered entities expose standard routes at
+`/api/entities/:entity`. JSON responses use the envelope
 `{ success: true, data }` (errors: `{ success: false, error: { message, code, details } }`).
 
 ## Endpoints
@@ -19,7 +19,7 @@ Every registered entity exposes the same REST surface at
 | `GET /api/entities/:e/:id` | Single record (`?include=owner`, `?withDeleted=true`) |
 | `POST /api/entities/:e` | Create (201; validation errors → 422 `VALIDATION`) |
 | `PATCH /api/entities/:e/:id` | Partial update (writes audit diff) |
-| `DELETE /api/entities/:e/:id` | Soft delete, or `?force=true` hard delete |
+| `DELETE /api/entities/:e/:id` | Deletes the record. If soft delete is enabled, `?force=true` requests a permanent delete. |
 | `PUT /api/entities/:e` | Replace entity definition (admin) |
 | `DELETE /api/entities/:e` | Unregister definition (admin; keeps the table) |
 | `POST /api/entities/validate` | Validate a definition without saving |
@@ -46,11 +46,11 @@ pageCount }`.
 - **Validation** runs per operation (create requires required fields; update
   validates only sent fields); coercions (`"42"` → `42`, `"true"` → `true`)
   happen in zod.
-- **Uniques** map to `409 UNIQUE_CONFLICT` (works against both live tables and
+- **Uniques** map to `409 UNIQUE_VIOLATION` (works against both live tables and
   PGlite).
 - **Soft delete** hides rows from everyone; rows are visible with
-  `?withDeleted=true` only when the caller may delete (RBAC).
+  `?withDeleted=true` for administrators.
 - **Audit**: creates/updates/deletes write `{ action, changes }` diffs to
-  `mosaic_audit` (disable per entity with `audit: false`).
+  `mosaic_audit_log` (disable per entity with `audit: false`).
 - **Meta** (`/meta`) also exposes `endpoints` and `query` capabilities so
   generated clients can adapt.

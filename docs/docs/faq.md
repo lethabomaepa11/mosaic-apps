@@ -1,35 +1,29 @@
 ---
-sidebar_position: 16
+title: FAQ
 ---
 
 # FAQ
 
-**Do I need Docker or Postgres installed?**
-No. `DATABASE_URL=pglite://memory` boots real Postgres compiled to WASM.
-Use a server Postgres for teams/production.
+## Do I need Docker?
 
-**Where is my data model stored?**
-`apps/web/src/lib/server/entities/*.entity.ts` classes (or `*.entity.json`) in git
-(reviewable), synced into `mosaic_entities` at boot; the physical schema lives
-in Postgres.
+No. The CLI defaults to embedded PostgreSQL. Use a durable PostgreSQL service for production. [Deployment](./deployment.md)
 
-**Can I write custom endpoints?**
-Yes — customize the provider in `apps/web/src/lib/server/mosaic.ts`, await
-`createMosaicServer(...)`, and mount extra Hono routes before returning the server.
+## Where do my changes live?
 
-**Can components be extended?**
-Register more types via `COMPONENTS.push(...)` before rendering (custom
-palette entries with `inspector` descriptors show up in Studio after a
-rebuild), or build standalone Svelte components consuming `MosaicClient`.
+Entity source and custom endpoints live in the repository. Published forms and pages live in the app database. Cloud Preview Studio changes are saved to the preview database. [Local and hosted workflows](./workflows.md)
 
-**How do renames work?**
-A rename is planned as drop + add (destructive). For zero-downtime renames,
-add the new column, backfill, then remove the old one in two migrates.
+## Where do I sign in?
 
-**Is the Studio required?**
-No. Pages and forms are database artifacts — manage them through the API or CLI and
-render them with Mosaic components in ordinary Svelte.
+For a Cloud deployment, reveal the initial administrator credentials in **Source & delivery** and open the deployed app's `/login`. For a local CLI scaffold, follow the framework-specific setup. [Cloud delivery](./cloud-studio.md#deliver-a-release) · [Local quickstart](./quickstart.md)
 
-**Offline writes?**
-Reads work offline out of the box; write queues are app-specific (see
-[PWA guide](./pwa.md)).
+## Where do I add custom code?
+
+Register server handlers in the application's endpoint module. Add a custom Svelte component through `registerComponent` in SvelteKit, or build React components in Next.js. [Extensions](./extensions.md)
+
+## Can I rename a field without losing data?
+
+Mosaic can plan a metadata rename as a drop and an add. Add the replacement field, backfill it, switch readers and writers to it, then remove the original in a later migration. [Migrations](./migrations.md)
+
+## Can users work offline?
+
+SvelteKit's optional PWA can serve cached assets and an offline fallback. Business records and writes need an API connection unless you implement your own persistence and synchronization. [PWA](./pwa.md)

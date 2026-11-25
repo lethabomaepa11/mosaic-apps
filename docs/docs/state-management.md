@@ -4,7 +4,7 @@ sidebar_position: 10
 
 # Runtime state management
 
-Mosaic state belongs to a runtime instance. The UI package does not keep
+These APIs describe the Svelte renderer. Mosaic state belongs to a runtime instance. The UI package does not keep
 user-specific data in a module singleton.
 
 ```ts
@@ -47,8 +47,9 @@ coordination, server synchronization, and undo integration are not implemented.
 
 ## Component actions
 
-Every component can define an ordered `actions` array in Studio. The runtime
-supports five serializable action types:
+Supported components can define ordered actions for `onclick`, `onchange`,
+or `onrowclick` under `props.events`. Earlier click configurations use
+`props.actions`. The runtime supports five serializable action types:
 
 - `message`: show an info, success, warning, or error notification;
 - `api`: call a relative route on the configured Mosaic API and optionally put

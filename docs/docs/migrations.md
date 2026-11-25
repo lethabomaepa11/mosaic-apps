@@ -4,9 +4,9 @@ sidebar_position: 6
 
 # Migrations
 
-The migration engine diffs **entity metadata** against the **live database**
-(`information_schema` + `pg_catalog`), so there are no migration files to
-write or drift to debug: the plan is always computed fresh.
+The migration engine compares registered entity metadata with the live database
+and computes a fresh plan. Review that plan against the target database before
+applying it.
 
 ## The 3-phase plan
 
@@ -26,18 +26,22 @@ table records `{ entity, version, checksum, statements, status }` in
 ## Workflow
 
 ```bash
-mosaic migrate --dry-run   # print SQL, apply nothing
-mosaic migrate             # apply pending statements
+npx @mosaic-apps/cli migrate --dry-run
+npx @mosaic-apps/cli migrate
 ```
 
 In the Studio: **Entities → your entity → Plan migration** shows the SQL in a
 modal, then **Apply migration** runs it for that entity.
 
+The CLI dry run can sync source definitions into the registry while leaving
+business tables unchanged. Use a staging database to review changes for production.
+
 ## Safety rules
 
-- Destructive statements (`DROP`, type changes, `SET NOT NULL`) are flagged
-  and need `allowDestructive` — the CLI defaults it on, the API route takes
-  `{ allowDestructive }` explicitly.
+- Destructive statements such as dropping a field are flagged. Both the CLI
+  apply command and the API default to allowing destructive changes. To skip
+  them in an API call, send `{ "allowDestructive": false }` to
+  `POST /api/migrations/apply`.
 - Renames are modelled as drop + add (no rename detection yet) — back up
   first, or copy data in a follow-up statement.
 - Reserved-word tables (`order`, `user`…) are quoted everywhere; introspection

@@ -1,77 +1,31 @@
 ---
-sidebar_position: 3
+title: Architecture
 ---
 
 # Architecture
 
-This guide explains how an application's entities, forms, pages, actions, and
-state work together. Start with the [Studio guide](./builder.md) to build a screen.
+A Mosaic app runs on SvelteKit or Next.js and exposes a same-origin Hono API. PostgreSQL stores users, metadata, and business tables. PGlite runs embedded PostgreSQL for local development.
 
-## Metadata is the source of truth
+## What owns each layer
 
-Mosaic stores entity definitions, form component trees, and page component trees
-as metadata. The API derives validation, migrations, CRUD, and runtime artifacts
-from those definitions; Studio edits the same form/page records applications
-render.
+| Layer | Responsibility |
+| --- | --- |
+| `@mosaic-apps/core` | Shared entity, form, and page types, entity loading, decorators, and expressions |
+| `@mosaic-apps/server` | Hono API, validation, CRUD, migrations, sessions, permissions, and artifact publishing |
+| `@mosaic-apps/ui` | Svelte component registry, canvas building blocks, API client, and runtime state |
+| `@mosaic-apps/sveltekit` | Same-origin API and database page routing for SvelteKit |
+| `@mosaic-apps/cli` | App scaffolding, entity commands, migrations, seeding, and local launch commands |
+| Mosaic Cloud | Prompt refinement, generation, preview environments, and delivery |
 
-## Packages
+## How data reaches the UI
 
-```mermaid
-flowchart LR
-  core[@mosaic-apps/core<br/>metadata and shared logic]
-  server[@mosaic-apps/server<br/>Hono API and database]
-  ui[@mosaic-apps/ui<br/>Svelte 5 components and renderers]
-  cli[@mosaic-apps/cli<br/>mosaic binary]
-  studio[apps/studio<br/>designer]
-  template[templates/fullstack<br/>scaffold]
-  core --> server
-  core --> ui
-  server --> cli
-  ui --> studio
-  ui --> template
-  server --> template
-```
+1. Entity definitions live in source files or in the registry. They describe fields, relations, validation, and permissions.
+2. The migration engine compares registered definitions with the database. A reviewed migration updates the physical schema.
+3. CRUD routes authorize the caller and validate input before evaluating parameterized SQL.
+4. Published form and page records describe the UI the runtime renders. The frontend uses the API for live record data.
 
-- **`@mosaic-apps/core`** contains shared types, expression parsing, tree helpers,
-  entity decorators, and entity loading. Server-side decorators use
-  `reflect-metadata`; TypeScript entity loading can use `tsx`.
-- **`@mosaic-apps/server`** exports a Hono app factory, PostgreSQL and PGlite
-  drivers, platform tables, entity administration, CRUD, auth/RBAC, audit,
-  settings, reference lists, form/page artifacts, and file endpoints.
-- **`@mosaic-apps/ui`** is a source-first Svelte 5 library with the component
-  registry, FormRenderer/PageRenderer, API client, shadcn-svelte/Bits UI
-  primitives, and an instance-scoped runtime state API. Consumers need Svelte 5
-  and Tailwind CSS 4 in their build.
-- **`@mosaic-apps/cli`** provides the `mosaic` executable and bundles the full-stack
-  project template into its npm tarball during `prepack`.
-- **Studio** consumes UI source directly. Run `npm run dev` from the repository
-  root to start API and Studio together. The launcher waits for `/api/health`
-  before starting Vite, preventing startup-order proxy 502 responses.
+SvelteKit renders with the Svelte UI package and includes visual Studio. Next.js renders a supported subset of components in React and provides Page Studio for page JSON. Cloud Preview Studio uses the shared preview renderer for both targets. [Local and hosted workflows](./workflows.md)
 
 ## Runtime state
 
-Each application session can own a `MosaicState` instance with application,
-page, and form stores. PageRenderer creates or accepts that instance;
-FormRenderer forks a form scope, and embedded forms share application/page
-scopes but get isolated form scopes. Updates are revisioned and observable;
-snapshots can be serialized and restored. Form state and bound inputs synchronize
-in both directions. Component actions use these scopes; Monaco scripts execute
-in an isolated browser worker and return declarative actions. State is in-memory
-only; persistence adapters and cross-tab coordination remain planned. See
-[State management](./state-management.md).
-
-## Request lifecycle (CRUD)
-
-```text
-fetch -> Hono route -> permission check -> Zod validation -> SQL builder
-      -> PostgreSQL/PGlite driver -> audit -> { success, data } envelope
-```
-
-Validation failures return 422, unique conflicts 409, missing records 404, and
-authorization failures 403.
-
-## Platform tables
-
-The platform stores entities, known entity columns, migrations, forms and form
-versions, pages, users and roles, settings, reference lists, files, and audit
-records in `mosaic_*` tables.
+Svelte runtime state is scoped to the application, page, form, and component. Embedded forms share application and page scope while holding their own form state. Browser scripts run in an isolated worker and return declarative actions. [Runtime state](./state-management.md)

@@ -3,10 +3,10 @@ sidebar_position: 8
 sidebar_label: Server extensions
 ---
 
-# Extend with Svelte packages
+# Extend an application
 
-Mosaic applications are ordinary SvelteKit workspaces. Add npm dependencies and
-custom Svelte components when the built-in visual components are not enough.
+Add server handlers in either framework. SvelteKit also supports custom visual
+components through its registry. Extend Next.js interfaces with React code.
 
 ## Register a component
 
@@ -33,15 +33,10 @@ registerComponent({
 });
 ```
 
-Add that registration to both:
-
-- `apps/web/src/lib/mosaic-components.ts` for the published application.
-- `apps/studio/src/lib/mosaic-components.ts` for the visual palette, canvas, and inspector.
-
-Install the widget package in both workspaces when it is not already hoisted by
-the root workspace. Commit the package and lockfile changes, then run the web and
-Studio checks before deployment. Saved artifacts contain only the stable component
-type and props; they do not embed package source.
+Add the registration to `apps/web/src/lib/mosaic-components.ts` in the unified SvelteKit scaffold.
+Install the widget package in the web workspace, build the application, and check
+the Studio palette and published rendering. Saved artifacts store the component
+type and props, so the runtime must have the same registration.
 
 `registerComponent` rejects duplicate types unless `{ replace: true }` is explicit
 and returns a cleanup function. Removing a package that still has saved nodes leaves
@@ -49,22 +44,31 @@ those nodes unsupported, so migrate or replace them before uninstalling it.
 
 ## Server extensions
 
-Keep server-only packages under `apps/web/src/lib/server`. Entity classes and
-`*.endpoint.ts` modules are discovered there. Explicit handlers belong in
-`apps/web/src/lib/server/endpoints.ts` and mount under `/api/extensions`:
+Register handlers in the file below. Each registration mounts under `/api/extensions`.
+
+| Framework | Registration module |
+| --- | --- |
+| SvelteKit | `apps/web/src/lib/server/endpoints.ts` |
+| Next.js | `lib/endpoints.js` in a current scaffold, passed to `createMosaicServer({ endpoints })` |
+
+This example registers a protected endpoint that returns the caller's email and
+the submitted invoice ID. It illustrates the request and response contract.
 
 ```ts
 import type { MosaicEndpointRegistration } from '@mosaic-apps/server';
 
 export const endpoints: MosaicEndpointRegistration[] = [{
-  method: 'POST', path: '/invoices/send', summary: 'Send an invoice',
+  method: 'POST', path: '/invoices/check', summary: 'Check invoice input',
   permission: 'entity:invoice:update',
   body: { type: 'object', required: ['invoiceId'], properties: { invoiceId: { type: 'string' } } },
-  responses: { 200: { description: 'Sent', schema: { type: 'object', properties: {
+  responses: { 200: { description: 'Validated input', schema: { type: 'object', properties: {
     invoiceId: { type: 'string' }, sentBy: { type: 'string' },
-  } } } },
+  } } }, 422: { description: 'Missing invoice ID' } },
   handler: async ({ json, user }) => {
-    const input = await json<{ invoiceId: string }>();
+    const input = await json<{ invoiceId?: unknown }>().catch(() => null);
+    if (typeof input?.invoiceId !== 'string' || !input.invoiceId.trim()) {
+      return Response.json({ error: 'Invoice ID is required' }, { status: 422 });
+    }
     return { invoiceId: input.invoiceId, sentBy: user?.email };
   },
 }];
@@ -76,16 +80,13 @@ Never import server modules into a Svelte component or browser bundle. Review
 migrations and environment variables alongside dependency changes; visual artifact
 publishing alone does not install code.
 
-In a Next.js scaffold, register handlers in `lib/endpoints.js` and keep server
-implementation files under `lib`. In SvelteKit, keep server code under
-`apps/web/src/lib/server` and register it in `endpoints.ts`.
-
 Declare each endpoint's input JSON Schema in `body` and its status-specific output
-schema in `responses`. Mosaic exposes these registered contracts at
-`GET /api/openapi` to callers with `endpoints:read`. Orval can read a local copy of
-that document to generate typed clients. Cloud also includes `mosaic/openapi.json`
-in releases with generated workflow endpoints. Use a path such as
-`/extensions/leave-request/submit` in a form's `settings.createEndpoint`.
+schema in `responses`. Validate the actual input inside your handler. On a server
+build that includes the OpenAPI route, callers with `endpoints:read` can export
+`GET /api/openapi` for Orval. The published server `0.4.1` predates this route.
+Cloud releases with generated workflow endpoints already include `mosaic/openapi.json`.
+For managed submissions, a supporting form renderer uses a relative path such as
+`/extensions/leave-request/submit` in `settings.createEndpoint`.
 
 Read the authenticated actor from the handler's `user` context and use `db.tx`
 for changes that must succeed together. For a leave request, accept dates and a

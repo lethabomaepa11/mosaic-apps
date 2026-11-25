@@ -4,7 +4,8 @@ sidebar_position: 8
 
 # Form JSON spec
 
-Forms and pages are serializable trees of component nodes:
+Forms and pages are serializable trees of component nodes. These examples use
+the Svelte renderer. The Next.js renderer supports a subset of component types.
 
 ```json
 {
@@ -37,7 +38,8 @@ Forms and pages are serializable trees of component nodes:
 - `children`: child nodes for container components.
 - `meta`: optional designer notes and flags.
 
-Framework props include `visibleIf`, `disabledIf`, and ordered `actions`.
+Framework props include `visibleIf`, `disabledIf`, and event action lists
+under `events`. Older click actions can use `actions`.
 Field props also include `binding`, `required`, `colSpan`, `helpText`, and
 validation constraints. Bindings are strings and can
 be custom; Studio suggests entity columns but does not require a catalog match.
@@ -82,9 +84,11 @@ submission does not yet collect nested required-field validation errors.
 ## Pages and lifecycle
 
 Pages use `root.type: "page"`, a route, settings, and the same component tree.
-Page data components receive the configured API client.
+Page data components receive the configured API client. For a managed submission,
+a compatible renderer can use `settings.createEndpoint` to submit to an
+authenticated Mosaic extension. [Server extensions](./extensions.md#server-extensions)
 
-In Studio, **Save** updates and publishes a form or page in one database
+In SvelteKit Studio, **Save** updates and publishes a form or page in one database
 transaction. The loaded version is sent with the request, so a stale tab gets a
 409 conflict instead of overwriting newer work. Unchanged publication is
 idempotent. Preview renders the current local tree inline. Form settings contain

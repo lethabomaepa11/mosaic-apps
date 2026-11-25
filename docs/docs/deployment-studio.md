@@ -2,11 +2,12 @@
 sidebar_position: 13
 ---
 
-# Studio and hosted building
+# Studio deployment and upgrade
 
-Generated repositories include Studio in the app itself at `/studio`. `npm run dev`
+SvelteKit repositories include visual Studio in the app at `/studio`. `npm run dev`
 starts one server for the app, `/api`, and Studio, and the same deployment serves
-all three. Studio requires an administrator or editor account.
+all three. Use an account with the relevant artifact permissions. Next.js
+provides Page Studio with page JSON editing at the same path.
 
 ## Local authoring
 
@@ -63,7 +64,7 @@ Mosaic database.
 npm install
 npm run check
 npm run build
-npx mosaic migrate --dry-run
+npx @mosaic-apps/cli migrate --dry-run
 npm run dev
 ```
 
@@ -84,7 +85,7 @@ version compatible with that release. If any schema changes were applied, accoun
 for writes made since the backup before restoring it, then verify the app and
 Studio again.
 
-## Hosted Mosaic Studio
+## Hosted preview
 
 Use [Mosaic Cloud](./cloud-studio.md) to build and preview an app, download its
 source, and connect GitHub, Vercel and Neon for delivery.

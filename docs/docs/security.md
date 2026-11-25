@@ -1,46 +1,29 @@
 ---
-sidebar_position: 12
+title: Security and access
 ---
 
-# Security
+# Security and access
 
 ## Authentication
 
-JWT bearer tokens (`Authorization: Bearer <token>`) and scrypt-hashed passwords.
-`POST /api/auth/login|register|logout`, `GET /api/auth/me`, and
-`POST /api/auth/change-password` provide the authentication surface. Same-origin
-login also sets an HttpOnly `mosaic_session` cookie so protected database pages
-can be enforced during server rendering. Bearer tokens remain supported for CLI
-and SDK clients. The browser client also keeps the token in `localStorage`
-(`mosaic_token`) for client-side API calls. Rotate `MOSAIC_JWT_SECRET` per
-environment.
+Sign in at `/login` or call `POST /api/auth/login`. The API sets an HttpOnly `mosaic_session` cookie for same-origin browser sessions and returns a JWT for API clients. The Svelte client can store the bearer token under `mosaic_token` in local storage. Passwords are hashed with scrypt.
 
-## RBAC model
+Use a stable, private `MOSAIC_JWT_SECRET` per environment. Changing it invalidates existing sessions. Disable public sign-up for internal applications. Where self-service registration is enabled, new accounts get the viewer role after the initial administrator has been provisioned. [App integrations](./app-integrations.md#oauth-sign-in)
 
-Permissions are strings matched in this order:
+## Roles and permissions
 
-1. `admin` role (or literal `*` permission) bypasses everything.
-2. **Entity specificity rule**: entity-level role gates (`entity.permissions`)
-   beat broad `entity:*` grants — except exact `entity:<name>:*` grants, which
-   override the gates.
-3. Otherwise, wildcard matching (`*`, `entity:customer:read`,
-   `forms:manage`…) decides.
+| Seeded role | Typical access |
+| --- | --- |
+| `admin` | Full access |
+| `editor` | Read, create, and update records by default, plus page and form management |
+| `viewer` | Read records by default |
 
-Denials are 403 `FORBIDDEN`. Public reads use `["*"]` on the entity.
+Entity definitions can tighten those defaults per operation. `["*"]` means any signed-in user when authentication is enabled. Entity role gates take precedence over broad grants such as `entity:*:read`. An exact entity-scoped grant or administrator access can override a gate. Missing credentials usually return 401, while an authenticated denial returns 403.
 
-Seeded roles: `admin` (`*`), `editor` (entities + forms + pages manage),
-`viewer` (`entity:*:read`, `forms:read`, `pages:read`).
+Page visibility and data authorization serve different purposes. Use page access settings for the route and sidebar, and enforce access again in the underlying API. Role-aware page API enforcement requires a framework build that supports page roles. Cloud-generated frontends also check page roles when rendering. A sidebar link, hidden field, or query filter provides no record-level isolation.
 
-## Transport & storage
+## Protect production data
 
-Run behind TLS in production; keep `.env` out of git (`.gitignore` covers
-it). Uploads default to `./uploads` (serve via the files route or move to
-object storage). Audit diffs exclude nothing — don't store secrets in entity
-fields.
+Use TLS and keep database, signing, and provider credentials in server-side settings. Keep secrets out of entity fields because audit records can contain changed values. Back up both the database and persistent file storage.
 
-## Validation
-
-Server-side zod schemas are built from the same field metadata the client
-validates against, so required/format/unique rules can't be bypassed from the
-browser. SQL is parameterised everywhere; identifiers are allow-listed
-(`ident()`).
+For record ownership or tenant isolation, enforce a trusted tenant or actor scope on the server for every read and write. For sensitive actions, validate the body, derive identity from the session, and perform related updates in a database transaction. [Server extensions](./extensions.md#server-extensions)

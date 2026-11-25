@@ -4,7 +4,7 @@ sidebar_position: 4
 
 # CLI reference
 
-Run commands inside your generated project with `npx mosaic <command>`.
+Run commands inside your generated project with `npx @mosaic-apps/cli <command>`.
 Use `-C, --dir <path>` to target another directory, or `--help` for help.
 
 ## Create an application
@@ -23,7 +23,7 @@ npx @mosaic-apps/cli@latest create "Acme CRM" --framework nextjs
 | `--pwa` / `--no-pwa` | Include or omit PWA support |
 | `--port 3001` | Legacy separate-API port retained for older projects |
 | `--web-port 3000` | Port for the app, its API, and Studio (`/studio`) |
-| `--db-port 5433` | Docker database host port; used only when you choose external PostgreSQL |
+| `--db-port 5432` | Host port for the generated Docker PostgreSQL service |
 | `--link PATH` | Explicitly use packages from a Mosaic source checkout for contributor development |
 | `--no-install` | Create files and install dependencies yourself |
 | `--no-git` | Create files without initializing a Git repository |
@@ -37,7 +37,7 @@ If your project has a separate `apps/studio` workspace, see the
 ## Add an entity
 
 ```bash
-npx mosaic entity Product --fields "name:string,sku:string,price:decimal,stock:int,active:boolean"
+npx @mosaic-apps/cli entity Product --fields "name:string,sku:string,price:decimal,stock:int,active:boolean"
 ```
 
 Field syntax is `name:type[:extra]`. The extra value names the related entity for
@@ -47,18 +47,18 @@ adds soft deletion. Review the generated entity before migrating.
 ## Review and apply migrations
 
 ```bash
-npx mosaic migrate --dry-run
-npx mosaic migrate
+npx @mosaic-apps/cli migrate --dry-run
+npx @mosaic-apps/cli migrate
 ```
 
-The preview shows planned SQL statements. Destructive changes require explicit
-review; see [Migrations](./migrations.md).
+The preview prints planned SQL. The apply command can run destructive statements,
+so review the preview before applying. [Migrations](./migrations.md)
 
 ## Start and inspect
 
-- `npx mosaic dev` starts the app and its same-origin API.
-- `npx mosaic studio` starts the SvelteKit app and prints its Studio URL.
-- `npx mosaic info`: inspect configuration and check API health.
-- `npx mosaic seed --demo`: seed demonstration data for local exploration.
+- `npx @mosaic-apps/cli dev` starts the app and its same-origin API.
+- `npx @mosaic-apps/cli studio` starts the app and prints its Studio URL.
+- `npx @mosaic-apps/cli info` prints project configuration and API health.
+- `npx @mosaic-apps/cli seed --demo` adds demonstration data for local exploration.
 
 Use [Deployment](./deployment.md) when moving the application to a hosted environment.

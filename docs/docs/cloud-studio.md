@@ -1,131 +1,58 @@
 ---
-sidebar_position: 3
 title: Mosaic Cloud
 ---
 
 # Mosaic Cloud
 
-[Open Mosaic Cloud](https://cloud.mosaictalent.co.za)
+Start with a brief, review the generated app in a private preview, and decide whether to download or deliver the source. Choose SvelteKit for the visual Studio in the deployed app, or Next.js for React and a page JSON editor. [Open Mosaic Cloud](https://cloud.mosaictalent.co.za)
 
-Mosaic Cloud is the hosted path for people who want to describe an app, edit it
-visually, and deliver it through GitHub, Neon and Vercel. SvelteKit and Next.js
-projects use the same Mosaic runtime and database-first artifacts.
+## Build from a brief
 
-## How it works
+1. Enter a brief of up to 24,000 characters and choose a framework under **Options**. Describe who uses the app, what each person can do, and which rules the server must enforce.
+2. Answer questions in chat when decisions affect the design. **Decide for me** delegates open product choices. Cloud asks before reducing scope for unsupported requirements.
+3. Open **Blueprint** to see the refined spec and build order. **Feature by feature** previews each checked feature as it is built. **One shot** attempts the agreed spec in a single build after brief refinement.
+4. Try the result in **Preview**. Chat feedback during a staged build queues a change after that build. Inspect the plan and test workflows with the actual roles you intend to use before going live.
 
-1. Enter a brief of up to 24,000 characters on the home page. In **Options → Framework**, choose **SvelteKit**
-   or **Next.js**. Cloud keeps your prompt and choice through sign-in and uses that
-   framework for later releases of the same project.
-2. **Feature by feature** is the default. A brief evaluator defines the users, access rules,
-   data, workflows and expected outcomes. If a decision affects how the app works, Cloud
-   asks in chat and refines the spec after you answer. Use **Decide for me** to delegate
-   open product decisions. Scope reductions for unsupported requirements need an explicit answer.
-3. A separate planner creates an ordered feature plan with acceptance checks. Open
-   **Blueprint** to see the specification and build order. Cloud builds each feature,
-   runs database create, list and edit checks, and reviews the result against its acceptance
-   criteria. The first passing feature appears in **Preview** while Cloud works through
-   later features. The final review uses the complete agreed spec. Cloud packages the
-   release and queues connected providers after all features pass. Choose **One shot**
-   when you want to build and preview the complete app in one pass after brief refinement.
-4. Open **App**, **Sign in**, or **Open Studio** in the preview toolbar. In Preview
-   Studio, open a page or form and choose **Edit** to use the visual designer. Saves
-   apply to the preview database. On installations with persistent previews, they
-   survive instance restarts.
-   Use **Edit sidebar** from Preview or the designer toolbar. Select a link on the
-   sidebar canvas to change its label, path, icon, or section, and use **Move up**
-   or **Move down** to reorder it. Save to apply it across the preview. Edit the live
-   sidebar separately in SvelteKit Studio under **Settings → Navigation** or in
-   Next.js Page Studio using **Edit sidebar**.
-   Under **Appearance**, set padding or margin for all sides, or override each side
-   individually. Select **Page root** to control spacing around the whole page.
-   When a SvelteKit deployment is ready, **Open live Studio** edits the deployed
-   app. **Live app** opens the deployed site separately.
-5. Send feedback in the chat while reviewing a preview. Cloud queues it as a change
-   after the staged build. For released apps, settings changes apply to the preview
-   and are rebuilt, committed and redeployed in the background.
-6. Optionally connect your own GitHub (private repository, one commit per release),
-   Neon (PostgreSQL), and Vercel (deployments) accounts in **Settings → Connections**.
-   Cloud can deliver an existing build after you connect your accounts. Open
-   **Source & delivery → Deliver latest** to queue it.
-7. Cloud creates the GitHub repository, provisions a Neon database, and deploys to
-   Vercel using the framework you selected. Each Vercel build installs the latest
-   published Mosaic packages for that framework. Open the production URL after delivery
-   completes. Workspace owners and admins see **View admin sign-in** in the build feed.
-   Open it and select **Reveal initial app sign-in** to copy the deployed app's initial
-   email and password. Local downloads default to `admin@mosaic.local` and
-   `admin1234` unless you set `ADMIN_EMAIL` and `ADMIN_PASSWORD` before initial startup.
+Cloud checks generated CRUD and supported submission paths against a database and uses AI to review the design. Complex approvals, balance accounting, row-level access and tenant isolation need [custom server logic](./extensions.md#server-extensions).
 
-Describe who signs in and what they should do. For a book club, ask for a reading
-schedule with upcoming meetings, an RSVP action, and a screen for choosing the next
-book. Cloud can combine live records, counts, instructions, and working forms in
-task-oriented screens along with record management pages.
+## Edit the preview
 
-If users should create their own accounts, request public sign-up in the brief or
-turn on **Allow public sign-up** under the project's **Settings**. After the next
-release, **Create an account** on the sign-in page opens `/signup`. New accounts
-get the viewer role and can use the actions their entity permissions allow.
-For a staff-only app, keep public sign-up closed.
+Use **Open Studio** in the preview toolbar to edit a page or form. Use **Edit sidebar** to select and edit navigation links. In **Appearance**, set padding and margin for all sides or individual sides. Select **Page root** to edit spacing around a page.
 
-Sign in and Create an account are published page definitions with editable titles,
-copy, field labels and order, and button labels. Use **Preview Studio** to edit
-the preview pages. In the deployed app, use the visual Studio on SvelteKit or
-**Page Studio** on Next.js to edit and publish page JSON. The app itself processes
-credentials through its auth API.
+Preview uses your Cloud session and a separate preview database. Visual saves affect that preview. Use the deployed app to test its real credentials, user roles and data. Preview changes persist across instance restarts when the Cloud installation has persistent preview storage configured.
 
-See [App integrations](./app-integrations.md) for configuring OAuth, notifications,
-and maps in the framework and scaffold.
+## Deliver a release
 
-**Source & delivery** also lets you download the app. Install dependencies and run
-`npm run dev` from the repository root. The generated pages and forms import on
-first start. Next.js downloads include a lockfile, so use `npm ci`. Both frameworks
-serve the Mosaic API at `/api`. SvelteKit includes Studio at `/studio`. Next.js uses
-React to render published pages and forms. The private Cloud preview uses Mosaic's
-shared renderer and sample database for both frameworks.
+Connect only the providers you need under **Settings → Connections**.
 
-If Vercel rejects an expired or revoked credential, open **Settings → Connections**
-and choose **Reconnect Vercel** or replace the access token in place. Cloud keeps
-your session, repository and deployment settings, then resumes the latest blocked
-delivery. Vercel's integration credential uses a fresh authorization when revoked.
+| Connection | What Cloud uses it for |
+| --- | --- |
+| GitHub | Creates a private repository and pushes release source. |
+| Neon | Provisions durable PostgreSQL. |
+| Vercel | Deploys the selected frontend and its same-origin API. Cloud delivery needs a provisioned database. |
 
-## Remove a project
+Cloud queues delivery after a release when providers are connected. To send an existing release, use **Source & delivery → Deliver latest** after connecting your accounts. You can also download the release from that tab. The Vercel build installs the latest **published** Mosaic packages for the target framework.
 
-In **Project Settings → Delete project**, type the project name to confirm. By
-default, Cloud removes its project, preview, chat and releases and keeps the
-resources in your own provider accounts. To delete those too, select each attached
-GitHub repository, Vercel project, or Neon project you want removed. Removing the
-Neon project deletes its databases and branches.
+When production is ready, workspace owners and admins can choose **View admin sign-in**, then **Reveal initial app sign-in**. Use those credentials at the deployed app's `/login`. Cloud-generated local downloads can use `admin@mosaic.local` / `admin1234` when you leave local bootstrap credentials unset.
 
-Cloud keeps the project visible if a selected provider rejects deletion. Check its
-Activity, update the connection if needed, and retry. A GitHub credential needs
-repository admin access and the `delete_repo` scope or fine-grained repository
-Administration write permission. [GitHub repository deletion permissions](https://docs.github.com/en/rest/repos/repos#delete-a-repository)
+If Vercel rejects a credential, reconnect it under **Settings → Connections** and check **Source & delivery → Activity** for the blocked job. For hosting outside Cloud's delivery setup, use [Manual deployment](./deployment.md).
+
+## Accounts and live editing
+
+For self-service registration, request it in the brief or enable **Allow public sign-up** in the project settings. After a new release, `/signup` assigns new accounts the viewer role. Keep sign-up closed for staff-only apps.
+
+Use the deployed SvelteKit **Studio** to edit forms, pages, and navigation. On Next.js, open **Page Studio** at `/studio` for page JSON or **Edit sidebar** for links. To publish generated changes from Cloud, create and deliver a new release. Preview and production each have their own published artifacts.
 
 ## AI models and limits
 
-The shared defaults route builds across Groq's GPT-OSS models. An operator can
-configure Gemini as a shared backup. In **Settings → AI**, you can also select
-Gemini, the OpenAI API, Anthropic or DeepSeek with your own key. If a Gemini model
-is temporarily unavailable, Cloud tries another Flash-Lite model using the same
-key. If both fail due to capacity, throttling, or an incomplete response, Cloud
-tries shared Groq when configured. The build feed shows which model responded.
+Cloud's shared tier routes across Groq models and can use a configured Gemini fallback. In **Settings → AI**, select Gemini, OpenAI, Anthropic, or DeepSeek to use your own key. If Gemini hits a temporary limit, Cloud tries a second Gemini model and can fall back to shared Groq. The build feed shows the responding model.
 
-## Current limits
+## Remove a project
 
-Generated apps cover data-driven business screens with entities, relationships, CRUD,
-dashboards, entity and page permissions, and sample data. A generated request workflow
-can use a server endpoint that fills in the signed-in user, organization and initial
-status. The form shows the fields the user supplies. Create a matching profile using
-the user's sign-in email so the endpoint can resolve those values.
-Tenant-wide policies, per-record browsing, approval and balance updates, invitations
-and password recovery still need developer implementation. See
-[Server extensions](./extensions.md#server-extensions) and the [road to v1](./roadmap.md).
+Type the name in **Project Settings → Delete project**. Select GitHub, Vercel, or Neon explicitly if you want Cloud to delete those resources too. Selecting Neon deletes the project, including its branches and databases.
+
+If a provider rejects deletion, the project remains visible so you can update the connection and retry. GitHub requires repository administration access and suitable deletion permissions. [GitHub repository deletion permissions](https://docs.github.com/en/rest/repos/repos#delete-a-repository)
 
 ## Developer takeover
 
-Generated apps are conventional SvelteKit or Next.js repositories. Developers can
-edit application routes, components and endpoints directly. Author published
-artifacts through Studio in SvelteKit or the Mosaic API in either framework.
-
-Orval is optional for stable external OpenAPI services. It is useful for generating
-typed clients and query hooks, but Mosaic's dynamic same-origin artifact APIs do not
-depend on generated clients.
+Use `npm install` for a SvelteKit download and `npm ci` for a Next.js download, then run `npm run dev` at the repository root. Generated workflow releases include `mosaic/openapi.json` for typed clients. See [Server extensions](./extensions.md#server-extensions) for code locations and [App integrations](./app-integrations.md) for package and provider requirements.
