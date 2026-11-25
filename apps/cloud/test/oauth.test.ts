@@ -59,7 +59,9 @@ test('every Vercel call names the team for team installs, and none for personal 
     const settings = stub.calls.find((call) => new URL(call.url).pathname === '/v9/projects/prj');
     assert.equal(settings?.init.method, 'PATCH');
     assert.equal(JSON.parse(String(settings?.init.body)).rootDirectory, null);
-    assert.equal(JSON.parse(String(settings?.init.body)).installCommand, 'npm install');
+    const installCommand = JSON.parse(String(settings?.init.body)).installCommand;
+    assert.match(installCommand, /^npm install --no-save --package-lock=false /);
+    for (const pkg of ['core', 'server', 'ui', 'sveltekit']) assert.ok(installCommand.includes(`@mosaic-apps/${pkg}@latest`));
     assert.equal(JSON.parse(String(settings?.init.body)).buildCommand, 'npm exec -- svelte-kit sync && npm run build');
     stub.calls.length = 0;
     await createVercelProject({ token: 't', name: 'app' });
