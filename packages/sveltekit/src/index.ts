@@ -41,8 +41,8 @@ export function resolveMosaicPage(pages: PageDef[], pathname: string): PageDef |
   return matchMosaicPage(pages, pathname)?.page;
 }
 
-export interface MosaicPageMatch {
-  page: PageDef;
+export interface MosaicPageMatch<T = PageDef> {
+  page: T;
   params: Record<string, string>;
 }
 
@@ -65,9 +65,9 @@ function matchRoute(pattern: string, pathname: string): Record<string, string> |
   return params;
 }
 
-export function matchMosaicPage(pages: PageDef[], pathname: string): MosaicPageMatch | undefined {
+export function matchMosaicPage<T extends Pick<PageDef, 'route'>>(pages: T[], pathname: string): MosaicPageMatch<T> | undefined {
   const ranked = [...pages].sort((left, right) => {
-    const dynamic = (page: PageDef) => normalizeMosaicRoute(page.route).split('/').filter((part) => part.startsWith(':')).length;
+    const dynamic = (page: T) => normalizeMosaicRoute(page.route).split('/').filter((part) => part.startsWith(':')).length;
     return dynamic(left) - dynamic(right);
   });
   for (const page of ranked) {
@@ -86,15 +86,17 @@ export interface MosaicRouteData {
 export function createMosaicRouteLoader(options: { apiBase?: string } = {}): ServerLoad<Record<string, string>, Record<string, unknown>, MosaicRouteData> {
   const apiBase = (options.apiBase ?? '/api').replace(/\/$/, '');
   return async ({ fetch, url }) => {
-    const response = await fetch(`${apiBase}/pages?published=true`);
-    const payload = await response.json() as ApiResponse<PageDef[]>;
+    const response = await fetch(`${apiBase}/pages?published=true&includeRestrictedRoutes=true`);
+    const payload = await response.json() as ApiResponse<Array<PageDef | Pick<PageDef, 'route'>>>;
     if (!response.ok || !payload.success) throw error(response.status || 503, 'Mosaic pages are unavailable');
     const match = matchMosaicPage(payload.data, url.pathname);
     if (!match) throw error(404, `No published page exists at ${url.pathname}`);
+    const login = `/login?next=${encodeURIComponent(url.pathname + url.search)}`;
+    if (!('root' in match.page)) throw redirect(303, login);
     if (match.page.settings?.requiresAuth) {
       const auth = await fetch(`${apiBase}/auth/me`);
       if (auth.status === 401 || auth.status === 403) {
-        throw redirect(303, `/login?next=${encodeURIComponent(url.pathname + url.search)}`);
+        throw redirect(303, login);
       }
       if (!auth.ok) throw error(auth.status || 503, 'Authentication is unavailable');
     }

@@ -6,8 +6,47 @@ import { createPgliteDriver } from '../db/pglite.js';
 import { ensurePlatformTables } from '../platform.js';
 import type { AuthEnv } from './auth.js';
 import { artifactRoutes } from './artifacts.js';
+import { createMosaicServer } from '../app.js';
 
 type Envelope<T> = { success: true; data: T } | { success: false; error: { code?: string } };
+
+test('published page definitions require a session when the page is protected', async () => {
+  const server = await createMosaicServer({ databaseUrl: 'pglite://memory', auth: { jwtSecret: 'page-access-test-secret-32-characters' }, seed: { admin: { email: 'builder@example.com', password: 'test-password' }, demo: false } });
+  try {
+    const login = await server.app.request('/api/auth/login', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: 'builder@example.com', password: 'test-password' }),
+    });
+    assert.equal(login.status, 200);
+    const cookie = login.headers.get('set-cookie')!.split(';')[0]!;
+    const headers = { cookie, 'content-type': 'application/json' };
+    const created = await server.app.request('/api/pages', {
+      method: 'POST', headers, body: JSON.stringify({ name: 'Internal report', route: '/internal/:id', settings: { requiresAuth: true } }),
+    });
+    assert.equal(created.status, 201);
+    const { data: page } = await created.json() as { data: PageDef };
+    assert.equal((await server.app.request(`/api/pages/${page.id}/publish`, { method: 'POST', headers })).status, 200);
+
+    for (const key of [page.slug, page.id]) {
+      assert.equal((await server.app.request(`/api/pages/${key}`)).status, 401);
+    }
+    const publicList = await server.app.request('/api/pages?published=true');
+    const { data: publicPages } = await publicList.json() as { data: PageDef[] };
+    assert.ok(publicPages.some((item) => item.route === '/'));
+    assert.ok(!publicPages.some((item) => item.id === page.id));
+    const routing = await server.app.request('/api/pages?published=true&includeRestrictedRoutes=true');
+    const { data: routes } = await routing.json() as { data: Array<Pick<PageDef, 'route'>> };
+    assert.deepEqual(routes.find((item) => item.route === page.route), { route: page.route });
+
+    const privatePage = await server.app.request(`/api/pages/${page.id}`, { headers });
+    assert.equal(privatePage.status, 200);
+    assert.equal(privatePage.headers.get('cache-control'), 'private, no-store');
+    const { data: signedInPages } = await (await server.app.request('/api/pages?published=true', { headers })).json() as { data: PageDef[] };
+    assert.ok(signedInPages.find((item) => item.id === page.id)?.root);
+  } finally {
+    await server.close();
+  }
+});
 
 test('page history supports diff and conflict-safe forward restore', async () => {
   const db = await createPgliteDriver('pglite://memory');

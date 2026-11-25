@@ -13,7 +13,7 @@
     "@anthropic-ai/sdk": "^1.14.0",
     "@lucide/svelte": "^1.79.0",
     "@mosaic-apps/core": "0.4.0",
-    "@mosaic-apps/server": "0.4.0",
+    "@mosaic-apps/server": "0.4.1",
     "@mosaic-apps/ui": "0.4.0",
     "@sveltejs/adapter-vercel": "^7.0.0",
     "@sveltejs/kit": "^3.0.1",

@@ -71,6 +71,10 @@ function toRecord(row: ArtifactRow, kind: ArtifactKind): FormDef | PageDef {
   return { ...base, route: row.route ?? `/${row.slug}` } as PageDef;
 }
 
+function pageRequiresAuth(row: ArtifactRow): boolean {
+  return (row.settings as PageDef['settings'])?.requiresAuth === true;
+}
+
 /** Columns must match each table exactly (mosaic_pages has no entity/data_source; mosaic_forms has no route). */
 function returnCols(kind: ArtifactKind): string {
   return kind === 'page'
@@ -211,18 +215,23 @@ export function artifactRoutes(deps: ArtifactDeps): Hono<AuthEnv> {
 
   // list
   app.get('/', async (c) => {
+    if (deps.kind === 'page') c.header('Cache-Control', 'private, no-store');
     const user = c.get('user');
     const publishedOnly = c.req.query('published') === 'true';
     if (!user && !publishedOnly) throw new HttpError(401, 'Authentication required', 'UNAUTHENTICATED');
     const filters: string[] = [];
     const params: unknown[] = [];
     if (publishedOnly) filters.push('published = true');
+    const q = c.req.query('q');
+    const includeRestrictedRoutes = deps.kind === 'page' && publishedOnly && !q && c.req.query('includeRestrictedRoutes') === 'true';
+    if (deps.kind === 'page' && !user && !includeRestrictedRoutes) {
+      filters.push("(settings->'requiresAuth') IS DISTINCT FROM 'true'::jsonb");
+    }
     const entity = c.req.query('entity');
     if (entity && deps.kind === 'form') {
       params.push(entity);
       filters.push(`entity = $${params.length}`);
     }
-    const q = c.req.query('q');
     if (q) {
       params.push(`%${q}%`);
       filters.push(`(name ILIKE $${params.length} OR slug ILIKE $${params.length})`);
@@ -232,13 +241,20 @@ export function artifactRoutes(deps: ArtifactDeps): Hono<AuthEnv> {
       `SELECT ${returnCols(deps.kind)} FROM ${table} ${where} ORDER BY updated_at DESC LIMIT 500`,
       params,
     );
-    return ok(c, res.rows.map((r) => toRecord(r, deps.kind)));
+    return ok(c, res.rows.map((row) => {
+      // Routing needs a protected route's path to choose between login and a 404.
+      if (includeRestrictedRoutes && !user && pageRequiresAuth(row)) return { route: row.route ?? `/${row.slug}` };
+      return toRecord(row, deps.kind);
+    }));
   });
 
-  // get by id or slug (published artifacts are readable anonymously)
+  // get by id or slug
   app.get('/:idOrSlug', async (c) => {
+    if (deps.kind === 'page') c.header('Cache-Control', 'private, no-store');
     const row = await rowOr404(c.req.param('idOrSlug'));
-    if (!row.published && !c.get('user')) throw new HttpError(401, 'Authentication required', 'UNAUTHENTICATED');
+    if (!c.get('user') && (!row.published || (deps.kind === 'page' && pageRequiresAuth(row)))) {
+      throw new HttpError(401, 'Authentication required', 'UNAUTHENTICATED');
+    }
     return ok(c, toRecord(row, deps.kind));
   });
 

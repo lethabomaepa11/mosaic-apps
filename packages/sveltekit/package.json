@@ -1,6 +1,6 @@
 {
   "name": "@mosaic-apps/sveltekit",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "SvelteKit route loaders and same-origin API adapters for Mosaic applications",
   "publishConfig": { "access": "public" },
   "type": "module",
@@ -21,7 +21,7 @@
   },
   "dependencies": {
     "@mosaic-apps/core": "0.4.0",
-    "@mosaic-apps/server": "0.4.0"
+    "@mosaic-apps/server": "0.4.1"
   },
   "peerDependencies": {
     "@sveltejs/kit": "^3.0.0"

@@ -16,7 +16,9 @@ export default defineConfig({
     adapter: process.env.MOSAIC_DEPLOY_TARGET === 'netlify' ? netlifyAdapter() : process.env.MOSAIC_DEPLOY_TARGET === 'vercel' ? vercelAdapter() : adapter(),
     ...(process.env.MOSAIC_APP_ORIGIN ? { paths: { origin: process.env.MOSAIC_APP_ORIGIN } } : {}),
   })],
-  resolve: { alias: { '#lib': fileURLToPath(new URL('./src/lib', import.meta.url)) } },
+  // The linked route adapter must throw redirects from the app's SvelteKit runtime.
+  ssr: { noExternal: ['@mosaic-apps/sveltekit'] },
+  resolve: { dedupe: ['@sveltejs/kit'], alias: { '#lib': fileURLToPath(new URL('./src/lib', import.meta.url)) } },
   server: {
     host: '127.0.0.1',
     fs: { allow: [fileURLToPath(new URL('./', import.meta.resolve('@mosaic-apps/ui')))] },

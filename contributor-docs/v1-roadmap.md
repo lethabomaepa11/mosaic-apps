@@ -4,6 +4,9 @@ What has to be true before we call Mosaic (framework, Studio, Cloud) v1, written
 the November 2026 Cloud build-out. Each item says what "done" means. **P0** blocks v1,
 **P1** is expected for v1, **P2** can follow.
 
+Track implementation, acceptance criteria, and verification in the
+[v1 GitHub issues](https://github.com/lethabomaepa11/mosaic-apps/issues?q=label%3Av1).
+
 ## Where we are (verified)
 
 - One prompt → clarifying questions (asked once) → developer/verifier/reviewer agents →
@@ -92,8 +95,10 @@ provider responses. This is the first thing to close.
 
 ## 5. Framework (core, server, ui)
 
-- **P0 Page access enforcement** at runtime (`requiresAuth`, roles) for database pages,
-  not only route guards in the UI.
+- **P0 Page access enforcement.** Published pages with `requiresAuth` now require a
+  session through both the framework API and the SvelteKit loader. Anonymous routing
+  receives only route paths for protected pages so it can redirect to sign-in.
+  Role-based page access still needs a policy and enforcement.
 - **P0 Multi-instance correctness.** The entity registry is cached per process; on
   serverless, other instances serve stale definitions after an entity change. Add a
   version check or cache invalidation. Also: revoke tokens on password change (JWT
@@ -116,9 +121,9 @@ provider responses. This is the first thing to close.
   build and a browser smoke test before the tag is promoted.
 - **P0 Upgrade notes.** Projects created before Studio moved into the app (no more
   `apps/studio`, `--studio-port` removed) need a migration guide.
-- **P0 Template linking.** `mosaic create --link` does not install the linked UI
-  package's dependencies (`tailwind-merge`, `svelte-sonner`) under `preserveSymlinks`,
-  so `npm run check` fails in linked projects; fix for contributors.
+- **P0 Template linking.** `mosaic create --link` now places the linked UI package's
+  dependencies in the generated app manifest. A fresh linked app passed `npm install`,
+  `npm run check`, and the Node production build on Windows.
 - **P1 Docs site.** Quickstart video/GIFs, Cloud guide with screenshots, provider setup
   guides (GitHub OAuth App, Vercel Integration, Neon key), troubleshooting, changelog.
 

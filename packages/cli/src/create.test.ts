@@ -79,6 +79,17 @@ test('published template is not mistaken for a source checkout', async (t) => {
   assert.equal(findRepoRoot(root), null);
 });
 
+test('link mode installs source UI dependencies in the generated app', async (t) => {
+  const root = await fixture(t);
+  const link = resolve(import.meta.dirname, '../../..');
+  await create(options(root, { link, git: false, pwa: false }));
+  const { dependencies } = JSON.parse(await readFile(join(root, 'my-crm/apps/web/package.json'), 'utf8'));
+  const ui = JSON.parse(await readFile(join(link, 'packages/ui/package.json'), 'utf8'));
+  assert.match(dependencies['@mosaic-apps/ui'], /^file:/);
+  assert.equal(dependencies['tailwind-merge'], ui.dependencies['tailwind-merge']);
+  assert.equal(dependencies['svelte-sonner'], ui.dependencies['svelte-sonner']);
+});
+
 test('CLI reads .env and resolves embedded data relative to the project', async (t) => {
   const root = await fixture(t);
   await writeFile(join(root, 'mosaic.config.json'), JSON.stringify({ databaseUrl: 'postgres://unused/old', api: { port: 9999 } }));

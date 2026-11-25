@@ -73,3 +73,17 @@ test('route loader sends anonymous users to login with a safe return path', asyn
     },
   );
 });
+
+test('a protected exact route redirects before a matching public dynamic route', async () => {
+  const load = createMosaicRouteLoader();
+  await assert.rejects(
+    () => load({
+      url: new URL('https://example.test/customers/private'),
+      fetch: async (input: RequestInfo | URL) => {
+        assert.equal(String(input), '/api/pages?published=true&includeRestrictedRoutes=true');
+        return new Response(JSON.stringify({ success: true, data: [page('/customers/:id'), { route: '/customers/private' }] }));
+      },
+    } as never),
+    (cause: unknown) => (cause as { location?: string }).location === '/login?next=%2Fcustomers%2Fprivate',
+  );
+});

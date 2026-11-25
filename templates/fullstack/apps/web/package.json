@@ -13,8 +13,8 @@
   },
   "dependencies": {
     "@mosaic-apps/core": "^0.4.0",
-    "@mosaic-apps/server": "^0.4.0",
-    "@mosaic-apps/sveltekit": "^0.4.0",
+    "@mosaic-apps/server": "^0.4.1",
+    "@mosaic-apps/sveltekit": "^0.4.1",
     "@mosaic-apps/ui": "^0.4.0",
     "@electric-sql/pglite": "^0.5.8",
     "pg": "^8.23.1",

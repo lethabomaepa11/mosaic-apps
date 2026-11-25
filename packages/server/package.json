@@ -1,6 +1,6 @@
 {
   "name": "@mosaic-apps/server",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Mosaic server: Hono app with metadata registry, migration engine, auto CRUD, JSON forms, auth/RBAC, audit, ref lists and settings over PostgreSQL",
   "publishConfig": {
     "access": "public"

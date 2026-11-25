@@ -153,6 +153,7 @@ export async function copyTemplate(
 /** Rewrite @mosaic-apps/* deps to file: links (link mode). */
 export async function rewriteMosaicDeps(dir: string, linkDir: string): Promise<void> {
   const packages = resolve(linkDir, 'packages');
+  const uiManifest = join(packages, 'ui', 'package.json');
   const files: string[] = [];
   const walk = async (relative: string): Promise<void> => {
     const src = join(dir, relative);
@@ -173,6 +174,11 @@ export async function rewriteMosaicDeps(dir: string, linkDir: string): Promise<v
     for (const section of ['dependencies', 'devDependencies'] as const) {
       const deps = raw[section];
       if (!deps) continue;
+      if (deps['@mosaic-apps/ui'] && existsSync(uiManifest)) {
+        // TypeScript reads linked UI source through the consumer's node_modules.
+        const ui = JSON.parse(await readFile(uiManifest, 'utf8')) as { dependencies?: Record<string, string> };
+        for (const [name, range] of Object.entries(ui.dependencies ?? {})) deps[name] ??= range;
+      }
       for (const name of Object.keys(deps)) {
         if (!name.startsWith('@mosaic-apps/')) continue;
         const short = name.replace('@mosaic-apps/', '');
