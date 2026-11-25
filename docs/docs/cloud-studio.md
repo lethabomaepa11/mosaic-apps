@@ -48,7 +48,8 @@ projects use the same Mosaic runtime and database-first artifacts.
    Cloud can deliver an existing build after you connect your accounts. Open
    **Source & delivery → Deliver latest** to queue it.
 7. Cloud creates the GitHub repository, provisions a Neon database, and deploys to
-   Vercel using the framework you selected. Open the production URL after delivery
+   Vercel using the framework you selected. Each Vercel build installs the latest
+   published Mosaic packages for that framework. Open the production URL after delivery
    completes. Workspace owners and admins see **View admin sign-in** in the build feed.
    Open it and select **Reveal initial app sign-in** to copy the deployed app's initial
    email and password. Local downloads default to `admin@mosaic.local` and
@@ -105,15 +106,19 @@ The shared defaults route builds across Groq's GPT-OSS models. An operator can
 configure Gemini as a shared backup. In **Settings → AI**, you can also select
 Gemini, the OpenAI API, Anthropic or DeepSeek with your own key. If a Gemini model
 is temporarily unavailable, Cloud tries another Flash-Lite model using the same
-key. The build feed shows which model responded.
+key. If both fail due to capacity, throttling, or an incomplete response, Cloud
+tries shared Groq when configured. The build feed shows which model responded.
 
 ## Current limits
 
 Generated apps cover data-driven business screens with entities, relationships, CRUD,
-dashboards, entity-level permissions and sample data. Requirements such as tenant
-isolation, per-record permissions, atomic approval and balance updates, invitation
-emails and password recovery need developer implementation in the generated repository.
-Database CRUD checks and AI review cover generated artifacts. See the [road to v1](./roadmap.md).
+dashboards, entity and page permissions, and sample data. A generated request workflow
+can use a server endpoint that fills in the signed-in user, organization and initial
+status. The form shows the fields the user supplies. Create a matching profile using
+the user's sign-in email so the endpoint can resolve those values.
+Tenant-wide policies, per-record browsing, approval and balance updates, invitations
+and password recovery still need developer implementation. See
+[Server extensions](./extensions.md#server-extensions) and the [road to v1](./roadmap.md).
 
 ## Developer takeover
 

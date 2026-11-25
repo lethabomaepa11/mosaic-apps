@@ -11,7 +11,7 @@ import { createMosaicServer } from '../app.js';
 type Envelope<T> = { success: true; data: T } | { success: false; error: { code?: string } };
 
 test('published page definitions require a session when the page is protected', async () => {
-  const server = await createMosaicServer({ databaseUrl: 'pglite://memory', auth: { jwtSecret: 'page-access-test-secret-32-characters' }, seed: { admin: { email: 'builder@example.com', password: 'test-password' }, demo: false } });
+  const server = await createMosaicServer({ databaseUrl: 'pglite://memory', auth: { jwtSecret: 'page-access-test-secret-32-characters', allowRegistration: true }, seed: { admin: { email: 'builder@example.com', password: 'test-password' }, demo: false } });
   try {
     const login = await server.app.request('/api/auth/login', {
       method: 'POST', headers: { 'content-type': 'application/json' },
@@ -21,7 +21,7 @@ test('published page definitions require a session when the page is protected', 
     const cookie = login.headers.get('set-cookie')!.split(';')[0]!;
     const headers = { cookie, 'content-type': 'application/json' };
     const created = await server.app.request('/api/pages', {
-      method: 'POST', headers, body: JSON.stringify({ name: 'Internal report', route: '/internal/:id', settings: { requiresAuth: true } }),
+      method: 'POST', headers, body: JSON.stringify({ name: 'Internal report', route: '/internal/:id', settings: { requiresAuth: true, roles: ['admin'] } }),
     });
     assert.equal(created.status, 201);
     const { data: page } = await created.json() as { data: PageDef };
@@ -43,6 +43,17 @@ test('published page definitions require a session when the page is protected', 
     assert.equal(privatePage.headers.get('cache-control'), 'private, no-store');
     const { data: signedInPages } = await (await server.app.request('/api/pages?published=true', { headers })).json() as { data: PageDef[] };
     assert.ok(signedInPages.find((item) => item.id === page.id)?.root);
+    const viewer = await server.app.request('/api/auth/register', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: 'viewer@example.com', password: 'test-password' }),
+    });
+    assert.equal(viewer.status, 201);
+    const viewerHeaders = { cookie: viewer.headers.get('set-cookie')!.split(';')[0]! };
+    assert.equal((await server.app.request(`/api/pages/${page.id}`, { headers: viewerHeaders })).status, 403);
+    assert.equal((await server.app.request(`/api/pages/${page.id}/revisions`, { headers: viewerHeaders })).status, 403);
+    const signedInRouting = await server.app.request('/api/pages?published=true&includeRestrictedRoutes=true', { headers: viewerHeaders });
+    const { data: viewerRoutes } = await signedInRouting.json() as { data: Array<Pick<PageDef, 'route'>> };
+    assert.deepEqual(viewerRoutes.find((item) => item.route === page.route), { route: page.route, forbidden: true });
   } finally {
     await server.close();
   }

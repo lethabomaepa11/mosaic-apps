@@ -5,6 +5,7 @@ import { getCloudDb, hosted, readCloud } from './db';
 import { applyApp, inProcessCaller, seedAndSmokeTest, type MosaicCall } from './mosaic-runtime';
 import { compileSpec, type AppSpec, type CompiledApp } from './spec';
 import { previewDatabaseUrl, withPreviewSchema } from './preview-schema';
+import { createWorkflowEndpoints } from '../../../../../templates/fullstack/apps/web/src/lib/server/create-workflows.js';
 
 /**
  * Each project's live preview is a real Mosaic app running inside Cloud with its own
@@ -34,6 +35,24 @@ async function start(project: PreviewProject, databaseUrl: string): Promise<Prev
   const server = await createMosaicServer({
     databaseUrl, database: { poolMax: 2, idleTimeoutMillis: 5_000 },
     auth: { jwtSecret, oauth: false }, notifications: false, cors: false,
+    endpoints: [{
+      method: 'POST', path: '/:workflow/submit', summary: 'Submit a generated preview workflow',
+      responses: { 201: { description: 'Submitted' } },
+      handler: async (context) => {
+        const db = await getCloudDb();
+        const { rows: [current] } = await db.query<{ app_spec: AppSpec | null }>('SELECT app_spec FROM cloud_projects WHERE id = $1', [project.id]);
+        const spec = current?.app_spec;
+        const workflowName = context.params.workflow;
+        const workflow = spec && compileSpec(spec).workflows?.find((item) => item.entity.replaceAll('_', '-') === workflowName);
+        if (!workflow) return Response.json({ success: false, error: { message: 'Workflow not found' } }, { status: 404 });
+        const endpoint = createWorkflowEndpoints([workflow])[0]!;
+        const profile = workflow.profile;
+        const sampleEmail = profile && spec.sampleData.find((sample) => sample.entity === profile.entity)?.records
+          .flat().find((pair) => pair.field === profile.emailField)?.value;
+        const user = context.user && sampleEmail ? { ...context.user, email: sampleEmail } : context.user;
+        return endpoint.handler({ ...context, user });
+      },
+    }],
     seed: { admin: { email: ADMIN_EMAIL, password: secretFor(project.id, 'admin') }, demo: false },
   });
   try {
@@ -112,12 +131,15 @@ export async function previewPages(project: { id: string; slug: string; app_spec
 }
 
 export async function previewNavigation(project: PreviewProject, pages: PageDef[]): Promise<NavItemDef[]> {
-  const { server } = await previewRuntime(project);
-  const { rows: [setting] } = await server.db.query<{ value: NavItemDef[] }>("SELECT value FROM mosaic_settings WHERE key = 'app.nav'");
-  const items = Array.isArray(setting?.value) ? setting.value : pages
+  const defaults = pages
     .filter((page) => page.settings?.menu?.show !== false && !page.route.split('/').some((part) => part.startsWith(':')))
     .sort((a, b) => (a.settings?.menu?.order ?? 99) - (b.settings?.menu?.order ?? 99))
-    .map((page) => ({ label: page.settings?.title ?? page.name, href: page.route, icon: page.settings?.menu?.icon, section: page.settings?.menu?.group }));
+    .map((page) => ({ label: page.settings?.menu?.label ?? page.settings?.title ?? page.name, href: page.route, icon: page.settings?.menu?.icon, section: page.settings?.menu?.group }));
+  const { call } = await previewRuntime(project);
+  const result = await call('GET', '/api/settings').catch(() => undefined);
+  const setting = result?.status === 200 && Array.isArray(result.body?.data)
+    ? result.body.data.find((item: { key?: string }) => item?.key === 'app.nav') : undefined;
+  const items: NavItemDef[] = Array.isArray(setting?.value) ? setting.value : defaults;
   return items.filter((item) => typeof item?.label === 'string' && typeof item.href === 'string' && /^\/(?![/\\])/.test(item.href) && !/[\\\u0000-\u001f]/.test(item.href))
     .map(({ label, href, icon, section }) => ({ label, href, icon: typeof icon === 'string' ? icon : undefined, section: typeof section === 'string' ? section : undefined }));
 }

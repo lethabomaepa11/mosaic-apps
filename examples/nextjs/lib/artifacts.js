@@ -28,13 +28,21 @@ export function canManageSettings(user) {
 
 export const readNavigation = cache(async function readNavigation() {
   const { rows: [setting] } = await (await mosaicServer()).db.query("SELECT value FROM mosaic_settings WHERE key = 'app.nav'");
-  const { data: pages } = Array.isArray(setting?.value) ? {} : await readMosaic('/pages?published=true');
-  const items = Array.isArray(setting?.value) ? setting.value : (pages ?? [])
+  const [{ data: pages }, { data: user }] = await Promise.all([readMosaic('/pages?published=true&includeRestrictedRoutes=true'), readMosaic('/auth/me')]);
+  const visible = (pages ?? []).filter((page) => page.root && canAccessPage(page, user));
+  const blocked = new Set((pages ?? []).filter((page) => !visible.includes(page)).map((page) => page.route));
+  const items = Array.isArray(setting?.value) ? setting.value : visible
     .filter((page) => page.settings?.menu?.show !== false && !page.route.split('/').some((part) => part.startsWith(':')))
     .sort((a, b) => (a.settings?.menu?.order ?? 99) - (b.settings?.menu?.order ?? 99))
-    .map((page) => ({ href: page.route, label: page.settings?.title ?? page.name, section: page.settings?.menu?.group }));
-  return items.filter((item) => typeof item?.label === 'string' && typeof item.href === 'string' && /^\/(?![/\\])/.test(item.href) && !/[\\\u0000-\u001f]/.test(item.href));
+    .map((page) => ({ href: page.route, label: page.settings?.menu?.label ?? page.settings?.title ?? page.name, section: page.settings?.menu?.group }));
+  return items.filter((item) => typeof item?.label === 'string' && typeof item.href === 'string'
+    && /^\/(?![/\\])/.test(item.href) && !/[\\\u0000-\u001f]/.test(item.href) && !blocked.has(item.href.split(/[?#]/, 1)[0]));
 });
+
+function canAccessPage(page, user) {
+  const roles = page.settings?.roles;
+  return !roles?.length || user?.isAdmin || roles.some((role) => user?.roles?.includes(role));
+}
 
 export async function readAuthPage(route) {
   const { data } = await readMosaic('/pages?published=true');
@@ -51,7 +59,12 @@ export async function publishedPage(segments) {
   for (const { page, parts } of candidates) {
     if (parts.length !== segments.length) continue;
     if (!parts.every((part, index) => part.startsWith(':') || part === encodeURIComponent(segments[index]) || part === segments[index])) continue;
-    if (!page.root) signIn('/' + segments.map(encodeURIComponent).join('/'));
+    if (page.forbidden) return undefined;
+    if (!page.root || page.settings?.roles?.length) {
+      const { data: user } = await readMosaic('/auth/me');
+      if (!user) signIn('/' + segments.map(encodeURIComponent).join('/'));
+      if (!page.root || !canAccessPage(page, user)) return undefined;
+    }
     return page;
   }
   return undefined;

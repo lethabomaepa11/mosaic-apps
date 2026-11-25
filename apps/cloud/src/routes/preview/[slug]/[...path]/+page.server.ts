@@ -32,6 +32,7 @@ export const load: PageServerLoad = async ({ params, locals, url }) => {
   const page = pages.find((item) => item.route === path) ?? (path === '/' ? pages.find((item) => item.settings?.menu?.show !== false) : undefined);
   const navigation = await previewNavigation(project, pages);
   const nav = navigation.map((item) => ({ ...item, href: `${base}${item.href === '/' ? '' : item.href}`, icon: item.icon ?? 'link' }));
+  if (path === '/studio' && url.searchParams.has('sidebar')) return { app, status: 'sidebar' as const, page: null, nav, navigation };
   if (path === '/studio') {
     const { call } = await previewRuntime(project);
     const forms = await call('GET', '/api/forms?published=true');

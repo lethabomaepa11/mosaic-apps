@@ -92,7 +92,10 @@ export function createMosaicRouteLoader(options: { apiBase?: string } = {}): Ser
     const match = matchMosaicPage(payload.data, url.pathname);
     if (!match) throw error(404, `No published page exists at ${url.pathname}`);
     const login = `/login?next=${encodeURIComponent(url.pathname + url.search)}`;
-    if (!('root' in match.page)) throw redirect(303, login);
+    if (!('root' in match.page)) {
+      if ('forbidden' in match.page && match.page.forbidden === true) throw error(403, 'This page is restricted to other roles');
+      throw redirect(303, login);
+    }
     if (match.page.settings?.requiresAuth) {
       const auth = await fetch(`${apiBase}/auth/me`);
       if (auth.status === 401 || auth.status === 403) {

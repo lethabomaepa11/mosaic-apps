@@ -19,7 +19,7 @@
         navigation = Array.isArray(setting?.value) ? (await client.getNav()).items : (await client.listPages(true))
           .filter((page) => page.settings?.menu?.show !== false && !page.route.split('/').some((part) => part.startsWith(':')))
           .sort((a, b) => (a.settings?.menu?.order ?? 99) - (b.settings?.menu?.order ?? 99))
-          .map((page) => ({ label: page.settings?.title ?? page.name, href: page.route, icon: page.settings?.menu?.icon, section: page.settings?.menu?.group }));
+          .map((page) => ({ label: (page.settings?.menu as { label?: string } | undefined)?.label ?? page.settings?.title ?? page.name, href: page.route, icon: page.settings?.menu?.icon, section: page.settings?.menu?.group }));
       }
       items = navigation.map((item) => ({ ...item }));
       ready = true;

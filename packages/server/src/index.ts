@@ -43,6 +43,7 @@ export type { NotificationOptions } from './modules/notifications.js';
 export { entityAdminRoutes } from './modules/entity-admin.js';
 export {
   endpointRegistryRoutes,
+  buildOpenApiDocument,
   registeredEndpointRoutes,
   scanApiDir,
   validateEndpointRegistrations,

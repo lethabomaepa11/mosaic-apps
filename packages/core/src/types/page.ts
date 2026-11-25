@@ -4,6 +4,7 @@ import type { FormNode, FormSeoSettings } from './form.js';
 
 export interface PageMenuConfig {
   show?: boolean;
+  label?: string;
   order?: number;
   group?: string;
   icon?: string;
@@ -12,6 +13,7 @@ export interface PageMenuConfig {
 export interface PageSettings {
   title?: string;
   requiresAuth?: boolean;
+  roles?: string[];
   layout?: 'default' | 'bare';
   menu?: PageMenuConfig;
   description?: string;

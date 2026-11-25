@@ -18,6 +18,24 @@ const app = await mkdtemp(join(tmpdir(), `mosaic-cloud-${framework}-`));
 const spec = structuredClone(equipmentSpec);
 spec.allowRegistration = true;
 spec.pages.find((page) => page.route === '/').slug = 'equipment-home';
+const adminLoans = spec.pages.find((page) => page.route === '/loans');
+adminLoans.roles = ['admin'];
+adminLoans.menuLabel = 'Loans administration';
+spec.pages.find((page) => page.route === '/equipment').menuLabel = 'Equipment inventory';
+const requestField = spec.entities.find((entity) => entity.name === 'employee').fields[0];
+spec.entities.push({
+  name: 'equipment_request', label: 'Equipment request', labelPlural: 'Equipment requests', labelField: 'reason', icon: '', description: '',
+  fields: [
+    { ...requestField, name: 'reason', label: 'Reason' },
+    { ...requestField, name: 'requesterEmail', label: 'Requester', format: 'email' },
+    { ...requestField, name: 'status', label: 'Status', type: 'enum', options: ['Pending Approval', 'Approved'] },
+  ],
+  permissions: { read: [], create: ['viewer'], update: [], delete: [] },
+  submission: { managed: [
+    { field: 'requesterEmail', source: 'userEmail', value: '' },
+    { field: 'status', source: 'constant', value: 'Pending Approval' },
+  ] },
+});
 const workflow = spec.pages.find((page) => page.route === '/dashboard');
 workflow.kind = 'workflow';
 workflow.sections = [
@@ -78,10 +96,21 @@ try {
   assert.equal(signup.status, 201);
   assert.deepEqual((await signup.json()).data.user.roles, ['viewer']);
   const user = { cookie: signup.headers.get('set-cookie').split(';')[0] };
+  const submit = (path, body) => request(path, {
+    method: 'POST', headers: { ...user, 'content-type': 'application/json' }, body: JSON.stringify(body),
+  });
+  assert.equal((await submit('/api/entities/equipment_request', { reason: 'Field work' })).status, 403);
+  assert.equal((await submit('/api/extensions/equipment-request/submit', { reason: 'Field work', status: 'approved' })).status, 422);
+  const submitted = await submit('/api/extensions/equipment-request/submit', { reason: 'Field work' });
+  assert.equal(submitted.status, 201, await submitted.clone().text());
+  const { data: requestRecord } = await submitted.json();
   const dashboard = await request('/dashboard', { headers: user });
   assert.equal(dashboard.status, 200);
   const dashboardHtml = await dashboard.text();
   assert.match(dashboardHtml, /aria-label="Main navigation"/);
+  assert.match(dashboardHtml, /Equipment inventory/);
+  assert.doesNotMatch(dashboardHtml, /Loans administration/);
+  assert.ok([403, 404].includes((await request('/loans', { headers: user })).status));
   assert.match(dashboardHtml, svelte ? /Lend equipment/ : /href="\/f\/loan-form">Lend equipment/);
   if (!svelte) assert.equal((await request('/studio', { headers: user })).status, 404);
   const credentials = await request('/api/auth/login', {
@@ -89,6 +118,9 @@ try {
   });
   assert.equal(credentials.status, 200);
   const headers = { cookie: credentials.headers.get('set-cookie').split(';')[0], 'content-type': 'application/json' };
+  const { data: savedRequest } = await (await request(`/api/entities/equipment_request/${requestRecord.id}`, { headers })).json();
+  assert.equal(savedRequest.requesterEmail, 'borrower@example.test');
+  assert.equal(savedRequest.status, 'pending_approval');
   const layout = await request('/api/pages/auth-signup', { headers });
   assert.equal(layout.status, 200);
   const { data: authPage } = await layout.json();
@@ -96,6 +128,9 @@ try {
     const studio = await request(`/studio?page=${encodeURIComponent(authPage.id)}`, { headers });
     assert.equal(studio.status, 200);
     assert.match(await studio.text(), /Page Studio[\s\S]*Page JSON/);
+    const sidebar = await request('/studio?sidebar', { headers });
+    assert.equal(sidebar.status, 200);
+    assert.match(await sidebar.text(), /Save sidebar/);
   }
   authPage.root.children[0].props.text = 'Join the equipment desk';
   const publish = await request(`/api/pages/${authPage.id}/save-and-publish`, {
@@ -105,7 +140,9 @@ try {
   assert.match(await (await request('/signup')).text(), /Join the equipment desk/);
   const loans = await request('/loans', { headers });
   assert.equal(loans.status, 200);
-  if (!svelte) assert.match(await loans.text(), /New record/);
+  const loansHtml = await loans.text();
+  assert.match(loansHtml, /Loans administration/);
+  if (!svelte) assert.match(loansHtml, /New record/);
   const form = await request('/f/loan-form', { headers });
   assert.equal(form.status, 200);
   if (!svelte) assert.match(await form.text(), /name="item"/);

@@ -42,6 +42,8 @@ export interface FormSettings {
   confirmBeforeSubmit?: boolean;
   confirmMessage?: string;
   redirectAfterSubmit?: string;
+  /** Relative Mosaic extension endpoint for creating a record from this form. */
+  createEndpoint?: string;
   /** hide system fields (createdAt...) when rendered against an entity */
   hideSystemFields?: boolean;
   transition?: import('./platform.js').TransitionConfig;

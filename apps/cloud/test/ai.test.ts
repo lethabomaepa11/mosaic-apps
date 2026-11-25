@@ -23,6 +23,27 @@ test('provider reset headers can specify hours', () => {
   assert.equal(parseWait('1800'), 1_800_000);
 });
 
+test('when both Gemini models return 503, the build uses shared Groq with its own key', async (t) => {
+  const saved = process.env.GROQ_API_KEY;
+  process.env.GROQ_API_KEY = 'shared-test-key';
+  t.after(() => { if (saved === undefined) delete process.env.GROQ_API_KEY; else process.env.GROQ_API_KEY = saved; });
+  let geminiCalls = 0;
+  t.mock.method(globalThis, 'fetch', async (url: string, init: RequestInit) => {
+    const headers = new Headers(init.headers);
+    if (url.includes('googleapis.com')) {
+      geminiCalls++;
+      assert.equal(headers.get('x-goog-api-key'), 'own-test-key');
+      return new Response(null, { status: 503 });
+    }
+    assert.match(url, /api\.groq\.com/);
+    assert.equal(headers.get('authorization'), 'Bearer shared-test-key');
+    assert.equal(headers.get('x-goog-api-key'), null);
+    return Response.json({ choices: [{ message: { content: '{"ok":true}' } }] });
+  });
+  assert.deepEqual(await aiJson({ ...request, config: { provider: 'gemini', apiKey: 'own-test-key' } }), { ok: true });
+  assert.equal(geminiCalls, 2);
+});
+
 test('a long AI cooldown returns immediately with the provider wait', async (t) => {
   const fetch = t.mock.method(globalThis, 'fetch', async () => new Response(null, { status: 429, headers: { 'retry-after': '65' } }));
   const onWait = t.mock.fn();

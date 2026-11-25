@@ -1,5 +1,6 @@
 import { createMosaicServer } from '@mosaic-apps/server';
 import { site } from './site.js';
+import { endpoints } from './endpoints.js';
 
 // Next can bundle API handlers and React routes separately inside one process.
 const instance = Symbol.for('mosaic-nextjs.server');
@@ -23,6 +24,7 @@ async function start() {
     throw new Error('Set both ADMIN_EMAIL and ADMIN_PASSWORD to seed an administrator.');
   }
   return createMosaicServer({
+    endpoints,
     databaseUrl: DATABASE_URL ?? 'pglite://./.mosaic-data',
     auth: { enabled: AUTH !== 'off', allowRegistration: AUTH !== 'off' && site.allowRegistration === true, jwtSecret: MOSAIC_JWT_SECRET },
     cors: false,

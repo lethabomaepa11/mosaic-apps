@@ -58,7 +58,10 @@ import type { MosaicEndpointRegistration } from '@mosaic-apps/server';
 export const endpoints: MosaicEndpointRegistration[] = [{
   method: 'POST', path: '/invoices/send', summary: 'Send an invoice',
   permission: 'entity:invoice:update',
-  responses: { 200: { description: 'Sent' } },
+  body: { type: 'object', required: ['invoiceId'], properties: { invoiceId: { type: 'string' } } },
+  responses: { 200: { description: 'Sent', schema: { type: 'object', properties: {
+    invoiceId: { type: 'string' }, sentBy: { type: 'string' },
+  } } } },
   handler: async ({ json, user }) => {
     const input = await json<{ invoiceId: string }>();
     return { invoiceId: input.invoiceId, sentBy: user?.email };
@@ -71,3 +74,20 @@ webhooks or public APIs, and verify their signatures or add rate limiting as nee
 Never import server modules into a Svelte component or browser bundle. Review
 migrations and environment variables alongside dependency changes; visual artifact
 publishing alone does not install code.
+
+In a Next.js scaffold, register handlers in `lib/endpoints.js` and keep server
+implementation files under `lib`. In SvelteKit, keep server code under
+`apps/web/src/lib/server` and register it in `endpoints.ts`.
+
+Declare each endpoint's input JSON Schema in `body` and its status-specific output
+schema in `responses`. Mosaic exposes these registered contracts at
+`GET /api/openapi` to callers with `endpoints:read`. Orval can read a local copy of
+that document to generate typed clients. Cloud also includes `mosaic/openapi.json`
+in releases with generated workflow endpoints. Use a path such as
+`/extensions/leave-request/submit` in a form's `settings.createEndpoint`.
+
+Read the authenticated actor from the handler's `user` context and use `db.tx`
+for changes that must succeed together. For a leave request, accept dates and a
+reason as input, resolve the employee and organization from the signed-in
+profile, and set the initial status in the same transaction. Approval, rejection
+and balance updates belong in separate authenticated handlers.

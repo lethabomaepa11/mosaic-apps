@@ -171,6 +171,8 @@
     try {
       if (onsubmit) {
         await onsubmit(data);
+      } else if (client && !record?.id && form.settings?.createEndpoint?.startsWith('/extensions/')) {
+        await client.call('POST', form.settings.createEndpoint, data);
       } else if (client && entityName) {
         if (record?.id) await client.updateRecord(entityName, String(record.id), data);
         else await client.createRecord(entityName, data);

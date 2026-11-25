@@ -2,6 +2,7 @@
   import { page as current } from '$app/state';
   import { invalidateAll } from '$app/navigation';
   import { FormRenderer, PageRenderer, Icon, Toaster, createClient } from '@mosaic-apps/ui';
+  import NavigationEditor from '../../../../../../../templates/fullstack/apps/web/src/lib/studio/components/NavigationEditor.svelte';
   let { data } = $props();
   // The preview's API is same-origin and member-only; Cloud forwards it to the project's Mosaic server.
   const client = $derived(createClient({ baseUrl: `${data.app.base}/api` }));
@@ -10,25 +11,18 @@
   const editingPage = $derived(data.status === 'studio' ? data.studioPages.find((item) => item.slug === pageKey || item.id === pageKey) : undefined);
   const editingForm = $derived(data.status === 'studio' ? data.studioForms.find((item) => item.slug === formKey || item.id === formKey) : undefined);
   const artifact = $derived(editingPage ? { kind: 'page' as const, slug: editingPage.slug } : editingForm ? { kind: 'form' as const, slug: editingForm.slug } : undefined);
-  const navigationEditor = $derived(current.url.searchParams.has('sidebar'));
 </script>
 
 <svelte:head><title>{data.page?.settings?.title ?? data.page?.name ?? data.app.name} · {data.app.name}</title></svelte:head>
 
 <div class="preview-app min-h-screen bg-base-200 text-base-content" data-theme={data.app.theme}>
-  {#if data.status === 'studio' && navigationEditor}
+  {#if data.status === 'sidebar'}
     <main class="mx-auto max-w-4xl p-4 md:p-8">
       <div class="mb-4 flex gap-2">
         <a class="btn btn-outline btn-sm" href={`${data.app.base}/studio`}>Back to Studio</a>
         <a class="btn btn-outline btn-sm" href={data.app.base}>Open app preview</a>
       </div>
-      {#await import('../../../../../../../templates/fullstack/apps/web/src/lib/studio/components/NavigationEditor.svelte')}
-        <p role="status">Opening sidebar canvas…</p>
-      {:then { default: NavigationEditor }}
-        <NavigationEditor {client} initial={data.navigation} name={data.app.name} onsave={invalidateAll} />
-      {:catch}
-        <p role="alert">Could not open the sidebar canvas.</p>
-      {/await}
+      <NavigationEditor {client} initial={data.navigation} name={data.app.name} onsave={invalidateAll} />
     </main>
   {:else if data.status === 'studio' && artifact}
     {#key `${artifact.kind}:${artifact.slug}`}

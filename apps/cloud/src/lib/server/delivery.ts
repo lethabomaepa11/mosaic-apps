@@ -125,7 +125,9 @@ export async function deployToVercel(input: { token: string; projectId: string; 
     framework,
     rootDirectory: workspace ? 'apps/web' : null,
     sourceFilesOutsideRootDirectory: workspace,
-    installCommand: framework === 'nextjs' ? 'npm ci' : 'npm install',
+    installCommand: framework === 'nextjs'
+      ? 'npm ci && npm install --no-save --package-lock=false @mosaic-apps/server@latest'
+      : 'npm install --no-save --package-lock=false @mosaic-apps/core@latest @mosaic-apps/server@latest @mosaic-apps/ui@latest @mosaic-apps/sveltekit@latest',
     buildCommand: workspace || framework === 'nextjs' ? 'npm run build' : 'npm exec -- svelte-kit sync && npm run build',
   };
   // Older saved releases put the SvelteKit app at the repo root. Clear any stale project root before uploading them.

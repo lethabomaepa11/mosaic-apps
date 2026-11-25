@@ -5,7 +5,7 @@ import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { Hono } from 'hono';
 import type { Db } from '../db/driver.js';
-import { ok } from '../modules/http.js';
+import { fail, ok } from '../modules/http.js';
 import { requirePermission } from '../modules/rbac.js';
 import type { AuthEnv, AuthUser } from '../modules/auth.js';
 import { importEntityModule } from '@mosaic-apps/core';
@@ -83,12 +83,6 @@ function endpointsDir(): string {
   return resolve(process.env.MOSAIC_ENDPOINTS_DIR ?? join(process.cwd(), 'apps', 'web', 'src', 'lib', 'server', 'endpoints'));
 }
 
-function guard(user: AuthUser | null, perm: string): AuthUser {
-  const authenticated = requirePermission(user, perm);
-  if (!authenticated) throw new Error(user ? 'FORBIDDEN' : 'UNAUTHENTICATED');
-  return user as AuthUser;
-}
-
 function normalizedPath(path: string): string {
   const normalized = `/${path}`.replace(/\/{2,}/g, '/').replace(/\/$/, '');
   if (normalized === '/' || normalized.includes('..') || !/^\/[a-z0-9_/:.-]+$/i.test(normalized)) {
@@ -141,7 +135,7 @@ export function endpointRegistryRoutes(_db: Db, registrations: MosaicEndpointReg
   const app = new Hono<AuthEnv>();
 
   app.get('/', async (c) => {
-    guard(c.get('user'), 'endpoints:read');
+    if (!requirePermission(c.get('user'), 'endpoints:read')) return fail(c, 403, 'Missing permission: endpoints:read', 'FORBIDDEN');
     const explicit: EndpointRegistryRow[] = registrations.map(({ handler: _handler, public: _public, permission: _permission, ...endpoint }) => ({
       ...endpoint,
       path: `/extensions${normalizedPath(endpoint.path)}`,
@@ -151,5 +145,49 @@ export function endpointRegistryRoutes(_db: Db, registrations: MosaicEndpointReg
   });
 
   return app;
+}
+
+export function openApiRoutes(registrations: MosaicEndpointRegistration[] = []): Hono<AuthEnv> {
+  const app = new Hono<AuthEnv>();
+  app.get('/', (c) => {
+    if (!requirePermission(c.get('user'), 'endpoints:read')) return fail(c, 403, 'Missing permission: endpoints:read', 'FORBIDDEN');
+    c.header('Cache-Control', 'private, no-store');
+    return c.json(buildOpenApiDocument(registrations));
+  });
+  return app;
+}
+
+export function buildOpenApiDocument(registrations: MosaicEndpointRegistration[]) {
+    const paths: Record<string, Record<string, object>> = {};
+    for (const endpoint of registrations) {
+      const route = normalizedPath(endpoint.path);
+      const path = `/extensions${route.replace(/:([a-z0-9_]+)/gi, '{$1}')}`;
+      const pathParams = new Set([...route.matchAll(/:([a-z0-9_]+)/gi)].map((match) => match[1]!));
+      const params = new Set([...pathParams, ...Object.keys(endpoint.params ?? {})]);
+      const parameters = [...params].map((name) => ({
+        name, in: pathParams.has(name) ? 'path' : 'query',
+        required: pathParams.has(name) || endpoint.params?.[name]?.required === true,
+        description: endpoint.params?.[name]?.description,
+        schema: { type: endpoint.params?.[name]?.type ?? 'string' },
+      }));
+      const responses = Object.fromEntries(Object.entries(endpoint.responses).map(([status, response]) => [status, {
+        description: response.description,
+        ...(response.schema === undefined ? {} : { content: { 'application/json': { schema: response.schema } } }),
+      }]));
+      const method = endpoint.method.toLowerCase();
+      const operations = paths[path] ??= {};
+      operations[method] = {
+        operationId: `${method}${route.replace(/[^a-z\d]+(.)/gi, (_char, letter: string) => letter.toUpperCase())}`,
+        summary: endpoint.summary, description: endpoint.description, tags: endpoint.tags,
+        ...(parameters.length ? { parameters } : {}),
+        ...(endpoint.body ? { requestBody: { required: true, content: { 'application/json': { schema: endpoint.body } } } } : {}),
+        responses, security: endpoint.public && !endpoint.permission ? [] : [{ bearerAuth: [] }],
+      };
+    }
+  return {
+    openapi: '3.1.0', info: { title: 'Mosaic extensions', version: '1.0.0' },
+    servers: [{ url: '/api' }], paths,
+    components: { securitySchemes: { bearerAuth: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' } } },
+  };
 }
 

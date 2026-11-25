@@ -11,6 +11,7 @@
   let record = $state<Record<string, unknown> | undefined>(undefined);
   let error = $state('');
   let mode = $state<'create' | 'edit'>('create');
+  const createEndpoint = $derived((form?.settings as { createEndpoint?: string } | undefined)?.createEndpoint);
 
   function afterSave() {
     const redirect = form?.settings?.redirectAfterSubmit;
@@ -53,6 +54,7 @@
       {record}
       {mode}
       {client}
+      onsubmit={mode === 'create' && createEndpoint?.startsWith('/extensions/') ? async (values) => { await client.call('POST', createEndpoint, values); } : undefined}
       onsaved={afterSave}
     />
   </div>

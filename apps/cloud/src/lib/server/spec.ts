@@ -14,10 +14,11 @@ export interface SpecField {
 export interface SpecEntity {
   name: string; label: string; labelPlural: string; icon: string; description: string; labelField: string;
   fields: SpecField[]; permissions: { read: string[]; create: string[]; update: string[]; delete: string[] };
+  submission?: { profile?: { entity: string; emailField: string }; managed: Array<{ field: string; source: 'constant' | 'userId' | 'userEmail' | 'profile'; value: string }> };
 }
 const SECTION_KINDS = ['spotlight', 'records', 'metric', 'form'] as const;
 interface SpecSection { kind: typeof SECTION_KINDS[number]; title: string; body: string; entity: string }
-export interface SpecPage { slug: string; title: string; route: string; kind: 'home' | 'dashboard' | 'list' | 'workflow'; entity: string; description: string; access: 'public' | 'authenticated'; inMenu: boolean; icon: string; sections?: SpecSection[] }
+export interface SpecPage { slug: string; title: string; route: string; kind: 'home' | 'dashboard' | 'list' | 'workflow'; entity: string; description: string; access: 'public' | 'authenticated'; inMenu: boolean; icon: string; menuLabel?: string; menuGroup?: string; menuOrder?: number; roles?: string[]; sections?: SpecSection[] }
 export interface SpecSample { entity: string; records: Array<Array<{ field: string; value: string }>> }
 export interface AppSpec { name: string; summary: string; allowRegistration?: boolean; roles: string[]; entities: SpecEntity[]; pages: SpecPage[]; sampleData: SpecSample[]; workflows: string[] }
 
@@ -33,6 +34,12 @@ export const APP_SPEC_SCHEMA = {
       properties: {
         name: str, label: str, labelPlural: str, icon: str, description: str, labelField: str,
         permissions: { type: 'object', additionalProperties: false, required: ['read', 'create', 'update', 'delete'], properties: { read: strList, create: strList, update: strList, delete: strList } },
+        submission: { type: 'object', additionalProperties: false, required: ['managed'], properties: {
+          profile: { type: 'object', additionalProperties: false, required: ['entity', 'emailField'], properties: { entity: str, emailField: str } },
+          managed: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['field', 'source', 'value'], properties: {
+            field: str, source: { type: 'string', enum: ['constant', 'userId', 'userEmail', 'profile'] }, value: str,
+          } } },
+        } },
         fields: { type: 'array', items: { type: 'object', additionalProperties: false,
           required: ['name', 'label', 'type', 'required', 'unique', 'searchable', 'options', 'refEntity', 'format'],
           properties: {
@@ -44,6 +51,7 @@ export const APP_SPEC_SCHEMA = {
     pages: { type: 'array', items: { type: 'object', additionalProperties: false,
       required: ['slug', 'title', 'route', 'kind', 'entity', 'description', 'access', 'inMenu', 'icon'],
       properties: { slug: str, title: str, route: str, kind: { type: 'string', enum: ['home', 'dashboard', 'list', 'workflow'] }, entity: str, description: str, access: { type: 'string', enum: ['public', 'authenticated'] }, inMenu: { type: 'boolean' }, icon: str,
+        menuLabel: str, menuGroup: str, menuOrder: { type: 'integer', minimum: 0 }, roles: strList,
         sections: { type: 'array', maxItems: 6, items: { type: 'object', additionalProperties: false, required: ['kind', 'title', 'body', 'entity'],
           properties: { kind: { type: 'string', enum: SECTION_KINDS }, title: str, body: str, entity: str } } },
       } } },
@@ -76,16 +84,24 @@ export function normalizeSpec(raw: any): AppSpec {
         };
       });
       const permissions = entity?.permissions ?? {};
+      const managed = Array.isArray(entity?.submission?.managed) ? entity.submission.managed.flatMap((item: any) =>
+        item && ['constant', 'userId', 'userEmail', 'profile'].includes(item.source)
+          ? [{ field: camel(text(item.field)), source: item.source, value: text(item.value) }] : []) : [];
+      const profile = entity?.submission?.profile;
       return {
         name: text(entity?.name), label: text(entity?.label, text(entity?.name)), labelPlural: text(entity?.labelPlural, text(entity?.label, text(entity?.name))),
         icon: text(entity?.icon), description: text(entity?.description), labelField: text(entity?.labelField, fields[0]?.name ?? ''), fields,
         permissions: { read: strings(permissions.read), create: strings(permissions.create), update: strings(permissions.update), delete: strings(permissions.delete) },
+        submission: managed.length ? { managed, profile: profile ? { entity: snake(text(profile.entity)), emailField: camel(text(profile.emailField)) } : undefined } : undefined,
       };
     }),
     pages: (Array.isArray(spec.pages) ? spec.pages : []).map((page: any) => ({
       slug: text(page?.slug, text(page?.route).replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '') || 'home'), title: text(page?.title, text(page?.slug)), route: text(page?.route, '/'),
       kind: ['home', 'dashboard', 'list', 'workflow'].includes(page?.kind) ? page.kind : 'list', entity: text(page?.entity), description: text(page?.description),
       access: page?.access === 'public' ? 'public' : 'authenticated', inMenu: page?.inMenu !== false, icon: text(page?.icon),
+      menuLabel: text(page?.menuLabel).trim() || undefined, menuGroup: text(page?.menuGroup).trim() || undefined,
+      menuOrder: Number.isSafeInteger(page?.menuOrder) && page.menuOrder >= 0 ? page.menuOrder : undefined,
+      roles: Array.isArray(page?.roles) ? strings(page.roles).map((role) => role.trim().toLowerCase()).filter(Boolean) : undefined,
       sections: Array.isArray(page?.sections) ? page.sections.filter((section: any) => SECTION_KINDS.includes(section?.kind)).slice(0, 6)
         .map((section: any) => ({ kind: section.kind, title: text(section.title).trim(), body: text(section.body).trim(), entity: text(section.entity) })) : undefined,
     })),
@@ -209,12 +225,33 @@ export function validateSpec(spec: AppSpec): string[] {
     if (!/^\/(?:[a-z0-9-]+(?:\/[a-z0-9-]+)*)?$/.test(page.route)) issues.push(`Page "${page.slug}": route must look like /path (lowercase, no params).`);
     if (reservedPageRoute(page.route)) issues.push(`Page "${page.slug}": route ${page.route} is reserved.`);
     if (routes.has(page.route)) issues.push(`Page "${page.slug}": duplicate route ${page.route}.`);
+    if (page.roles?.some((role) => !['admin', 'editor', 'viewer', ...spec.roles].includes(role))) issues.push(`Page "${page.slug}" uses an undefined role.`);
     routes.add(page.route);
     if (page.kind === 'list' && (!page.entity || !entityNames.has(page.entity))) issues.push(`Page "${page.slug}": list pages need an existing entity.`);
     if (page.kind === 'workflow' && !page.sections?.some((section) => section.kind !== 'spotlight')) issues.push(`Page "${page.slug}": a workflow needs a live records, metric, or form section.`);
     for (const section of page.sections ?? []) {
       if (!section.title || (section.kind !== 'spotlight' && !entityNames.has(section.entity))) issues.push(`Page "${page.slug}": ${section.kind} sections need a title and live sections need an existing entity.`);
       if (page.access === 'public' && section.kind !== 'spotlight') issues.push(`Page "${page.slug}": live sections require sign-in.`);
+    }
+  }
+  for (const entity of spec.entities) {
+    const submission = entity.submission;
+    if (!submission) continue;
+    const profile = submission.profile && spec.entities.find((item) => item.name === submission.profile!.entity);
+    if (submission.profile && !profile?.fields.some((field) => field.name === submission.profile!.emailField && field.type === 'string' && field.unique)) {
+      issues.push(`${entity.name}: the submission profile must have a unique email field.`);
+    }
+    for (const value of submission.managed) {
+      const target = entity.fields.find((field) => field.name === value.field);
+      const from = profile?.fields.find((field) => field.name === value.value);
+      const profileId = value.value === 'id' && target?.type === 'ref' && target.refEntity === profile?.name;
+      if (!target || (value.source === 'profile' && !profileId && (!from || from.type !== target.type || from.refEntity !== target.refEntity))
+        || (target.type === 'ref' && value.source !== 'profile') || (value.source === 'constant' && target.type === 'enum' && !target.options.includes(value.value))) {
+        issues.push(`${entity.name}: invalid server-managed value for "${value.field}".`);
+      }
+    }
+    if (entity.fields.some((field) => field.type === 'ref' && !submission.managed.some((value) => value.field === field.name))) {
+      issues.push(`${entity.name}: a managed submission must derive reference fields from its signed-in profile.`);
     }
   }
   for (const entity of spec.entities) {
@@ -241,7 +278,7 @@ export function coerceSample(field: SpecField, value: string): unknown {
 
 function fieldDef(field: SpecField): FieldDef {
   const def: FieldDef = { name: field.name, label: field.label, type: field.type, required: field.required || undefined, unique: field.unique || undefined, searchable: field.searchable || undefined };
-  if (field.type === 'enum') def.options = field.options.map((value) => ({ value: value.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || value, label: value }));
+  if (field.type === 'enum') def.options = field.options.map((value) => ({ value: enumValue(value), label: value }));
   if (field.type === 'ref') def.refEntity = field.refEntity!;
   if (field.format) def.format = field.format;
   return def;
@@ -261,14 +298,40 @@ function formNode(field: SpecField, id: string): FormNode {
   }
 }
 
-export interface CompiledApp { entities: EntityDef[]; forms: FormDef[]; pages: PageDef[] }
+const enumValue = (label: string) => label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || label;
+
+export interface CreateWorkflow extends NonNullable<SpecEntity['submission']> {
+  entity: string; label: string; roles: string[];
+  input: { type: 'object'; properties: Record<string, unknown>; required: string[]; additionalProperties: false };
+}
+export interface CompiledApp { entities: EntityDef[]; forms: FormDef[]; pages: PageDef[]; workflows?: CreateWorkflow[]; roles?: string[] }
 
 export function compileSpec(spec: AppSpec): CompiledApp {
+  const workflows: CreateWorkflow[] = spec.entities.flatMap((entity) => {
+    const submission = entity.submission;
+    if (!submission) return [];
+    const fields = entity.fields.filter((field) => !submission.managed.some((item) => item.field === field.name));
+    const properties = Object.fromEntries(fields.map((field) => [field.name, {
+      type: field.type === 'int' ? 'integer' : field.type === 'decimal' ? 'number' : field.type === 'boolean' ? 'boolean' : 'string',
+      ...(field.type === 'enum' ? { enum: field.options.map(enumValue) } : {}),
+      ...(field.type === 'date' ? { format: 'date' } : field.type === 'datetime' ? { format: 'date-time' } : {}),
+    }]));
+    return [{ ...submission, entity: entity.name, label: entity.label, roles: entity.permissions.create,
+      managed: submission.managed.map((item) => ({ ...item, value: item.source === 'constant'
+        && entity.fields.find((field) => field.name === item.field)?.type === 'enum' ? enumValue(item.value) : item.value })),
+      input: { type: 'object', properties, required: fields.filter((field) => field.required).map((field) => field.name), additionalProperties: false },
+    }];
+  });
+  const protectedEntities = new Set(workflows.flatMap((workflow) => [
+    workflow.entity, workflow.profile?.entity,
+    ...(spec.entities.find((entity) => entity.name === workflow.entity)?.fields
+      .filter((field) => field.type === 'ref').map((field) => field.refEntity) ?? []),
+  ]));
   const entities: EntityDef[] = spec.entities.map((entity) => ({
     name: entity.name, label: entity.label, labelPlural: entity.labelPlural, icon: entity.icon || undefined, description: entity.description,
     softDelete: true, timestamps: true, audit: true,
     permissions: Object.fromEntries(Object.entries(entity.permissions).map(([action, roles]) => [action,
-      spec.allowRegistration && action === 'delete' && (!roles.length || roles.includes('*')) ? ['admin'] : roles.length ? roles : ['*'],
+      protectedEntities.has(entity.name) || (spec.allowRegistration && action === 'delete' && (!roles.length || roles.includes('*'))) ? ['admin'] : roles.length ? roles : ['*'],
     ])),
     list: { defaultSort: '-createdAt', labelField: entity.labelField, columns: entity.fields.filter((field) => field.type !== 'text').slice(0, 6).map((field) => field.name), searchFields: entity.fields.filter((field) => field.searchable).map((field) => field.name) },
     fields: entity.fields.map(fieldDef),
@@ -276,8 +339,11 @@ export function compileSpec(spec: AppSpec): CompiledApp {
   const forms: FormDef[] = spec.entities.map((entity) => ({
     id: `frm_${entity.name}`, slug: `${entity.name.replaceAll('_', '-')}-form`, name: `${entity.label} form`, description: `Create or edit a ${entity.label.toLowerCase()}`,
     entity: entity.name, version: 1, published: true, dataSource: { kind: 'entity', entity: entity.name },
-    settings: { layout: 'vertical', columns: 2, submitLabel: `Save ${entity.label.toLowerCase()}`, successMessage: `${entity.label} saved` },
-    root: { id: `frm_${entity.name}_root`, type: 'form', children: [{ id: `frm_${entity.name}_grid`, type: 'grid', props: { columns: 2, gap: 'md' }, children: entity.fields.map((field, index) => formNode(field, `f_${entity.name}_${index}`)) }] },
+    settings: { layout: 'vertical', columns: 2, submitLabel: `${entity.submission ? 'Submit' : 'Save'} ${entity.label.toLowerCase()}`, successMessage: `${entity.label} saved`,
+      ...(entity.submission ? { createEndpoint: `/extensions/${entity.name.replaceAll('_', '-')}/submit` } : {}) },
+    root: { id: `frm_${entity.name}_root`, type: 'form', children: [{ id: `frm_${entity.name}_grid`, type: 'grid', props: { columns: 2, gap: 'md' }, children: entity.fields
+      .map((field, index) => ({ field, index })).filter(({ field }) => !entity.submission?.managed.some((item) => item.field === field.name))
+      .map(({ field, index }) => formNode(field, `f_${entity.name}_${index}`)) }] },
   } as FormDef));
   const byName = new Map(spec.entities.map((entity) => [entity.name, entity]));
   const pages: PageDef[] = spec.pages.map((page, order) => {
@@ -308,15 +374,21 @@ export function compileSpec(spec: AppSpec): CompiledApp {
       }
       children.push({ id: key, type: 'card', children: content });
     }
+    const requestedRoles = page.roles?.filter((role) => role !== '*') ?? [];
+    const entityReaders = protectedEntities.has(page.entity) ? ['admin'] : byName.get(page.entity)?.permissions.read ?? [];
+    const roles = requestedRoles.length ? requestedRoles : page.kind === 'list' && !entityReaders.includes('*') ? entityReaders : [];
     return {
       id, slug: page.slug, route: page.route, name: page.title, description: page.description, version: 1, published: true,
-      settings: { title: page.title, requiresAuth: page.access === 'authenticated', menu: { show: page.inMenu, order: order + 1, icon: page.icon || undefined } },
+      settings: { title: page.title, requiresAuth: page.access === 'authenticated' || roles.length > 0, roles: roles.length ? roles : undefined,
+        menu: { show: page.inMenu, order: page.menuOrder ?? order + 1, label: page.menuLabel, group: page.menuGroup, icon: page.icon || undefined } },
       root: { id: `${id}_root`, type: 'page', props: { appearance: { padding: 24 } }, children },
     } as PageDef;
   });
   pages.push(authPage(false));
   if (spec.allowRegistration) pages.push(authPage(true));
-  return { entities, forms, pages };
+  const roles = [...new Set([...spec.roles, ...pages.flatMap((page) => page.settings?.roles ?? []), ...entities.flatMap((entity) => Object.values(entity.permissions ?? {}).flat())])]
+    .filter((role) => /^[a-z][a-z0-9_-]{1,39}$/.test(role) && !['admin', 'editor', 'viewer'].includes(role));
+  return { entities, forms, pages, workflows, roles };
 }
 
 function authPage(registering: boolean): PageDef {
@@ -347,12 +419,15 @@ export function blueprintFromSpec(spec: AppSpec) {
 
 /** One-line summary per entity/page for the reviewer (keeps prompts small on the 8k-token budget). */
 export function describeSpec(spec: AppSpec): string {
+  const compiled = compileSpec(spec);
   const entities = spec.entities.map((entity) => {
     const fields = entity.fields.map((field) => `${field.name}:${field.type}${field.type === 'ref' ? `→${field.refEntity}` : ''}${field.type === 'enum' ? `[${field.options.join('|')}]` : ''}${field.required ? '*' : ''}${field.unique ? ' (unique)' : ''}`).join(', ');
-    const permissions = Object.entries(entity.permissions).map(([action, roles]) => `${action}=${roles.join('/') || '*'}`).join(' ');
+    const effective = compiled.entities.find((item) => item.name === entity.name)?.permissions ?? entity.permissions;
+    const permissions = Object.entries(effective).map(([action, roles]) => `${action}=${roles.join('/') || '*'}`).join(' ');
     return `- ${entity.name} (${entity.label}): ${fields}; permissions ${permissions}`;
   }).join('\n');
-  const pages = spec.pages.map((page) => `- ${page.route} ${page.kind}${page.entity ? `(${page.entity})` : ''} ${page.access}${page.inMenu ? ' menu' : ''}${page.sections?.length ? `: ${page.sections.map((section) => `${section.title} [${section.kind}${section.entity ? `/${section.entity}` : ''}]`).join(', ')}` : ''}`).join('\n');
+  const pages = spec.pages.map((page) => `- ${page.route} ${page.kind}${page.entity ? `(${page.entity})` : ''} ${page.access}${page.inMenu ? ' menu' : ''}${page.roles?.length ? ` roles=${page.roles.join('/')}` : ''}${page.sections?.length ? `: ${page.sections.map((section) => `${section.title} [${section.kind}${section.entity ? `/${section.entity}` : ''}]`).join(', ')}` : ''}`).join('\n');
   const samples = spec.sampleData.map((sample) => `${sample.entity}×${sample.records.length}`).join(', ');
-  return `Roles: ${spec.roles.join(', ')}\nPublic registration: ${spec.allowRegistration === true}; new users have the viewer role\nEntities:\n${entities}\nPages (list pages give full create/edit/delete/detail):\n${pages}\nSample data: ${samples || 'none'}\nWorkflows: ${spec.workflows.join('; ')}`;
+  const workflows = (compiled.workflows ?? []).map((workflow) => `${workflow.entity}: user enters ${Object.keys(workflow.input.properties).join(', ')}; server sets ${workflow.managed.map(({ field, source, value }) => `${field}=${source}${value ? `(${value})` : ''}`).join(', ')}`).join('\n');
+  return `Roles: ${spec.roles.join(', ')}\nPublic registration: ${spec.allowRegistration === true}; new users have the viewer role\nEntities:\n${entities}\nPages:\n${pages}\nSample data: ${samples || 'none'}\nManaged submissions:\n${workflows || 'none'}\nWorkflows: ${spec.workflows.join('; ')}`;
 }

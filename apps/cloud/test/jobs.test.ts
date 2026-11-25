@@ -364,7 +364,7 @@ test(`${framework} release reaches GitHub, Neon and Vercel after connecting prov
   assert.equal(build.rootDirectory, framework === 'nextjs' ? null : 'apps/web');
   assert.equal(build.framework, framework);
   if (framework === 'nextjs') {
-    assert.equal(build.installCommand, 'npm ci');
+    assert.match(build.installCommand, /^npm ci && npm install .*@mosaic-apps\/server@latest$/);
     assert.ok(tree.body.tree.some((entry: any) => entry.path === 'app/api/[...path]/route.js'));
     assert.ok(calls.some((call) => call.url.endsWith('/api/health')));
     assert.equal(calls.filter((call) => call.url.endsWith('/git/commits')).length, 1, 'resuming leaves the existing commit in place');

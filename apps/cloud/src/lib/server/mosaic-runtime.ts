@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { createMosaicServer, type MosaicServer } from '@mosaic-apps/server';
 import { coerceSample, type AppSpec, type CompiledApp, type SpecEntity } from './spec';
+import { createWorkflowEndpoints } from '../../../../../templates/fullstack/apps/web/src/lib/server/create-workflows.js';
 
 /** A Mosaic API caller: in-process for verification/preview, HTTP for a deployed app. */
 export type MosaicCall = (method: string, path: string, body?: unknown) => Promise<{ status: number; body: any }>;
@@ -61,6 +62,17 @@ export function entityOrder<T extends { name: string; fields: Array<{ type: stri
 export async function applyApp(call: MosaicCall, app: CompiledApp, options: { allowDestructive: boolean }): Promise<{ errors: string[]; warnings: string[] }> {
   const errors: string[] = [];
   const warnings: string[] = [];
+  if (app.roles?.length) {
+    const existing = await call('GET', '/api/roles');
+    if (existing.status !== 200) return { errors: [`Loading roles failed: ${reason(existing)}`], warnings };
+    const names = new Set((existing.body?.data ?? []).map((role: { name: string }) => role.name));
+    for (const role of app.roles) {
+      if (names.has(role)) continue;
+      const saved = await call('PUT', `/api/roles/${encodeURIComponent(role)}`, { displayName: role, permissions: [] });
+      if (saved.status !== 200) errors.push(`Creating role "${role}" failed: ${reason(saved)}`);
+    }
+    if (errors.length) return { errors, warnings };
+  }
   for (const entity of entityOrder(app.entities.map((def) => ({ ...def, fields: def.fields.map((field) => ({ ...field, refEntity: field.refEntity ?? null })) })))) {
     const result = await call('PUT', `/api/entities/${entity.name}`, { entity: app.entities.find((def) => def.name === entity.name), origin: 'ai', message: 'Mosaic Cloud generation' });
     if (result.status !== 200) errors.push(`Saving entity "${entity.name}" failed: ${reason(result)}`);
@@ -167,6 +179,7 @@ export async function verifyApp(spec: AppSpec, app: CompiledApp): Promise<string
   const password = randomBytes(12).toString('base64url');
   const server = await createMosaicServer({
     databaseUrl: 'pglite://memory', auth: { jwtSecret: randomBytes(32).toString('hex') }, cors: false,
+    endpoints: createWorkflowEndpoints(app.workflows ?? []),
     seed: { admin: { email: 'verify@mosaic.local', password }, demo: false },
   });
   try {
@@ -174,7 +187,34 @@ export async function verifyApp(spec: AppSpec, app: CompiledApp): Promise<string
     const call = inProcessCaller(server, token);
     const applied = await applyApp(call, app, { allowDestructive: true });
     if (applied.errors.length) return applied.errors;
-    return await seedAndSmokeTest(call, spec);
+    const failures = await seedAndSmokeTest(call, spec);
+    if (failures.length) return failures;
+    for (const workflow of app.workflows ?? []) {
+      if (workflow.profile) {
+        const { entity, emailField } = workflow.profile;
+        const rows = await call('GET', `/api/entities/${entity}?pageSize=1`);
+        const profile = rows.body?.data?.data?.[0];
+        const patched = profile && await call('PATCH', `/api/entities/${entity}/${profile.id}`, { [emailField]: 'verify@mosaic.local' });
+        if (patched?.status !== 200) {
+          failures.push(`Could not match a signed-in profile for the ${workflow.entity} workflow.`);
+          continue;
+        }
+      }
+      const rows = await call('GET', `/api/entities/${workflow.entity}?pageSize=1`);
+      const record = rows.body?.data?.data?.[0] ?? {};
+      const values = Object.fromEntries(Object.entries(workflow.input.properties)
+        .filter(([field]) => record[field] !== undefined).map(([field, schema]) => [
+          field, (schema as { format?: string }).format === 'date' && typeof record[field] === 'string' ? record[field].slice(0, 10) : record[field],
+        ]));
+      const endpoint = `/api/extensions/${workflow.entity.replaceAll('_', '-')}/submit`;
+      const result = await call('POST', endpoint, values);
+      if (result.status !== 201) failures.push(`Submitting ${workflow.label} failed: ${reason(result)}`);
+      const managed = workflow.managed[0];
+      if (managed && (await call('POST', endpoint, { ...values, [managed.field]: 'forged' })).status !== 422) {
+        failures.push(`Submitting ${workflow.label} accepted a forged server-managed field.`);
+      }
+    }
+    return failures;
   } finally {
     await server.close();
   }

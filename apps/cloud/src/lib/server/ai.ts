@@ -76,21 +76,31 @@ export async function aiJson<T>(input: AiRequest & { config?: AiConfig }): Promi
     const preferred = aiModel(config);
     const fallback = preferred === 'gemini-3.1-flash-lite' ? AI_PROVIDERS.gemini.defaultModel : 'gemini-3.1-flash-lite';
     let failure: AiError | undefined;
+    let transient = false;
     for (const model of [preferred, fallback]) {
-      const result = await geminiReply<T>(input, model, config.apiKey, AbortSignal.timeout(45_000)).catch(() => null);
+      const result = await geminiReply<T>(input, model, config.apiKey, AbortSignal.timeout(20_000)).catch(() => null);
       if (result?.ok) {
         await config.onModel?.(result.model);
         return result.value;
       }
       if (!result) {
+        transient = true;
         failure = new AiError('Gemini did not return a usable response. Try again shortly.');
         continue;
       }
       const { response } = result;
       await response.body?.cancel().catch(() => {});
-      if (response.status === 429) failure = rateLimitError('gemini', parseWait(response.headers.get('retry-after')));
-      else if (response.status >= 500) failure = new AiError(`Gemini is temporarily unavailable (${response.status}). Try again shortly.`);
+      if (response.status === 429 || response.status >= 500) {
+        transient = true;
+        failure = response.status === 429 ? rateLimitError('gemini', parseWait(response.headers.get('retry-after')))
+          : new AiError(`Gemini is temporarily unavailable (${response.status}). Try again shortly.`);
+      } else if (response.status === 404) {
+        failure ??= new AiError('This Gemini model is unavailable to your account. Check the model in Settings → AI.');
+      }
       else throw new AiError(`Gemini rejected the request (${response.status}). Check your key and model in Settings → AI.`);
+    }
+    if (transient && process.env.GROQ_API_KEY?.trim()) {
+      return sharedJson<T>(input, { provider: 'mosaic', onModel: config.onModel }, true);
     }
     throw failure ?? new AiError('Gemini is temporarily unavailable.');
   }
@@ -129,9 +139,9 @@ async function geminiReply<T>(input: AiRequest, model: string, key: string, sign
 }
 
 /** Try each available shared model at most once before returning a useful failure. */
-async function sharedJson<T>(input: AiRequest, config: AiConfig): Promise<T> {
+async function sharedJson<T>(input: AiRequest, config: AiConfig, groqOnly = false): Promise<T> {
   const groqKey = process.env.GROQ_API_KEY?.trim();
-  const geminiKey = process.env.GEMINI_FALLBACK_API_KEY?.trim();
+  const geminiKey = groqOnly ? undefined : process.env.GEMINI_FALLBACK_API_KEY?.trim();
   const active = (model: string) => groqInFlight.get(model) ?? 0;
   const groq = groqKey ? [...new Set([aiModel(config), ...groqFallbacks])].sort((a, b) => active(a) - active(b)) : [];
   const gemini = AI_PROVIDERS.gemini.defaultModel;

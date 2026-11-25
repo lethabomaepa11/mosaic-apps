@@ -26,6 +26,7 @@ import { HttpError, fail, mapDbError } from './modules/http.js';
 import { QueryError } from './crud/sql.js';
 import {
   endpointRegistryRoutes,
+  openApiRoutes,
   registeredEndpointRoutes,
   validateEndpointRegistrations,
   type MosaicEndpointRegistration,
@@ -167,6 +168,7 @@ export async function createMosaicServer(config: MosaicServerConfig): Promise<Mo
   app.route('/api/files', fileRoutes({ db, uploadsDir, publicRead: config.publicFiles ?? false }));
   app.route('/files', fileRoutes({ db, uploadsDir, publicRead: config.publicFiles ?? false }));
   app.route('/api/endpoints', endpointRegistryRoutes(db, config.endpoints));
+  app.route('/api/openapi', openApiRoutes(config.endpoints));
   app.route('/api/extensions', registeredEndpointRoutes(db, config.endpoints, authEnabled));
   app.route('/api', metaRoutes(db));
 

@@ -4,7 +4,7 @@ import { Hono } from 'hono';
 import { diffArtifactSnapshots, ensureRoot, slugify, type FormDef, type PageDef } from '@mosaic-apps/core';
 import type { Db } from '../db/driver.js';
 import { HttpError, fail, ok, readJson } from './http.js';
-import { requirePermission } from './rbac.js';
+import { isAdmin, requirePermission } from './rbac.js';
 import { writeAudit } from './audit.js';
 import type { AuthEnv, AuthUser } from './auth.js';
 import { getPreviousRevision, getRevision, listRevisions, recordRevision } from './revisions.js';
@@ -72,7 +72,15 @@ function toRecord(row: ArtifactRow, kind: ArtifactKind): FormDef | PageDef {
 }
 
 function pageRequiresAuth(row: ArtifactRow): boolean {
-  return (row.settings as PageDef['settings'])?.requiresAuth === true;
+  const settings = row.settings as PageDef['settings'];
+  return settings?.requiresAuth === true || Boolean(settings?.roles?.length);
+}
+
+function canReadPage(row: ArtifactRow, user: AuthUser | null): boolean {
+  if (!pageRequiresAuth(row)) return true;
+  if (!user) return false;
+  const roles = (row.settings as PageDef['settings'])?.roles;
+  return !roles?.length || isAdmin(user) || roles.some((role) => user.roles.includes(role));
 }
 
 /** Columns must match each table exactly (mosaic_pages has no entity/data_source; mosaic_forms has no route). */
@@ -241,10 +249,12 @@ export function artifactRoutes(deps: ArtifactDeps): Hono<AuthEnv> {
       `SELECT ${returnCols(deps.kind)} FROM ${table} ${where} ORDER BY updated_at DESC LIMIT 500`,
       params,
     );
-    return ok(c, res.rows.map((row) => {
+    return ok(c, res.rows.flatMap<FormDef | PageDef | { route: string; forbidden?: boolean }>((row) => {
       // Routing needs a protected route's path to choose between login and a 404.
-      if (includeRestrictedRoutes && !user && pageRequiresAuth(row)) return { route: row.route ?? `/${row.slug}` };
-      return toRecord(row, deps.kind);
+      if (deps.kind === 'page' && !canReadPage(row, user) && !requirePermission(user, deps.managePerm)) {
+        return includeRestrictedRoutes ? [{ route: row.route ?? `/${row.slug}`, ...(user ? { forbidden: true } : {}) }] : [];
+      }
+      return [toRecord(row, deps.kind)];
     }));
   });
 
@@ -255,17 +265,22 @@ export function artifactRoutes(deps: ArtifactDeps): Hono<AuthEnv> {
     if (!c.get('user') && (!row.published || (deps.kind === 'page' && pageRequiresAuth(row)))) {
       throw new HttpError(401, 'Authentication required', 'UNAUTHENTICATED');
     }
+    if (deps.kind === 'page' && !canReadPage(row, c.get('user')) && !requirePermission(c.get('user'), deps.managePerm)) {
+      throw new HttpError(403, 'This page is restricted to other roles', 'FORBIDDEN');
+    }
     return ok(c, toRecord(row, deps.kind));
   });
 
   app.get('/:idOrSlug/revisions', async (c) => {
     if (!c.get('user')) throw new HttpError(401, 'Authentication required', 'UNAUTHENTICATED');
+    if (deps.kind === 'page') requireManage(c.get('user'), deps.managePerm, 'read history');
     const row = await rowOr404(c.req.param('idOrSlug'));
     return ok(c, await listRevisions(deps.db, deps.kind, row.id));
   });
 
   app.get('/:idOrSlug/revisions/:revision', async (c) => {
     if (!c.get('user')) throw new HttpError(401, 'Authentication required', 'UNAUTHENTICATED');
+    if (deps.kind === 'page') requireManage(c.get('user'), deps.managePerm, 'read history');
     const row = await rowOr404(c.req.param('idOrSlug'));
     const revision = Number(c.req.param('revision'));
     if (!Number.isInteger(revision) || revision < 1) throw new HttpError(422, 'Invalid revision', 'BAD_INPUT');
@@ -276,6 +291,7 @@ export function artifactRoutes(deps: ArtifactDeps): Hono<AuthEnv> {
 
   app.get('/:idOrSlug/revisions/:revision/diff', async (c) => {
     if (!c.get('user')) throw new HttpError(401, 'Authentication required', 'UNAUTHENTICATED');
+    if (deps.kind === 'page') requireManage(c.get('user'), deps.managePerm, 'read history');
     const row = await rowOr404(c.req.param('idOrSlug'));
     const revision = Number(c.req.param('revision'));
     if (!Number.isInteger(revision) || revision < 1) throw new HttpError(422, 'Invalid revision', 'BAD_INPUT');

@@ -23,6 +23,7 @@ function preservedDesign(current: AppSpec, next: AppSpec): string[] {
       problems.push(`Preserve the existing ${entity.name} entity and its records.`);
       continue;
     }
+    if (entity.submission && !updated.submission) problems.push(`Preserve the existing ${entity.name} server-managed workflow.`);
     for (const field of entity.fields) {
       const candidate = updated.fields.find((item) => item.name === field.name);
       if (!candidate || candidate.type !== field.type || candidate.refEntity !== field.refEntity || field.options.some((option) => !candidate.options.includes(option))) {
@@ -91,7 +92,8 @@ export async function buildApp(
       app = compileSpec(spec);
       await events.think('Verifier', `Booting the app and testing create, list, edit and view for ${spec.entities.length} entities…`);
       problems = await verifyApp(spec, app);
-      await events.think('Verifier', problems.length ? `${problems.length} check${problems.length === 1 ? '' : 's'} failed: ${problems[0]}` : 'All CRUD checks pass on a real database.');
+      await events.think('Verifier', problems.length ? `${problems.length} check${problems.length === 1 ? '' : 's'} failed: ${problems[0]}`
+        : app.workflows?.length ? 'CRUD and managed submission checks passed on a real database.' : 'All CRUD checks pass on a real database.');
     }
     await events.progress(Math.min(35 + round * 9, 85));
 

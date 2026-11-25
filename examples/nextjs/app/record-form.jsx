@@ -21,7 +21,9 @@ export function RecordForm({ form, record, options }) {
   const fields = fieldsOf(form.root);
   const entity = form.entity ?? form.dataSource?.entity;
   if (!entity || !fields.length) return <p>This form has no supported record fields.</p>;
-  const endpoint = `/api/entities/${encodeURIComponent(entity)}${record ? '/' + encodeURIComponent(record.id) : ''}`;
+  const custom = form.settings?.createEndpoint;
+  const endpoint = !record && typeof custom === 'string' && custom.startsWith('/extensions/')
+    ? `/api${custom}` : `/api/entities/${encodeURIComponent(entity)}${record ? '/' + encodeURIComponent(record.id) : ''}`;
   async function submit(event) {
     event.preventDefault();
     const element = event.currentTarget;
