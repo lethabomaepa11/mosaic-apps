@@ -35,7 +35,7 @@ run([npm, 'install', '--no-audit', '--no-fund'], directory);
 const cli = join(directory, 'node_modules/@mosaic-apps/cli/dist/index.js');
 // Exercise normal published defaults, including Git/PWA, rather than hiding
 // scaffold failures behind --no-git/--npm-mode/--db overrides.
-run([cli, 'create', 'reference-app', '--no-install', '--port', '3101', '--web-port', '3100', '--studio-port', '3102'], directory);
+run([cli, 'create', 'reference-app', '--no-install', '--web-port', '3100'], directory);
 const app = join(directory, 'reference-app');
 if (!(await readFile(join(app, '.env'), 'utf8')).includes('DATABASE_URL=pglite://./data')) throw new Error('Embedded database default missing.');
 if (!(await readFile(join(app, '.gitignore'), 'utf8')).includes('.env')) throw new Error('Packaged gitignore missing.');
@@ -63,7 +63,6 @@ await mkdir(join(app, 'evidence'), { recursive: true });
 run([npm, 'install', '--no-audit', '--no-fund'], app);
 run([npm, 'run', 'migrate', '--', '--dry-run'], app);
 run([npm, 'run', 'check', '-w', 'apps/web'], app);
-run([npm, 'run', 'check', '-w', 'apps/studio'], app);
 run([npm, 'run', 'build'], app);
 
 const development = spawn(process.execPath, [npm, 'run', 'dev'], { cwd: app, env: process.env, detached: process.platform !== 'win32', windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -86,8 +85,7 @@ try {
     waitHealthy('http://127.0.0.1:3100/api/health'),
     // Use the light shell for readiness; the browser exercise below verifies the
     // full Studio after Vite has finished its first dependency optimization.
-    waitHealthy('http://127.0.0.1:3102/login'),
-    waitHealthy('http://127.0.0.1:3102/api/health'),
+    waitHealthy('http://127.0.0.1:3100/studio/login'),
   ]);
   // HTTP health cannot detect a client prebundling failure. Exercise hydration
   // and Monaco with the installed npm package, not source aliases from the repo.
@@ -99,11 +97,11 @@ try {
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
     const hydrated = page.waitForResponse((response) => response.url().includes('/api/auth/me'));
-    await page.goto('http://127.0.0.1:3102/login', { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await page.goto('http://127.0.0.1:3100/studio/login', { waitUntil: 'domcontentloaded', timeout: 60000 });
     await hydrated;
     await page.getByRole('button', { name: 'Sign in', exact: true }).click();
-    await page.waitForURL('http://127.0.0.1:3102/', { waitUntil: 'domcontentloaded' });
-    await page.goto('http://127.0.0.1:3102/studio', { waitUntil: 'domcontentloaded' });
+    await page.waitForURL('http://127.0.0.1:3100/studio', { waitUntil: 'domcontentloaded' });
+    await page.getByRole('link', { name: 'Forms', exact: true }).click();
     await page.getByRole('heading', { name: 'Forms', exact: true }).waitFor();
     await page.locator('a.explorer-recent').first().click();
     await page.getByRole('button', { name: 'JSON', exact: true }).click();

@@ -9,16 +9,8 @@ import { fileURLToPath } from 'node:url';
  */
 const SKIP = /(^|\/)(node_modules|\.svelte-kit|dist|build|pgdata|data)(\/|$)/;
 
-function fromBundle(): Record<string, string> | null {
-  try {
-    const raw = import.meta.glob(['../../../../../templates/fullstack/**/*', '../../../../../templates/fullstack/**/.*', '!**/node_modules/**'], { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
-    const files: Record<string, string> = {};
-    for (const [path, content] of Object.entries(raw)) files[path.replace(/^.*?templates\/fullstack\//, '')] = content;
-    return Object.keys(files).length ? files : null;
-  } catch {
-    return null; // not running under Vite
-  }
-}
+// Bundle the file contents directly so Vite does not resolve the scaffold's TypeScript configs.
+declare const __MOSAIC_TEMPLATE_FILES__: Record<string, string> | undefined;
 
 function fromDisk(): Record<string, string> {
   const root = fileURLToPath(new URL('../../../../../templates/fullstack/', import.meta.url));
@@ -26,7 +18,7 @@ function fromDisk(): Record<string, string> {
   const walk = (relative: string) => {
     for (const name of readdirSync(join(root, relative))) {
       const path = relative ? `${relative}/${name}` : name;
-      if (SKIP.test(path)) continue;
+      if (SKIP.test(path) || (name.startsWith('.env') && name !== '.env.example')) continue;
       if (statSync(join(root, path)).isDirectory()) walk(path);
       else files[path] = readFileSync(join(root, path), 'utf8');
     }
@@ -37,7 +29,7 @@ function fromDisk(): Record<string, string> {
 
 let cached: Record<string, string> | undefined;
 export function templateFiles(): Record<string, string> {
-  cached ??= fromBundle() ?? fromDisk();
+  cached ??= typeof __MOSAIC_TEMPLATE_FILES__ === 'undefined' ? fromDisk() : __MOSAIC_TEMPLATE_FILES__;
   return cached;
 }
 

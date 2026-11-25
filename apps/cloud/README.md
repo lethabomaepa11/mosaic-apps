@@ -53,9 +53,9 @@ user's builds. ChatGPT Plus and Claude Pro subscriptions do not include API acce
 
 Users connect GitHub and Vercel with OAuth (when the OAuth App / Integration are
 configured) or by pasting a token; Neon uses an API key (Neon OAuth is partner-only).
-GitHub sign-in to Cloud reuses the GitHub OAuth App: register its callback URL as the site
-origin so both `/auth/github/callback` and `/settings/connections/github/callback` are
-accepted.
+GitHub sign-in to Cloud reuses the GitHub OAuth App. Register `/auth/github/callback`
+and `/settings/connections/github/callback` as exact URLs on the Cloud domain.
+Disable expiring user access tokens until Cloud supports refreshing them.
 
 ## Local development
 
@@ -83,8 +83,9 @@ connection string.
 
 ## Vercel
 
-Create a Vercel project rooted at `apps/cloud`, set the install command to
-`cd ../.. && npm install`, and keep the build command as `npm run build`. Configure the
+Create a Vercel project rooted at `apps/cloud` with access to files outside that directory.
+Set the install command to `cd ../.. && npm ci` and the build command to
+`cd ../.. && npm run build -w @mosaic-apps/core && npm run build -w @mosaic-apps/server && npm run build -w @mosaic-apps/cloud`. Configure the
 values in `.env.example`. Built servers refuse local defaults: they need
 `CLOUD_DATABASE_URL` (PostgreSQL), `CLOUD_SESSION_SECRET`, `CLOUD_PROVIDER_SECRET_KEY`
 and `GROQ_API_KEY`. Never change `CLOUD_PROVIDER_SECRET_KEY` once set (stored
