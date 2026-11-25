@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process';
 
 const npm = process.env.npm_execpath;
 if (!npm) throw new Error('Run through npm run release:publish.');
-for (const directory of ['core', 'server', 'ui', 'cli']) {
+for (const directory of ['core', 'server', 'sveltekit', 'ui', 'cli']) {
   const { name, version } = JSON.parse(await readFile(new URL(`../packages/${directory}/package.json`, import.meta.url), 'utf8'));
   const lookup = spawnSync(process.execPath, [npm, 'view', `${name}@${version}`, 'version', '--json'], { encoding: 'utf8', windowsHide: true });
   if (lookup.status === 0 && JSON.parse(lookup.stdout) === version) {

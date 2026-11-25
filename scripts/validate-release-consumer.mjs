@@ -33,6 +33,10 @@ console.log(`[mosaic] isolated consumer: ${directory}`);
 run([npm, 'install', '--no-audit', '--no-fund'], directory);
 
 const cli = join(directory, 'node_modules/@mosaic-apps/cli/dist/index.js');
+const cliVersion = JSON.parse(await readFile(join(repository, 'packages/cli/package.json'), 'utf8')).version;
+const reportedVersion = spawnSync(process.execPath, [cli, '--version'], { cwd: directory, encoding: 'utf8', windowsHide: true });
+assert.equal(reportedVersion.status, 0, reportedVersion.stderr);
+assert.equal(reportedVersion.stdout.trim(), `mosaic ${cliVersion}`);
 // Exercise normal published defaults, including Git/PWA, rather than hiding
 // scaffold failures behind --no-git/--npm-mode/--db overrides.
 run([cli, 'create', 'reference-app', '--no-install', '--web-port', '3100'], directory);

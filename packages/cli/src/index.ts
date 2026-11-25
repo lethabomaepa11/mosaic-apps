@@ -2,6 +2,7 @@
 /** mosaic CLI - scaffold, migrate, seed and drive Mosaic full-stack apps. */
 
 import { spawn } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 import { create } from './create.js';
 import { info, studio, entity } from './commands-entity.js';
@@ -54,7 +55,8 @@ async function main(): Promise<void> {
 
   if (command === 'help' || command === '--help' || command === '-h' || command === 'version' || command === '--version') {
     if (command === 'version' || command === '--version') {
-      console.log('mosaic 0.3.0');
+      const { version } = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+      console.log(`mosaic ${version}`);
       return;
     }
     console.log(HELP);
