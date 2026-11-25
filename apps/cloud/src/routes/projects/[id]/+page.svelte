@@ -16,6 +16,7 @@
   let thread = $state<HTMLElement>();
   let deleteDialog = $state<HTMLDialogElement>();
   let deleteConfirmation = $state('');
+  let deleteChoices = $state<string[]>([]);
   let deleting = $state(false);
   let credentials = $state<{ email: string; password: string }>();
   let credentialsError = $state('');
@@ -55,8 +56,13 @@
   let apiUrl = $derived(appUrl ? `${appUrl}/api/health` : undefined);
   let copied = $state('');
   const copy = async (value: string) => { await navigator.clipboard.writeText(value).catch(() => {}); copied = value; setTimeout(() => (copied = ''), 1500); };
-  const tone = (status: string) => ['ready', 'completed', 'connected'].includes(status) ? 'is-ready' : status === 'failed' ? 'is-failed' : ['queued', 'running', 'generating', 'delivering', 'building'].includes(status) ? 'is-busy' : '';
-  const jobTitle: Record<string, string> = { generate: 'Building your app', deliver: 'Delivering to your providers', 'vercel-status': 'Deploying on Vercel' };
+  const tone = (status: string) => ['ready', 'completed', 'connected'].includes(status) ? 'is-ready' : ['failed', 'delete_failed'].includes(status) ? 'is-failed' : ['queued', 'running', 'generating', 'delivering', 'building', 'deleting'].includes(status) ? 'is-busy' : '';
+  const jobTitle: Record<string, string> = { generate: 'Building your app', deliver: 'Delivering to your providers', 'vercel-status': 'Deploying on Vercel', delete: 'Deleting selected resources' };
+  const deleteOptions = $derived([
+    { provider: 'github', label: 'GitHub repository', target: data.project.github_repository },
+    { provider: 'vercel', label: 'Vercel project and deployments', target: data.project.vercel_project_id },
+    { provider: 'neon', label: 'Neon project, including all databases and branches', target: data.project.neon_project_id },
+  ].filter((item) => item.target));
   const tabs: Array<{ id: Tab; label: string }> = [{ id: 'preview', label: 'Preview' }, { id: 'blueprint', label: 'Blueprint' }, { id: 'source', label: 'Source & delivery' }, { id: 'settings', label: 'Settings' }];
 
   onMount(() => { const timer = setInterval(() => { if (busy) void invalidateAll(); }, 2000); return () => clearInterval(timer); });
@@ -285,7 +291,11 @@
           {#if ['owner', 'admin'].includes(data.project.role)}
             <section class="surface mt-5 flex flex-wrap items-center justify-between gap-4 p-5">
               <div><h2 class="text-base font-semibold">Delete project</h2><p class="mb-0 mt-1 text-sm muted">Permanently remove this project and its releases from Mosaic Cloud.</p></div>
-              <button type="button" class="btn btn-error btn-outline btn-sm" onclick={() => { deleteConfirmation = ''; deleteDialog?.showModal(); }}>Delete project</button>
+              <button type="button" class="btn btn-error btn-outline btn-sm" disabled={data.project.status === 'deleting'} onclick={() => {
+                deleteConfirmation = '';
+                deleteChoices = [];
+                deleteDialog?.showModal();
+              }}>Delete project</button>
             </section>
             <dialog bind:this={deleteDialog} class="modal" aria-labelledby="delete-project-title" oncancel={(event) => { if (deleting) event.preventDefault(); }}>
               <form method="POST" action="?/delete" class="modal-box space-y-4" use:enhance={() => {
@@ -293,14 +303,26 @@
                 return async ({ update }) => { try { await update({ reset: false }); } finally { deleting = false; } };
               }}>
                 <h2 id="delete-project-title" class="text-lg font-semibold">Delete {data.project.name}?</h2>
-                <p class="text-sm muted">This permanently removes the Cloud project, its chat, and its releases. GitHub, Vercel, and Neon resources stay in your accounts.</p>
+                <p class="text-sm muted">This permanently removes the Cloud project, its preview, chat, and releases.</p>
+                {#if deleteOptions.length}
+                  <fieldset class="space-y-2">
+                    <legend class="text-sm font-medium">Also permanently delete</legend>
+                    {#each deleteOptions as option (option.provider)}
+                      <label class="flex items-start gap-2 text-sm">
+                        <input class="checkbox checkbox-error checkbox-sm mt-0.5" type="checkbox" name="deleteResources" value={option.provider} bind:group={deleteChoices} />
+                        <span>{option.label}<span class="block break-all text-xs muted">{option.target}</span></span>
+                      </label>
+                    {/each}
+                  </fieldset>
+                  <p class="text-xs muted">Provider resources stay in your accounts unless you select them here.</p>
+                {/if}
                 <label class="block text-sm font-medium">Type <strong>{data.project.name}</strong> to confirm
                   <input class="input input-bordered mt-1 w-full" name="projectName" bind:value={deleteConfirmation} autocomplete="off" spellcheck={false} required />
                 </label>
                 {#if form?.deleteMessage}<div class="alert alert-error text-sm" role="alert">{form.deleteMessage}</div>{/if}
                 <div class="modal-action">
                   <button type="button" class="btn btn-ghost" disabled={deleting} onclick={() => deleteDialog?.close()}>Cancel</button>
-                  <button type="submit" class="btn btn-error" disabled={deleting || deleteConfirmation !== data.project.name}>{deleting ? 'Deleting…' : 'Delete project'}</button>
+                  <button type="submit" class="btn btn-error" disabled={deleting || deleteConfirmation !== data.project.name}>{deleting ? 'Deleting…' : deleteChoices.length ? 'Delete project and selected resources' : 'Remove from Cloud'}</button>
                 </div>
               </form>
             </dialog>

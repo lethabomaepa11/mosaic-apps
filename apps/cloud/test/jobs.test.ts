@@ -54,6 +54,7 @@ async function runDue(): Promise<void> {
 }
 
 const jobsOf = async (projectId: string) => (await db.query<{ kind: string; status: string; error: string | null }>('SELECT kind, status, error FROM cloud_jobs WHERE project_id = $1 ORDER BY created_at', [projectId])).rows;
+const deleteStatus = (result: Awaited<ReturnType<typeof deleteProject>>) => result && 'status' in result ? result.status : undefined;
 
 test('a transient Cloud database read is retried once', async () => {
   let attempts = 0;
@@ -67,26 +68,73 @@ test('a transient Cloud database read is retried once', async () => {
 
 test('project deletion checks the name and role, then removes its queued work and saved data', async () => {
   const { organizationId, projectId } = await createProject();
+  await db.query("UPDATE cloud_projects SET github_repository = 'octo/keep-repo', vercel_project_id = 'prj_keep', neon_project_id = 'keep-database' WHERE id = $1", [projectId]);
   const userId = randomUUID(), releaseId = randomUUID();
   await db.query("INSERT INTO cloud_users (id, email, name, password_hash) VALUES ($1, $2, 'Test', '')", [userId, `${userId}@test.example`]);
   await db.query("INSERT INTO cloud_memberships (organization_id, user_id, role) VALUES ($1, $2, 'member')", [organizationId, userId]);
-  assert.equal((await deleteProject(projectId, userId, 'Northstar CRM'))?.status, 403);
+  assert.equal(deleteStatus(await deleteProject(projectId, userId, 'Northstar CRM', ['github'])), 403);
   await db.query("UPDATE cloud_memberships SET role = 'owner' WHERE organization_id = $1 AND user_id = $2", [organizationId, userId]);
-  assert.equal((await deleteProject(projectId, userId, 'northstar crm'))?.status, 400);
+  assert.equal(deleteStatus(await deleteProject(projectId, userId, 'northstar crm')), 400);
 
   const jobId = await enqueueJob(db, { projectId, kind: 'generate' });
   await db.query("UPDATE cloud_jobs SET status = 'running' WHERE id = $1", [jobId]);
-  assert.equal((await deleteProject(projectId, userId, 'Northstar CRM'))?.status, 409);
+  assert.equal(deleteStatus(await deleteProject(projectId, userId, 'Northstar CRM')), 409);
   await db.query("UPDATE cloud_jobs SET status = 'queued' WHERE id = $1", [jobId]);
   await db.query("INSERT INTO cloud_messages (id, conversation_id, role, content) SELECT $1, id, 'user', 'A message' FROM cloud_conversations WHERE project_id = $2", [randomUUID(), projectId]);
   await db.query("INSERT INTO cloud_releases (id, project_id, version, checksum, file_count) VALUES ($1, $2, 1, 'test', 1)", [releaseId, projectId]);
   await db.query("INSERT INTO cloud_release_files (release_id, path, content) VALUES ($1, 'package.json', '{}')", [releaseId]);
 
   assert.equal(await deleteProject(projectId, userId, 'Northstar CRM'), undefined);
-  assert.equal((await deleteProject(projectId, userId, 'Northstar CRM'))?.status, 404);
+  assert.equal(deleteStatus(await deleteProject(projectId, userId, 'Northstar CRM')), 404);
   assert.deepEqual(await jobsOf(projectId), []);
   assert.equal((await db.query('SELECT 1 FROM cloud_release_files WHERE release_id = $1', [releaseId])).rows.length, 0);
   assert.equal((await db.query("SELECT 1 FROM cloud_audit_log WHERE target_id = $1 AND action = 'project.delete'", [projectId])).rows.length, 1);
+});
+
+test('provider deletion skips unchecked resources and resumes after a partial failure', async () => {
+  const { organizationId, projectId } = await createProject();
+  const owner = randomUUID();
+  await db.query("INSERT INTO cloud_users (id, email, name, password_hash) VALUES ($1, $2, 'Owner', '')", [owner, `${owner}@example.test`]);
+  await db.query("INSERT INTO cloud_memberships (organization_id, user_id, role) VALUES ($1, $2, 'owner')", [organizationId, owner]);
+  await db.query("UPDATE cloud_projects SET github_repository = 'octo/delete-repo', vercel_project_id = 'prj_delete', neon_project_id = 'keep-database' WHERE id = $1", [projectId]);
+  await connect(organizationId, 'github');
+  await connect(organizationId, 'vercel', { teamId: 'team_delete' });
+  await connect(organizationId, 'neon');
+  const originalFetch = providerFetch;
+  const worker = process.env.CLOUD_DEDICATED_WORKER;
+  const calls: string[] = [];
+  let denyGitHub = true;
+  process.env.CLOUD_DEDICATED_WORKER = 'true';
+  providerFetch = (async (input, init) => {
+    const url = String(input);
+    assert.equal(init?.method, 'DELETE');
+    calls.push(url);
+    if (url === 'https://api.github.com/repos/octo/delete-repo' && denyGitHub) return Response.json({ message: 'Forbidden' }, { status: 403 });
+    return new Response(null, { status: 204 });
+  }) as typeof fetch;
+  try {
+    assert.deepEqual(await deleteProject(projectId, owner, 'Northstar CRM', ['github', 'vercel']), { queued: true });
+    await runDue();
+    const remaining = await db.query('SELECT status, github_repository, vercel_project_id, neon_project_id FROM cloud_projects WHERE id = $1', [projectId]);
+    assert.deepEqual(remaining.rows, [{ status: 'delete_failed', github_repository: 'octo/delete-repo', vercel_project_id: null, neon_project_id: 'keep-database' }]);
+    assert.match((await jobsOf(projectId))[0]?.error ?? '', /delete_repo/);
+    denyGitHub = false;
+    await db.query("UPDATE cloud_jobs SET status = 'queued', attempts = 0 WHERE project_id = $1 AND kind = 'delete'", [projectId]);
+    await db.query("UPDATE cloud_projects SET status = 'deleting' WHERE id = $1", [projectId]);
+    await runDue();
+    assert.equal((await db.query('SELECT 1 FROM cloud_projects WHERE id = $1', [projectId])).rows.length, 0);
+    assert.deepEqual(calls, ['https://api.vercel.com/v9/projects/prj_delete?teamId=team_delete', 'https://api.github.com/repos/octo/delete-repo', 'https://api.github.com/repos/octo/delete-repo']);
+    const databaseProject = await createProject('sveltekit', organizationId);
+    await db.query("UPDATE cloud_projects SET neon_project_id = 'explicitly-selected' WHERE id = $1", [databaseProject.projectId]);
+    assert.deepEqual(await deleteProject(databaseProject.projectId, owner, 'Northstar CRM', ['neon']), { queued: true });
+    await runDue();
+    assert.equal((await db.query('SELECT 1 FROM cloud_projects WHERE id = $1', [databaseProject.projectId])).rows.length, 0);
+    assert.equal(calls.at(-1), 'https://console.neon.tech/api/v2/projects/explicitly-selected');
+  } finally {
+    providerFetch = originalFetch;
+    if (worker === undefined) delete process.env.CLOUD_DEDICATED_WORKER;
+    else process.env.CLOUD_DEDICATED_WORKER = worker;
+  }
 });
 
 test('a queued generate job plans, writes a release, and readies the project with no providers', async () => {

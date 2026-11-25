@@ -2,6 +2,7 @@ import { createDb } from '@mosaic-apps/server';
 import type { GeneratedFile } from './generation';
 import type { AppFramework } from '../framework';
 import { VercelCredentialError, vercelCredentialRejected } from './providers';
+import type { Provider } from './providers';
 
 export class ProviderError extends Error {}
 
@@ -78,6 +79,28 @@ export async function applyMigration(connectionUri: string, sql: string) {
 const VERCEL = 'https://api.vercel.com';
 // Team installs (Vercel OAuth integration) must name the team on every call; personal tokens omit it.
 const vercelUrl = (path: string, teamId?: string | null) => { const url = new URL(path, VERCEL); if (teamId) url.searchParams.set('teamId', teamId); return url.toString(); };
+
+export async function deleteProviderResource(input: { provider: Provider; token: string; target: string; teamId?: string | null }) {
+  const { provider, token, target } = input;
+  const label = provider === 'github' ? 'GitHub' : provider === 'vercel' ? 'Vercel' : 'Neon';
+  let response;
+  if (provider === 'github') {
+    if (!/^[a-zA-Z0-9][a-zA-Z0-9_.-]*\/[a-zA-Z0-9][a-zA-Z0-9_.-]*$/.test(target)) throw new ProviderError('The attached GitHub repository name is invalid.');
+    try {
+      response = await github(token, `/repos/${target.split('/').map(encodeURIComponent).join('/')}`, 'DELETE');
+    } catch (cause) {
+      if (cause instanceof ProviderError && cause.message.includes('(403)')) throw new ProviderError('GitHub denied repository deletion. Connect a credential with repository administration write or the delete_repo scope.');
+      throw cause;
+    }
+  } else {
+    if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/.test(target)) throw new ProviderError(`The attached ${label} project ID is invalid.`);
+    const path = provider === 'vercel' ? vercelUrl(`/v9/projects/${encodeURIComponent(target)}`, input.teamId)
+      : `https://console.neon.tech/api/v2/projects/${encodeURIComponent(target)}`;
+    response = await api(label, path, token, { method: 'DELETE' });
+  }
+  if (response.status === 404) throw new ProviderError(`${label} could not verify the resource. Check the connected account or remove the project from Cloud only.`);
+  if (response.status >= 300) throw new ProviderError(`${label} could not delete the selected resource (${response.status}).`);
+}
 
 export async function createVercelProject(input: { token: string; name: string; teamId?: string | null; framework?: AppFramework }): Promise<string> {
   const created = await api('Vercel', vercelUrl('/v11/projects', input.teamId), input.token, { method: 'POST', body: { name: input.name, framework: input.framework ?? 'sveltekit' } });

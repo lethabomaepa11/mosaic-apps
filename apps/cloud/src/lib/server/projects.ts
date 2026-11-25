@@ -5,7 +5,8 @@ import { isDaisyTheme } from '../themes';
 import { canManageConnections } from './connections';
 import { discardPreview } from './preview';
 import type { AppFramework } from '../framework';
-import { decryptProviderSecret } from './providers';
+import { decryptProviderSecret, type Provider } from './providers';
+import { removeProjectData } from './project-data';
 
 export interface NewProject { prompt: string; name: string; appFramework: AppFramework; uiTheme: string; uiSystem: string; includeHome: boolean; includeLogin: boolean }
 
@@ -68,11 +69,11 @@ export async function createProject(userId: string, input: NewProject, origin: s
   return projectId;
 }
 
-export async function deleteProject(projectId: string, userId: string, confirmation: FormDataEntryValue | null) {
+export async function deleteProject(projectId: string, userId: string, confirmation: FormDataEntryValue | null, providers: Provider[] = []) {
   const db = await getCloudDb();
   const result = await db.tx(async (tx) => {
-    const { rows: [project] } = await tx.query<{ name: string; organization_id: string; role: string }>(
-      `SELECT project.name, project.organization_id, membership.role FROM cloud_projects project
+    const { rows: [project] } = await tx.query<{ name: string; organization_id: string; role: string; github_repository: string | null; vercel_project_id: string | null; neon_project_id: string | null }>(
+      `SELECT project.name, project.organization_id, membership.role, project.github_repository, project.vercel_project_id, project.neon_project_id FROM cloud_projects project
        JOIN cloud_memberships membership ON membership.organization_id = project.organization_id
        WHERE project.id = $1 AND membership.user_id = $2 FOR UPDATE OF project, membership`, [projectId, userId],
     );
@@ -81,25 +82,26 @@ export async function deleteProject(projectId: string, userId: string, confirmat
     if (confirmation !== project.name) return { status: 400 as const, message: 'Type the exact project name to confirm deletion.' };
 
     // Lock queued jobs before deleting them so a worker cannot claim one during deletion.
-    const jobs = await tx.query<{ status: string }>('SELECT status FROM cloud_jobs WHERE project_id = $1 FOR UPDATE', [projectId]);
+    const jobs = await tx.query<{ status: string; kind: string }>('SELECT status, kind FROM cloud_jobs WHERE project_id = $1 FOR UPDATE', [projectId]);
     if (jobs.rows.some((job) => job.status === 'running')) return { status: 409 as const, message: 'Wait for the running job to finish before deleting this project.' };
+    if (jobs.rows.some((job) => job.kind === 'delete' && job.status === 'queued')) return { status: 409 as const, message: 'Deletion is already queued.' };
 
-    await tx.query('DELETE FROM cloud_jobs WHERE project_id = $1', [projectId]);
-    await tx.query('DELETE FROM cloud_messages WHERE conversation_id IN (SELECT id FROM cloud_conversations WHERE project_id = $1)', [projectId]);
-    await tx.query('DELETE FROM cloud_conversations WHERE project_id = $1', [projectId]);
-    await tx.query('DELETE FROM cloud_releases WHERE project_id = $1', [projectId]);
-    await tx.query('DELETE FROM cloud_environments WHERE project_id = $1', [projectId]);
-    await tx.query('DELETE FROM cloud_projects WHERE id = $1', [projectId]);
-    if (process.env.CLOUD_PREVIEW_DATABASE_URL) await tx.query('INSERT INTO cloud_preview_cleanup (project_id) VALUES ($1) ON CONFLICT DO NOTHING', [projectId]);
-    await tx.query(
-      `INSERT INTO cloud_audit_log (id, organization_id, user_id, action, target_type, target_id)
-       VALUES ($1, $2, $3, 'project.delete', 'project', $4)`, [id(), project.organization_id, userId, projectId],
-    );
+    if (providers.length) {
+      const resources = { github: project.github_repository, vercel: project.vercel_project_id, neon: project.neon_project_id };
+      if (providers.some((provider) => !resources[provider])) return { status: 409 as const, message: 'A selected resource is no longer attached. Reload and check the deletion options again.' };
+      await tx.query(`UPDATE cloud_jobs SET status = 'cancelled', finished_at = now() WHERE project_id = $1
+        AND (status IN ('queued', 'waiting_input') OR (kind = 'delete' AND status = 'failed'))`, [projectId]);
+      await tx.query("UPDATE cloud_projects SET status = 'deleting', updated_at = now() WHERE id = $1", [projectId]);
+      await enqueueJob(tx, { projectId, kind: 'delete', metadata: { userId, targets: Object.fromEntries(providers.map((provider) => [provider, resources[provider]])) }, stage: 'Waiting to delete selected resources' });
+      return { queued: true } as const;
+    }
+    await removeProjectData(tx, projectId, project.organization_id, userId);
   });
   if (!result) {
     void discardPreview(projectId);
     if (process.env.CLOUD_PREVIEW_DATABASE_URL) kickJobs();
   }
+  if (result && 'queued' in result) kickJobs();
   return result;
 }
 

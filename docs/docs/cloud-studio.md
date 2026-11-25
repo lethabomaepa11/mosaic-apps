@@ -68,6 +68,19 @@ and choose **Reconnect Vercel** or replace the access token in place. Cloud keep
 your session, repository and deployment settings, then resumes the latest blocked
 delivery. Vercel's integration credential uses a fresh authorization when revoked.
 
+## Remove a project
+
+In **Project Settings → Delete project**, type the project name to confirm. By
+default, Cloud removes its project, preview, chat and releases and keeps the
+resources in your own provider accounts. To delete those too, select each attached
+GitHub repository, Vercel project, or Neon project you want removed. Removing the
+Neon project deletes its databases and branches.
+
+Cloud keeps the project visible if a selected provider rejects deletion. Check its
+Activity, update the connection if needed, and retry. A GitHub credential needs
+repository admin access and the `delete_repo` scope or fine-grained repository
+Administration write permission. [GitHub repository deletion permissions](https://docs.github.com/en/rest/repos/repos#delete-a-repository)
+
 ## AI models and limits
 
 The shared defaults route builds across Groq's GPT-OSS models. An operator can

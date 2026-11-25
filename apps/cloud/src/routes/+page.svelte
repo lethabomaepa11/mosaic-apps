@@ -1,5 +1,6 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
+  import { invalidateAll } from '$app/navigation';
   import { ArrowUp, GitBranch, Cloud, Database, Settings2, LoaderCircle, Sparkles } from '@lucide/svelte';
   import { DAISY_THEME_CHOICES } from '#lib/themes';
   let { data, form } = $props();
@@ -14,7 +15,12 @@
     { label: 'Book club', text: 'A book club app with members, a reading schedule, meeting RSVPs, book votes, and discussion notes for each meeting.' },
   ];
   const providerIcons = { github: GitBranch, vercel: Cloud, neon: Database };
-  const tone = (status: string) => ['ready', 'completed'].includes(status) ? 'is-ready' : status === 'failed' ? 'is-failed' : ['queued', 'generating', 'delivering', 'running'].includes(status) ? 'is-busy' : '';
+  const tone = (status: string) => ['ready', 'completed'].includes(status) ? 'is-ready' : ['failed', 'delete_failed'].includes(status) ? 'is-failed' : ['queued', 'generating', 'delivering', 'running', 'deleting'].includes(status) ? 'is-busy' : '';
+  $effect(() => {
+    if (!data.projects.some((project) => project.status === 'deleting')) return;
+    const poll = setInterval(() => { void invalidateAll(); }, 3000);
+    return () => clearInterval(poll);
+  });
   const ago = (iso: string) => {
     const minutes = Math.round((Date.now() - new Date(iso).getTime()) / 60_000);
     if (minutes < 1) return 'just now';
@@ -93,7 +99,7 @@
       {#each data.projects as project}
         <a class="surface group flex flex-col p-4 transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md" href={`/projects/${project.id}`}>
           <div class="mb-3 grid h-24 place-items-center rounded-lg bg-gradient-to-br from-primary/10 via-base-200 to-accent/10 text-2xl font-bold text-primary/70">{project.name.slice(0, 1).toUpperCase()}</div>
-          <div class="flex items-center justify-between gap-3"><strong class="truncate">{project.name}</strong><span class="flex shrink-0 items-center gap-1.5 text-xs muted"><span class={`status-dot ${tone(project.status)}`}></span>{project.status}</span></div>
+          <div class="flex items-center justify-between gap-3"><strong class="truncate">{project.name}</strong><span class="flex shrink-0 items-center gap-1.5 text-xs muted"><span class={`status-dot ${tone(project.status)}`}></span>{project.status === 'delete_failed' ? 'Deletion needs attention' : project.status}</span></div>
           <p class="mb-3 mt-1 line-clamp-2 text-sm leading-6 muted">{project.prompt}</p>
           <small class="mt-auto muted">Edited {ago(project.updated_at)}</small>
         </a>

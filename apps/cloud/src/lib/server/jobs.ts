@@ -6,17 +6,18 @@ import { AI_PROVIDERS, aiModel } from './ai';
 import { aiConfigFor } from './ai-settings';
 import type { Answer } from './agents';
 import { buildApp } from './build-app';
-import { publishToPreview } from './preview';
+import { discardPreview, publishToPreview } from './preview';
 import { drainPreviewCleanup } from './preview-schema';
 import { applyApp, httpCaller, loginToken } from './mosaic-runtime';
 import { randomBytes } from 'node:crypto';
 import { blueprintFromSpec, compileSpec, type AppSpec, type CompiledApp } from './spec';
 import { persistGeneratedRelease, type GeneratedFile } from './generation';
 import { decryptProviderSecret, encryptProviderSecret, VercelCredentialError, type Provider } from './providers';
-import { createGitHubRepository, createVercelProject, deployToVercel, provisionNeon, pushToGitHub, releaseFramework, vercelDeploymentStatus } from './delivery';
+import { createGitHubRepository, createVercelProject, deleteProviderResource, deployToVercel, provisionNeon, pushToGitHub, releaseFramework, vercelDeploymentStatus } from './delivery';
+import { removeProjectData } from './project-data';
 import { frameworkLabel, type AppFramework } from '../framework';
 
-export type JobKind = 'generate' | 'deliver' | 'vercel-status';
+export type JobKind = 'generate' | 'deliver' | 'vercel-status' | 'delete';
 export interface ClaimedJob { id: string; project_id: string; kind: JobKind; metadata: Record<string, any>; attempts: number; lease_id: string }
 export interface JobContext { db: Db; job: ClaimedJob; stage(text: string, progress: number): Promise<void>; think(agent: string, message: string): Promise<void>; pause(questions: unknown[], message: string): Promise<void>; enqueue(kind: JobKind, metadata: Record<string, unknown>, delaySeconds?: number): Promise<void>; requeue(delaySeconds: number, metadata: Record<string, unknown>): Promise<void> }
 export type JobHandler = (context: JobContext) => Promise<void>;
@@ -38,7 +39,8 @@ export async function enqueueJob(db: Db, input: { projectId: string; kind: JobKi
 
 export async function queueLatestDelivery(db: Db, projectId: string): Promise<string | undefined> {
   return db.tx(async (tx) => {
-    await tx.query('SELECT id FROM cloud_projects WHERE id = $1 FOR UPDATE', [projectId]);
+    const { rows: [project] } = await tx.query<{ status: string }>('SELECT status FROM cloud_projects WHERE id = $1 FOR UPDATE', [projectId]);
+    if (!project || ['deleting', 'delete_failed'].includes(project.status)) return 'This project is being removed.';
     const active = await tx.query("SELECT 1 FROM cloud_jobs WHERE project_id = $1 AND status IN ('queued', 'running') LIMIT 1", [projectId]);
     if (active.rows.length) return 'Wait for the current job to finish before delivering.';
     const release = await tx.query<{ id: string }>("SELECT id FROM cloud_releases WHERE project_id = $1 AND status = 'ready' ORDER BY version DESC LIMIT 1", [projectId]);
@@ -65,7 +67,7 @@ export async function claimJob(db: Db): Promise<ClaimedJob | undefined> {
     [MAX_ATTEMPTS],
   );
   const failed = expired.rows.filter((job) => job.status === 'failed').map((job) => job.project_id);
-  if (failed.length) await db.query(`UPDATE cloud_projects project SET status = 'failed', updated_at = now()
+  if (failed.length) await db.query(`UPDATE cloud_projects project SET status = CASE WHEN status = 'deleting' THEN 'delete_failed' ELSE 'failed' END, updated_at = now()
     WHERE project.id = ANY($1::uuid[]) AND NOT EXISTS (SELECT 1 FROM cloud_jobs job
       WHERE job.project_id = project.id AND job.status IN ('queued', 'running', 'waiting_input'))`, [failed]);
   return db.tx(async (tx) => {
@@ -74,6 +76,7 @@ export async function claimJob(db: Db): Promise<ClaimedJob | undefined> {
        JOIN LATERAL (
          SELECT MIN(job.created_at) AS oldest FROM cloud_jobs job JOIN cloud_projects project ON project.id = job.project_id
          WHERE project.organization_id = workspace.id AND job.status = 'queued' AND job.run_after <= now()
+           AND (job.kind = 'delete' OR project.status NOT IN ('deleting', 'delete_failed'))
        ) due ON due.oldest IS NOT NULL
        WHERE NOT EXISTS (SELECT 1 FROM cloud_jobs job JOIN cloud_projects project ON project.id = job.project_id
          WHERE project.organization_id = workspace.id AND job.status = 'running')
@@ -85,6 +88,7 @@ export async function claimJob(db: Db): Promise<ClaimedJob | undefined> {
          lease_id = $2, lease_expires_at = now() + make_interval(secs => $3)
        WHERE id = (SELECT job.id FROM cloud_jobs job JOIN cloud_projects project ON project.id = job.project_id
          WHERE project.organization_id = $1 AND job.status = 'queued' AND job.run_after <= now()
+           AND (job.kind = 'delete' OR project.status NOT IN ('deleting', 'delete_failed'))
            AND NOT EXISTS (SELECT 1 FROM cloud_jobs active JOIN cloud_projects owner ON owner.id = active.project_id
              WHERE owner.organization_id = $1 AND active.status = 'running')
          ORDER BY job.created_at FOR UPDATE OF job SKIP LOCKED LIMIT 1)
@@ -150,7 +154,7 @@ export async function runJob(store: Db, job: ClaimedJob, handlers: Record<string
     console.error(`Job ${job.id} (${job.kind}) failed`, cause);
     await db.tx(async (tx) => {
       await tx.query("UPDATE cloud_jobs SET status = 'failed', error = $2, finished_at = now(), lease_id = NULL, lease_expires_at = NULL, log = log || jsonb_build_array(jsonb_build_object('at', now(), 'message', $2::text)) WHERE id = $1", [job.id, message]);
-      await tx.query("UPDATE cloud_projects SET status = 'failed', updated_at = now() WHERE id = $1", [job.project_id]);
+      await tx.query('UPDATE cloud_projects SET status = $2, updated_at = now() WHERE id = $1', [job.project_id, job.kind === 'delete' ? 'delete_failed' : 'failed']);
     }).catch((failure) => { if (!(failure instanceof JobLeaseLost)) throw failure; });
   } finally {
     clearInterval(heartbeat);
@@ -166,7 +170,8 @@ export async function runJobs(db: Db, budgetMs = 240_000, handlers: Record<strin
     if (job) { await runJob(db, job, handlers); ran++; continue; }
     const next = await db.query<{ wait: number | null }>(`SELECT EXTRACT(EPOCH FROM (MIN(job.run_after) - now())) * 1000 AS wait
       FROM cloud_jobs job JOIN cloud_projects project ON project.id = job.project_id
-      WHERE job.status = 'queued' AND NOT EXISTS (SELECT 1 FROM cloud_jobs active JOIN cloud_projects owner ON owner.id = active.project_id
+      WHERE job.status = 'queued' AND (job.kind = 'delete' OR project.status NOT IN ('deleting', 'delete_failed'))
+        AND NOT EXISTS (SELECT 1 FROM cloud_jobs active JOIN cloud_projects owner ON owner.id = active.project_id
         WHERE owner.organization_id = project.organization_id AND active.status = 'running')`);
     const wait = next.rows[0]?.wait;
     if (wait === null || wait === undefined || Date.now() + Number(wait) > deadline) return ran;
@@ -181,6 +186,7 @@ export function kickJobs(): void {
   waitUntil(getCloudDb().then(async (db) => {
     await drainPreviewCleanup(db).catch((cause) => console.error('Preview cleanup failed', cause));
     await runJobs(db);
+    await drainPreviewCleanup(db).catch((cause) => console.error('Preview cleanup failed', cause));
   }).catch((cause) => console.error('Job runner failed', cause)));
 }
 
@@ -420,4 +426,36 @@ const vercelStatus: JobHandler = async ({ db, job, stage, think, requeue }) => {
   }
 };
 
-const HANDLERS: Record<JobKind, JobHandler> = { generate, deliver, 'vercel-status': vercelStatus };
+const deleteProject: JobHandler = async ({ db, job, stage }) => {
+  const userId = String(job.metadata.userId ?? '');
+  const { rows: [workspace] } = await db.query<{ id: string }>(`SELECT project.organization_id AS id FROM cloud_projects project
+    JOIN cloud_memberships membership ON membership.organization_id = project.organization_id
+    WHERE project.id = $1 AND membership.user_id = $2 AND membership.role IN ('owner', 'admin')`, [job.project_id, userId]);
+  if (!workspace) throw new Error('A workspace owner or admin must retry this deletion.');
+  const project = await loadProject(db, job.project_id);
+  const resources = { github: project.github_repository, vercel: project.vercel_project_id, neon: project.neon_project_id };
+  const targets = job.metadata.targets as Partial<Record<Provider, string>>;
+  for (const [index, provider] of (['vercel', 'github', 'neon'] as const).entries()) {
+    const target = targets[provider];
+    if (!target || !resources[provider]) continue;
+    if (resources[provider] !== target) throw new Error(`The attached ${provider} resource changed. Confirm deletion again.`);
+    const connection = await providerToken(db, project.id, provider);
+    if (!connection) throw new Error(`Connect ${provider === 'github' ? 'GitHub' : provider === 'vercel' ? 'Vercel' : 'Neon'} in Settings and retry deletion.`);
+    await stage(`Deleting ${provider === 'github' ? 'the GitHub repository' : provider === 'vercel' ? 'the Vercel project' : 'the Neon database'}`, 15 + index * 25);
+    const remove = () => deleteProviderResource({ provider, token: connection.token, teamId: connection.metadata.teamId, target });
+    if (provider === 'vercel') await useVercel(db, connection, remove);
+    else await remove();
+    await db.tx(async (tx) => {
+      if (provider === 'github') await tx.query('UPDATE cloud_projects SET github_repository = NULL WHERE id = $1', [project.id]);
+      else if (provider === 'neon') await tx.query('UPDATE cloud_projects SET neon_project_id = NULL, database_secret = NULL WHERE id = $1', [project.id]);
+      else {
+        await tx.query('UPDATE cloud_projects SET vercel_project_id = NULL WHERE id = $1', [project.id]);
+        await tx.query("UPDATE cloud_environments SET status = 'not_configured', url = NULL WHERE project_id = $1 AND kind = 'production'", [project.id]);
+      }
+    });
+  }
+  await db.tx((tx) => removeProjectData(tx, project.id, workspace.id, userId, Object.keys(targets)));
+  void discardPreview(project.id);
+};
+
+const HANDLERS: Record<JobKind, JobHandler> = { generate, deliver, 'vercel-status': vercelStatus, delete: deleteProject };

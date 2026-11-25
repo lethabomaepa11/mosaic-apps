@@ -37,6 +37,7 @@ export async function saveConnection(input: { organizationId: string; userId: st
         SELECT DISTINCT ON (job.project_id) job.id, job.project_id
         FROM cloud_jobs job JOIN cloud_projects project ON project.id = job.project_id
         WHERE project.organization_id = $1 AND job.status = 'failed'
+          AND project.status NOT IN ('deleting', 'delete_failed')
           AND job.kind IN ('deliver', 'vercel-status') AND (
             job.error = $2 OR job.error = 'Vercel request failed (403): Not authorized'
             OR job.error LIKE 'Vercel request failed (401):%'
