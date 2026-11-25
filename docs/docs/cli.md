@@ -31,6 +31,8 @@ npx @mosaic-apps/cli@latest create "Acme CRM" --framework nextjs
 The CLI writes `.env` with a generated JWT secret. When no `--db` is supplied,
 it uses embedded PostgreSQL in the project's `data/` directory. Published packages
 are used by default. No Docker service is needed. See [Quickstart](./quickstart.md).
+If your project has a separate `apps/studio` workspace, see the
+[unified Studio upgrade guide](./deployment-studio.md#upgrade-from-a-separate-studio-app).
 
 ## Add an entity
 

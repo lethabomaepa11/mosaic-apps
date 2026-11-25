@@ -121,8 +121,11 @@ provider responses. This is the first thing to close.
 - **P0 Publishing.** CI publishes `@mosaic-apps/*` to npm on tagged releases with
   provenance; a consumer project created from the published packages passes check,
   build and a browser smoke test before the tag is promoted.
-- **P0 Upgrade notes.** Projects created before Studio moved into the app (no more
-  `apps/studio`, `--studio-port` removed) need a migration guide.
+- **Unified Studio upgrades.** The [upgrade guide](../docs/docs/deployment-studio.md#upgrade-from-a-separate-studio-app)
+  covers backup, staging, cutover, and rollback. A staging smoke test moved a CLI
+  0.3.0 project's PGlite database into a CLI 0.4.3 scaffold and verified the
+  existing login, published page and form, business records, and `/studio` in
+  the production build. Track evidence in [#36](https://github.com/lethabomaepa11/mosaic-apps/issues/36).
 - **P0 Template linking.** `mosaic create --link` now places the linked UI package's
   dependencies in the generated app manifest. A fresh linked app passed `npm install`,
   `npm run check`, and the Node production build on Windows.
