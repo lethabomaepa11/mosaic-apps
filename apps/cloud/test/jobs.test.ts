@@ -102,6 +102,7 @@ test('connecting providers after generation lets the existing release reach GitH
     if (url.endsWith('/git/commits')) return reply({ sha: 'commit-sha' }, 201);
     if (url.endsWith('/git/refs/heads/main')) return reply({});
     if (url.endsWith('/v11/projects')) return reply({ id: 'prj_1' });
+    if (url.endsWith('/v9/projects/prj_1') && method === 'PATCH') return reply({});
     if (url.includes('/v10/projects/prj_1/env')) return reply({});
     if (url.endsWith('/v13/deployments')) return reply({ id: 'dpl_1', readyState: 'QUEUED' });
     if (url.endsWith('/v13/deployments/dpl_1')) return reply({ readyState: deploymentState, alias: ['northstar.vercel.app'] });
@@ -133,6 +134,7 @@ test('connecting providers after generation lets the existing release reach GitH
   assert.ok(tree.body.tree.some((entry: any) => entry.path === 'package.json'));
   assert.deepEqual(calls.find((call) => call.url.endsWith('/git/commits'))!.body.parents, ['parent-sha']);
   assert.equal(calls.find((call) => call.url.includes('/env'))!.body.key, 'DATABASE_URL');
+  assert.equal(calls.find((call) => call.url.endsWith('/v9/projects/prj_1'))?.body.rootDirectory, 'apps/web');
   assert.equal(calls.filter((call) => call.url.endsWith('/v13/deployments/dpl_1')).length, 2);
   const providerCalls = calls.filter((call) => !call.url.startsWith('https://northstar.vercel.app'));
   assert.ok(providerCalls.every((call) => call.auth === `Bearer ${call.url.includes('github') ? 'github' : call.url.includes('neon') ? 'neon' : 'vercel'}-token`));

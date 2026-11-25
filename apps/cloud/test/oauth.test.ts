@@ -52,10 +52,15 @@ test('every Vercel call names the team for team installs, and none for personal 
   const stub = stubFetch((url) => url.includes('/v11/projects') ? [200, { id: 'prj' }] : url.includes('/v13/deployments/') ? [200, { readyState: 'READY', alias: ['a.vercel.app'] }] : url.includes('/v13/deployments') ? [200, { id: 'dpl' }] : [200, {}]);
   try {
     await createVercelProject({ token: 't', name: 'app', teamId: 'team_1' });
-    await deployToVercel({ token: 't', projectId: 'prj', name: 'app', files: [{ path: 'a', content: 'b' }], env: { DATABASE_URL: 'x' }, teamId: 'team_1' });
+    await deployToVercel({ token: 't', projectId: 'prj', name: 'app', files: [{ path: 'package.json', content: '{}' }], env: { DATABASE_URL: 'x' }, teamId: 'team_1' });
     await vercelDeploymentStatus('t', 'dpl', 'team_1');
     assert.ok(stub.calls.every((call) => new URL(call.url).searchParams.get('teamId') === 'team_1'), 'all team calls scoped');
     assert.ok(stub.calls.some((call) => new URL(call.url).searchParams.get('upsert') === 'true'), 'env upsert flag kept');
+    const settings = stub.calls.find((call) => new URL(call.url).pathname === '/v9/projects/prj');
+    assert.equal(settings?.init.method, 'PATCH');
+    assert.equal(JSON.parse(String(settings?.init.body)).rootDirectory, null);
+    assert.equal(JSON.parse(String(settings?.init.body)).installCommand, 'npm install');
+    assert.equal(JSON.parse(String(settings?.init.body)).buildCommand, 'npm exec -- svelte-kit sync && npm run build');
     stub.calls.length = 0;
     await createVercelProject({ token: 't', name: 'app' });
     assert.equal(new URL(stub.calls[0]!.url).searchParams.has('teamId'), false);
