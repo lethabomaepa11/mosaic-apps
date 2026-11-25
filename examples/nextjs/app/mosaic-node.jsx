@@ -2,19 +2,23 @@ import { publishedForm, readMosaic, recordFormProps } from '../lib/artifacts.js'
 import { RecordForm } from './record-form.jsx';
 import LocationMap from './location-map.jsx';
 import OAuthChoices from './login/oauth-choices.jsx';
+import { displayDate } from '../lib/dates.js';
 
 function safeLink(value) {
   return typeof value === 'string' && (/^https?:\/\//i.test(value) || /^\/(?![\/\\])/.test(value) && !value.includes('\\')) ? value : undefined;
 }
 
-function Table({ rows = [], columns = [], editHref }) {
+function Table({ rows = [], columns = [], fields = [], editHref }) {
   if (!rows.length) return <p>No records</p>;
+  const types = new Map(fields.map(({ name, type }) => [name, type]));
   return (
     <div className="table-scroll"><table>
       <thead><tr>{columns.map((col) => <th key={col.key} scope="col">{col.label ?? col.key}</th>)}{editHref && <th scope="col">Actions</th>}</tr></thead>
-      <tbody>{rows.map((row, index) => <tr key={row.id ?? index}>{columns.map((col) =>
-        <td key={col.key}>{row[col.key] == null ? '' : String(row[col.key])}</td>,
-      )}{editHref && <td><a href={editHref(row)}>Edit</a></td>}</tr>)}</tbody>
+      <tbody>{rows.map((row, index) => <tr key={row.id ?? index}>{columns.map((col) => {
+        const value = row[col.key];
+        const type = types.get(col.key) ?? col.type;
+        return <td key={col.key}>{value == null ? '' : type === 'date' || type === 'datetime' ? displayDate(value, type) : String(value)}</td>;
+      })}{editHref && <td><a href={editHref(row)}>Edit</a></td>}</tr>)}</tbody>
     </table></div>
   );
 }
@@ -69,16 +73,18 @@ async function NodeContent({ node, props }) {
     case 'entityTable': {
       if (typeof props.entity !== 'string' || !props.entity) return null;
       const pageSize = Math.max(1, Math.min(100, Number(props.pageSize) || 20));
-      const result = await readMosaic(`/entities/${encodeURIComponent(props.entity)}?pageSize=${pageSize}`);
+      const entityPath = `/entities/${encodeURIComponent(props.entity)}`;
+      const [result, { data: meta }, { data: forms }] = await Promise.all([
+        readMosaic(`${entityPath}?pageSize=${pageSize}`), readMosaic(`${entityPath}/meta`), readMosaic('/forms?published=true'),
+      ]);
       if (!result.data) return <p>Records unavailable.</p>;
       const rows = Array.isArray(result.data) ? result.data : result.data.data ?? [];
       const columns = Array.isArray(props.columns) && props.columns.length ? props.columns.map((col) => typeof col === 'string' ? { key: col } : col) : Object.keys(rows[0] ?? {}).map((key) => ({ key }));
-      const { data: forms } = await readMosaic('/forms?published=true');
       const form = forms?.find((item) => (item.entity ?? item.dataSource?.entity) === props.entity);
       const url = form && '/f/' + encodeURIComponent(form.slug);
       return <section>{props.title && <h2>{props.title}</h2>}
         {url && props.allowCreate && <a href={url}>New record</a>}
-        <Table rows={rows} columns={columns} editHref={url && props.allowEdit ? (row) => `${url}?record=${encodeURIComponent(row.id)}` : undefined} />
+        <Table rows={rows} columns={columns} fields={meta?.fields} editHref={url && props.allowEdit ? (row) => `${url}?record=${encodeURIComponent(row.id)}` : undefined} />
       </section>;
     }
     case 'subform': {
