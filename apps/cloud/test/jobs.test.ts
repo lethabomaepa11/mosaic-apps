@@ -9,6 +9,7 @@ delete process.env.VERCEL;
 
 const { getCloudDb } = await import('../src/lib/server/db');
 const { claimJob, enqueueJob, queueLatestDelivery, runJob, runJobs } = await import('../src/lib/server/jobs');
+const { deleteProject } = await import('../src/lib/server/projects');
 const { encryptProviderSecret } = await import('../src/lib/server/providers');
 const { equipmentSpec } = await import('./fixtures/equipment-spec');
 const db = await getCloudDb();
@@ -51,6 +52,30 @@ async function runDue(): Promise<void> {
 }
 
 const jobsOf = async (projectId: string) => (await db.query<{ kind: string; status: string; error: string | null }>('SELECT kind, status, error FROM cloud_jobs WHERE project_id = $1 ORDER BY created_at', [projectId])).rows;
+
+test('project deletion checks the name and role, then removes its queued work and saved data', async () => {
+  const { organizationId, projectId } = await createProject();
+  const userId = randomUUID(), releaseId = randomUUID();
+  await db.query("INSERT INTO cloud_users (id, email, name, password_hash) VALUES ($1, $2, 'Test', '')", [userId, `${userId}@test.example`]);
+  await db.query("INSERT INTO cloud_memberships (organization_id, user_id, role) VALUES ($1, $2, 'member')", [organizationId, userId]);
+  assert.equal((await deleteProject(projectId, userId, 'Northstar CRM'))?.status, 403);
+  await db.query("UPDATE cloud_memberships SET role = 'owner' WHERE organization_id = $1 AND user_id = $2", [organizationId, userId]);
+  assert.equal((await deleteProject(projectId, userId, 'northstar crm'))?.status, 400);
+
+  const jobId = await enqueueJob(db, { projectId, kind: 'generate' });
+  await db.query("UPDATE cloud_jobs SET status = 'running' WHERE id = $1", [jobId]);
+  assert.equal((await deleteProject(projectId, userId, 'Northstar CRM'))?.status, 409);
+  await db.query("UPDATE cloud_jobs SET status = 'queued' WHERE id = $1", [jobId]);
+  await db.query("INSERT INTO cloud_messages (id, conversation_id, role, content) SELECT $1, id, 'user', 'A message' FROM cloud_conversations WHERE project_id = $2", [randomUUID(), projectId]);
+  await db.query("INSERT INTO cloud_releases (id, project_id, version, checksum, file_count) VALUES ($1, $2, 1, 'test', 1)", [releaseId, projectId]);
+  await db.query("INSERT INTO cloud_release_files (release_id, path, content) VALUES ($1, 'package.json', '{}')", [releaseId]);
+
+  assert.equal(await deleteProject(projectId, userId, 'Northstar CRM'), undefined);
+  assert.equal((await deleteProject(projectId, userId, 'Northstar CRM'))?.status, 404);
+  assert.deepEqual(await jobsOf(projectId), []);
+  assert.equal((await db.query('SELECT 1 FROM cloud_release_files WHERE release_id = $1', [releaseId])).rows.length, 0);
+  assert.equal((await db.query("SELECT 1 FROM cloud_audit_log WHERE target_id = $1 AND action = 'project.delete'", [projectId])).rows.length, 1);
+});
 
 test('a queued generate job plans, writes a release, and readies the project with no providers', async () => {
   const { projectId } = await createProject();

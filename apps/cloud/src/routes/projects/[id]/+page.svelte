@@ -14,6 +14,9 @@
   let reloads = $state(0);
   let sending = $state(false);
   let thread = $state<HTMLElement>();
+  let deleteDialog = $state<HTMLDialogElement>();
+  let deleteConfirmation = $state('');
+  let deleting = $state(false);
 
   // Prefer the real Vercel deployment once it is live; the built-in preview covers every other path.
   let preview = $derived(data.environments.find((environment) => environment.kind === 'production' && environment.status === 'ready' && environment.url) ?? data.environments.find((environment) => environment.kind === 'preview'));
@@ -239,6 +242,29 @@
             {#if form?.settingsSaved}<div class="alert alert-success text-sm" role="status">Design settings saved.</div>{/if}
             <div class="flex justify-end"><button class="btn btn-primary btn-sm" type="submit">Save settings</button></div>
           </form>
+          {#if ['owner', 'admin'].includes(data.project.role)}
+            <section class="surface mt-5 flex flex-wrap items-center justify-between gap-4 p-5">
+              <div><h2 class="text-base font-semibold">Delete project</h2><p class="mb-0 mt-1 text-sm muted">Permanently remove this project and its releases from Mosaic Cloud.</p></div>
+              <button type="button" class="btn btn-error btn-outline btn-sm" onclick={() => { deleteConfirmation = ''; deleteDialog?.showModal(); }}>Delete project</button>
+            </section>
+            <dialog bind:this={deleteDialog} class="modal" aria-labelledby="delete-project-title" oncancel={(event) => { if (deleting) event.preventDefault(); }}>
+              <form method="POST" action="?/delete" class="modal-box space-y-4" use:enhance={() => {
+                deleting = true;
+                return async ({ update }) => { try { await update({ reset: false }); } finally { deleting = false; } };
+              }}>
+                <h2 id="delete-project-title" class="text-lg font-semibold">Delete {data.project.name}?</h2>
+                <p class="text-sm muted">This permanently removes the Cloud project, its chat, and its releases. GitHub, Vercel, and Neon resources stay in your accounts.</p>
+                <label class="block text-sm font-medium">Type <strong>{data.project.name}</strong> to confirm
+                  <input class="input input-bordered mt-1 w-full" name="projectName" bind:value={deleteConfirmation} autocomplete="off" spellcheck={false} required />
+                </label>
+                {#if form?.deleteMessage}<div class="alert alert-error text-sm" role="alert">{form.deleteMessage}</div>{/if}
+                <div class="modal-action">
+                  <button type="button" class="btn btn-ghost" disabled={deleting} onclick={() => deleteDialog?.close()}>Cancel</button>
+                  <button type="submit" class="btn btn-error" disabled={deleting || deleteConfirmation !== data.project.name}>{deleting ? 'Deleting…' : 'Delete project'}</button>
+                </div>
+              </form>
+            </dialog>
+          {/if}
         </div>
       {/if}
     </div>

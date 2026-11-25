@@ -5,6 +5,7 @@ import { isDaisyTheme } from '#lib/themes';
 import type { ProjectBlueprint } from '#lib/server/groq';
 import { enqueueJob, kickJobs, queueLatestDelivery } from '#lib/server/jobs';
 import { canManageConnections } from '#lib/server/connections';
+import { deleteProject } from '#lib/server/projects';
 
 async function projectFor(projectId: string, userId: string) {
   const db = await getCloudDb();
@@ -49,6 +50,13 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 };
 
 export const actions: Actions = {
+  delete: async ({ params, request, locals }) => {
+    if (!locals.user) throw redirect(303, '/login');
+    const form = await request.formData();
+    const result = await deleteProject(params.id, locals.user.id, form.get('projectName'));
+    if (result) return fail(result.status, { deleteMessage: result.message });
+    throw redirect(303, '/');
+  },
   deliver: async ({ params, locals }) => {
     if (!locals.user) throw redirect(303, '/login');
     const project = await projectFor(params.id, locals.user.id);

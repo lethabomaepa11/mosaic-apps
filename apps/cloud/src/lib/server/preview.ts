@@ -16,6 +16,12 @@ const MAX_RUNNING = 8;
 const cache = globalThis as typeof globalThis & { __mosaicPreviews?: Map<string, Promise<PreviewRuntime>> };
 const running: Map<string, Promise<PreviewRuntime>> = (cache.__mosaicPreviews ??= new Map());
 
+export function discardPreview(projectId: string): void {
+  const runtime = running.get(projectId);
+  running.delete(projectId);
+  void runtime?.then((item) => item.server.close()).catch(() => {});
+}
+
 const secretFor = (projectId: string, purpose: string) =>
   createHmac('sha256', process.env.CLOUD_SESSION_SECRET ?? 'mosaic-local-preview').update(`${purpose}:${projectId}`).digest('base64url');
 const ADMIN_EMAIL = 'preview-admin@mosaic.local';
@@ -54,9 +60,7 @@ export function previewRuntime(project: { id: string; slug: string; app_spec: Ap
     runtime = start(project).catch((cause) => { running.delete(project.id); throw cause; });
     running.set(project.id, runtime);
     if (running.size > MAX_RUNNING) {
-      const [oldestId, oldest] = running.entries().next().value!;
-      running.delete(oldestId);
-      void oldest.then((item: PreviewRuntime) => item.server.close()).catch(() => {});
+      discardPreview(running.keys().next().value!);
     }
   }
   return runtime;

@@ -2,6 +2,8 @@ import type { Cookies } from '@sveltejs/kit';
 import { getCloudDb, hosted, id, slugify } from './db';
 import { enqueueJob, kickJobs } from './jobs';
 import { isDaisyTheme } from '../themes';
+import { canManageConnections } from './connections';
+import { discardPreview } from './preview';
 
 export interface NewProject { prompt: string; name: string; uiTheme: string; uiSystem: string; includeHome: boolean; includeLogin: boolean }
 
@@ -60,6 +62,37 @@ export async function createProject(userId: string, input: NewProject, origin: s
   });
   kickJobs();
   return projectId;
+}
+
+export async function deleteProject(projectId: string, userId: string, confirmation: FormDataEntryValue | null) {
+  const db = await getCloudDb();
+  const result = await db.tx(async (tx) => {
+    const { rows: [project] } = await tx.query<{ name: string; organization_id: string; role: string }>(
+      `SELECT project.name, project.organization_id, membership.role FROM cloud_projects project
+       JOIN cloud_memberships membership ON membership.organization_id = project.organization_id
+       WHERE project.id = $1 AND membership.user_id = $2 FOR UPDATE OF project, membership`, [projectId, userId],
+    );
+    if (!project) return { status: 404 as const, message: 'Project not found.' };
+    if (!canManageConnections(project.role)) return { status: 403 as const, message: 'Only workspace owners and admins can delete a project.' };
+    if (confirmation !== project.name) return { status: 400 as const, message: 'Type the exact project name to confirm deletion.' };
+
+    // Lock queued jobs before deleting them so a worker cannot claim one during deletion.
+    const jobs = await tx.query<{ status: string }>('SELECT status FROM cloud_jobs WHERE project_id = $1 FOR UPDATE', [projectId]);
+    if (jobs.rows.some((job) => job.status === 'running')) return { status: 409 as const, message: 'Wait for the running job to finish before deleting this project.' };
+
+    await tx.query('DELETE FROM cloud_jobs WHERE project_id = $1', [projectId]);
+    await tx.query('DELETE FROM cloud_messages WHERE conversation_id IN (SELECT id FROM cloud_conversations WHERE project_id = $1)', [projectId]);
+    await tx.query('DELETE FROM cloud_conversations WHERE project_id = $1', [projectId]);
+    await tx.query('DELETE FROM cloud_releases WHERE project_id = $1', [projectId]);
+    await tx.query('DELETE FROM cloud_environments WHERE project_id = $1', [projectId]);
+    await tx.query('DELETE FROM cloud_projects WHERE id = $1', [projectId]);
+    await tx.query(
+      `INSERT INTO cloud_audit_log (id, organization_id, user_id, action, target_type, target_id)
+       VALUES ($1, $2, $3, 'project.delete', 'project', $4)`, [id(), project.organization_id, userId, projectId],
+    );
+  });
+  if (!result) discardPreview(projectId);
+  return result;
 }
 
 // A signed-out visitor's prompt waits in an HttpOnly cookie until they sign in, then becomes their project.
