@@ -14,7 +14,14 @@ const npm = process.env.npm_execpath;
 if (!npm) throw new Error('Run through npm run test:cloud-next.');
 const app = await mkdtemp(join(tmpdir(), 'mosaic-cloud-next-'));
 const spec = structuredClone(equipmentSpec);
+spec.allowRegistration = true;
 spec.pages.find((page) => page.route === '/').slug = 'equipment-home';
+const workflow = spec.pages.find((page) => page.route === '/dashboard');
+workflow.kind = 'workflow';
+workflow.sections = [
+  { kind: 'records', title: 'Recent loans', body: '', entity: 'loan' },
+  { kind: 'form', title: 'Lend equipment', body: 'Choose an item and a borrower.', entity: 'loan' },
+];
 const compiled = compileSpec(spec);
 for (const file of generateProjectFiles({ name: 'Equipment smoke', slug: 'equipment-smoke', framework: 'nextjs', theme: 'nord', spec, app: compiled })) {
   const path = join(app, file.path);
@@ -57,6 +64,18 @@ try {
   assert.ok(html.includes(spec.pages.find((page) => page.route === '/').title));
   const protectedRoute = await request('/loans', { redirect: 'manual' });
   assert.equal(protectedRoute.status, 307);
+  assert.match(await (await request('/login')).text(), /Create an account/);
+  assert.match(await (await request('/login?mode=signup')).text(), /name="name"/);
+  const signup = await request('/api/auth/register', {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ name: 'New Borrower', email: 'borrower@example.test', password }),
+  });
+  assert.equal(signup.status, 201);
+  assert.deepEqual((await signup.json()).data.user.roles, ['viewer']);
+  const user = { cookie: signup.headers.get('set-cookie').split(';')[0] };
+  const dashboard = await request('/dashboard', { headers: user });
+  assert.equal(dashboard.status, 200);
+  assert.match(await dashboard.text(), /href="\/f\/loan-form">Lend equipment/);
   const credentials = await request('/api/auth/login', {
     method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email, password }),
   });

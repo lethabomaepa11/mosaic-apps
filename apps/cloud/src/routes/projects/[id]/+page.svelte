@@ -32,8 +32,10 @@
     }
   }
 
-  // Prefer the real Vercel deployment once it is live; the built-in preview covers every other path.
-  let preview = $derived(data.environments.find((environment) => environment.kind === 'production' && environment.status === 'ready' && environment.url) ?? data.environments.find((environment) => environment.kind === 'preview'));
+  let preview = $derived(data.environments.find((environment) => environment.kind === 'preview'));
+  let previewBase = $derived(`/preview/${data.project.slug}`);
+  let previewView = $state<'app' | 'login' | 'studio'>('app');
+  let iframeUrl = $derived(`${previewBase}${previewView === 'app' ? '' : `/${previewView}`}`);
   let busy = $derived(data.jobs.some((job) => ['queued', 'running'].includes(job.status)));
   let activeJob = $derived(data.jobs.find((job) => ['queued', 'running'].includes(job.status)) ?? (data.jobs[0]?.status === 'failed' ? data.jobs[0] : undefined));
   let waitingJob = $derived(busy ? undefined : data.jobs.find((job) => job.status === 'waiting_input'));
@@ -48,8 +50,9 @@
   };
   const sendNow = (text: string) => { if (!composer) return; composer.value = text; composer.form?.requestSubmit(); };
   let production = $derived(data.environments.find((environment) => environment.kind === 'production'));
-  // The generated app serves its API same-origin: /api on the built-in preview, /api/health on the deployed app.
-  let apiUrl = $derived(preview?.url ? `${preview.url}/api/health` : null);
+  let liveUrl = $derived(production?.status === 'ready' ? production.url?.replace(/\/$/, '') : undefined);
+  let appUrl = $derived(liveUrl ?? preview?.url);
+  let apiUrl = $derived(appUrl ? `${appUrl}/api/health` : undefined);
   let copied = $state('');
   const copy = async (value: string) => { await navigator.clipboard.writeText(value).catch(() => {}); copied = value; setTimeout(() => (copied = ''), 1500); };
   const tone = (status: string) => ['ready', 'completed', 'connected'].includes(status) ? 'is-ready' : status === 'failed' ? 'is-failed' : ['queued', 'running', 'generating', 'delivering', 'building'].includes(status) ? 'is-busy' : '';
@@ -156,12 +159,16 @@
         {#each tabs as item}<button class="tab-link" type="button" role="tab" aria-selected={tab === item.id} onclick={() => (tab = item.id)}>{item.label}</button>{/each}
       </div>
       {#if tab === 'preview'}
-        <div class="ml-auto flex min-w-0 items-center gap-1">
-          <div class="hidden min-w-0 items-center gap-2 rounded-lg bg-base-200 px-3 py-1.5 text-xs muted md:flex"><Globe size={13} class="shrink-0" /><span class="truncate">{preview?.url ?? 'Preparing…'}</span>{#if preview?.kind === 'production'}<span class="badge badge-xs badge-success badge-soft">live</span>{/if}</div>
-          {#if apiUrl}<a class="btn btn-ghost btn-sm hidden font-mono text-xs lg:inline-flex" href={apiUrl} target="_blank" rel="noreferrer" title={apiUrl}>API</a>{/if}
+        <div class="ml-auto flex min-w-0 flex-wrap items-center gap-1" aria-label="Preview controls">
+          {#if data.releases.length}
+            <button class={`btn btn-sm ${previewView === 'app' ? 'btn-primary' : 'btn-outline'}`} type="button" aria-pressed={previewView === 'app'} onclick={() => (previewView = 'app')}>App</button>
+            <button class={`btn btn-sm ${previewView === 'login' ? 'btn-primary' : 'btn-outline'}`} type="button" aria-pressed={previewView === 'login'} onclick={() => (previewView = 'login')}>Sign in</button>
+            <button class={`btn btn-sm ${previewView === 'studio' ? 'btn-primary' : 'btn-outline'}`} type="button" aria-pressed={previewView === 'studio'} onclick={() => (previewView = 'studio')}>Open Studio</button>
+          {/if}
+          {#if liveUrl}<a class="btn btn-outline btn-sm" href={liveUrl} target="_blank" rel="noreferrer"><Globe size={14} /> Live app</a>{/if}
           <div class="join hidden sm:flex"><button class={`btn btn-ghost btn-sm join-item btn-square ${device === 'desktop' ? 'btn-active' : ''}`} type="button" aria-label="Desktop width" aria-pressed={device === 'desktop'} onclick={() => (device = 'desktop')}><Monitor size={15} /></button><button class={`btn btn-ghost btn-sm join-item btn-square ${device === 'mobile' ? 'btn-active' : ''}`} type="button" aria-label="Phone width" aria-pressed={device === 'mobile'} onclick={() => (device = 'mobile')}><Smartphone size={15} /></button></div>
           <button class="btn btn-ghost btn-sm btn-square" type="button" aria-label="Reload preview" onclick={() => reloads++}><RotateCw size={15} /></button>
-          {#if preview?.url}<a class="btn btn-ghost btn-sm btn-square" href={preview.url} target="_blank" rel="noreferrer" aria-label="Open in new tab"><ExternalLink size={15} /></a>{/if}
+          {#if preview?.url}<a class="btn btn-ghost btn-sm btn-square" href={iframeUrl} target="_blank" rel="noreferrer" aria-label="Open preview in new tab"><ExternalLink size={15} /></a>{/if}
         </div>
       {/if}
     </div>
@@ -171,7 +178,7 @@
         <div class={`mx-auto h-full p-3 transition-all ${device === 'mobile' ? 'max-w-[400px]' : ''}`}>
           <div class="relative h-full overflow-hidden rounded-xl border border-base-300 bg-white shadow-sm">
             {#if preview?.url && data.releases.length}
-              {#key `${preview.url}#${data.releases[0]?.version ?? 0}#${data.project.ui_theme}#${reloads}`}<iframe class="absolute inset-0 h-full w-full" src={preview.url} title={`${data.project.name} live preview`}></iframe>{/key}
+              {#key `${iframeUrl}#${data.releases[0]?.version ?? 0}#${data.project.ui_theme}#${reloads}`}<iframe class="absolute inset-0 h-full w-full" src={iframeUrl} title={`${data.project.name} preview`}></iframe>{/key}
             {:else}
               {#if activeJob?.status === 'failed'}
                 <div class="absolute inset-0 grid place-items-center p-8 text-center"><div class="max-w-sm"><div class="mx-auto mb-4 grid size-12 place-items-center rounded-2xl bg-error/10 text-error"><CircleAlert size={22} /></div><p class="mb-1 font-medium">The build stopped</p><p class="mb-4 text-sm muted">{activeJob.error}</p><form method="POST" action="?/retry" use:enhance><input type="hidden" name="jobId" value={activeJob.id} /><button class="btn btn-primary btn-sm" type="submit"><RotateCw size={14} /> Try again</button></form></div></div>
@@ -208,7 +215,7 @@
           <div class="surface overflow-hidden">
             <h3 class="border-b border-base-300 px-4 py-3 text-sm font-semibold">Endpoints</h3>
             <dl class="divide-y divide-base-300">
-              {#each [{ label: 'App URL', value: preview?.url }, { label: 'API URL', value: apiUrl }] as endpoint}
+              {#each [{ label: 'App URL', value: appUrl }, { label: 'API URL', value: apiUrl }] as endpoint}
                 <div class="flex items-center gap-3 px-4 py-3 text-sm"><dt class="w-20 shrink-0 muted">{endpoint.label}</dt><dd class="min-w-0 flex-1 truncate font-mono text-xs">{endpoint.value ?? 'Preparing…'}</dd>{#if endpoint.value}<button class="btn btn-ghost btn-xs" type="button" onclick={() => copy(endpoint.value!)}>{copied === endpoint.value ? 'Copied' : 'Copy'}</button><a class="btn btn-ghost btn-xs btn-square" href={endpoint.value} target="_blank" rel="noreferrer" aria-label={`Open ${endpoint.label}`}><ExternalLink size={13} /></a>{/if}</div>
               {/each}
             </dl>

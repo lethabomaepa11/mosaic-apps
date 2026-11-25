@@ -35,8 +35,10 @@ export async function MosaicNode({ node }) {
     case 'iconButton': {
       const action = (props.events?.onclick ?? props.actions)?.[0];
       const href = safeLink(action?.type === 'navigate' && action.target === 'form' ? `/f/${encodeURIComponent(action.to)}` : action?.type === 'navigate' && action.target === 'url' ? action.to : props.href);
-      return href ? <a href={href}>{props.label}</a> : null;
+      return href ? <a className="workflow-action" href={href}>{props.label}</a> : null;
     }
+    case 'card':
+      return <section className="workflow-card">{props.title && <h2>{props.title}</h2>}{node.children?.map((child) => <MosaicNode key={child.id} node={child} />)}</section>;
     case 'dataTable':
       return <Table rows={Array.isArray(props.rows) ? props.rows : []} columns={Array.isArray(props.columns) ? props.columns : []} />;
     case 'statCard': {
@@ -46,7 +48,8 @@ export async function MosaicNode({ node }) {
     }
     case 'entityTable': {
       if (typeof props.entity !== 'string' || !props.entity) return null;
-      const result = await readMosaic(`/entities/${encodeURIComponent(props.entity)}?pageSize=20`);
+      const pageSize = Math.max(1, Math.min(100, Number(props.pageSize) || 20));
+      const result = await readMosaic(`/entities/${encodeURIComponent(props.entity)}?pageSize=${pageSize}`);
       if (!result.data) return <p>Records unavailable.</p>;
       const rows = Array.isArray(result.data) ? result.data : result.data.data ?? [];
       const columns = Array.isArray(props.columns) && props.columns.length ? props.columns.map((col) => typeof col === 'string' ? { key: col } : col) : Object.keys(rows[0] ?? {}).map((key) => ({ key }));

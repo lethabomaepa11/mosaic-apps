@@ -81,14 +81,16 @@ export async function publishToPreview(project: { id: string; slug: string }, sp
 export async function previewPages(project: { id: string; slug: string; app_spec: AppSpec | null }): Promise<PageDef[]> {
   const { call } = await previewRuntime(project);
   const pages = await call('GET', '/api/pages?published=true');
+  if (pages.status !== 200) throw new Error(`Could not load preview pages (${pages.status}).`);
   return (pages.body?.data ?? []) as PageDef[];
 }
 
 /** Previews are private to the project's workspace members (the iframe is same-origin, so the Cloud session applies). */
 export async function previewProject(slug: string, userId: string) {
-  const result = await readCloud((db) => db.query<{ id: string; slug: string; name: string; app_framework: string; ui_theme: string; app_spec: AppSpec | null }>(
-    `SELECT project.id, project.slug, project.name, project.app_framework, project.ui_theme, project.app_spec FROM cloud_projects project
+  const result = await readCloud((db) => db.query<{ id: string; slug: string; name: string; app_framework: string; ui_theme: string; app_spec: AppSpec | null; live_url: string | null }>(
+    `SELECT project.id, project.slug, project.name, project.app_framework, project.ui_theme, project.app_spec, live.url AS live_url FROM cloud_projects project
      JOIN cloud_memberships membership ON membership.organization_id = project.organization_id
+     LEFT JOIN cloud_environments live ON live.project_id = project.id AND live.kind = 'production' AND live.status = 'ready'
      WHERE project.slug = $1 AND membership.user_id = $2`, [slug, userId],
   ));
   return result.rows[0];

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { appearanceProps, componentEvents, eventActions, getComponent, Tabs, toast, type PropDesc } from '@mosaic-apps/ui';
   import { findNode, type FormNode } from '@mosaic-apps/core';
-  import { designer } from '#lib/studio/designer.svelte';
+  import { designer } from '../designer.svelte';
   import Control from './Control.svelte';
   let activeTab = $state('properties');
 

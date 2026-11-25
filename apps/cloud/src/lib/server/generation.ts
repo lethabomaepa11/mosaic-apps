@@ -84,8 +84,18 @@ export async function importGeneratedApp(server: MosaicServer): Promise<MosaicSe
     await call('POST', '/api/migrations/apply', { allowDestructive: false });
     for (const [kind, items] of [['forms', generated.forms], ['pages', generated.pages]] as const) {
       for (const item of items as Array<Record<string, any>>) {
-        if ((await call('GET', \`/api/\${kind}/\${item.slug}\`)).status !== 404) continue;
-        const created = await call('POST', \`/api/\${kind}\`, { name: item.name, slug: item.slug, description: item.description, schema: item.root, settings: item.settings, ...(kind === 'forms' ? { entity: item.entity, dataSource: item.dataSource } : { route: item.route }) });
+        const existing = await call('GET', \`/api/\${kind}/\${item.slug}\`);
+        const payload = { name: item.name, slug: item.slug, description: item.description, schema: item.root, settings: item.settings, ...(kind === 'forms' ? { entity: item.entity, dataSource: item.dataSource } : { route: item.route }) };
+        if (kind === 'pages' && item.route === '/') {
+          const home = existing.body?.data ?? (await call('GET', '/api/pages?published=true')).body?.data?.find((page: { route: string }) => page.route === '/');
+          if (home?.id === 'pg_home' && home.version === 1 && home.root?.id === 'pg_home_root') {
+            await call('PUT', \`/api/pages/\${home.id}/save-and-publish\`, { ...payload, expectedVersion: home.version, origin: 'import' });
+            continue;
+          }
+          if (home) continue;
+        }
+        if (existing.status !== 404) continue;
+        const created = await call('POST', \`/api/\${kind}\`, payload);
         if (created.status === 201) await call('POST', \`/api/\${kind}/\${created.body.data.id}/publish\`);
       }
     }
@@ -129,7 +139,7 @@ export function generateProjectFiles(input: { name: string; slug: string; spec: 
       .replace(/\n  \}\);\n\}\s*$/, '\n  });\n  return importGeneratedApp(server, email, password);\n}\n'));
     if (!out.get('lib/mosaic.js')!.content.includes('return importGeneratedApp(server')) throw new Error('The Next.js server template changed.');
     put('lib/import-generated.js', NEXT_IMPORTER);
-    put('lib/site.js', `export const site = ${json({ name: input.name, theme: input.theme ?? 'corporate' }).trimEnd()};\n`);
+    put('lib/site.js', `export const site = ${json({ name: input.name, theme: input.theme ?? 'corporate', allowRegistration: input.spec.allowRegistration === true }).trimEnd()};\n`);
     const manifest = JSON.parse(out.get('package.json')!.content);
     delete manifest.scripts.test;
     manifest.name = input.slug;
@@ -143,7 +153,9 @@ export function generateProjectFiles(input: { name: string; slug: string; spec: 
   } else {
     const mosaicTs = out.get(`${SERVER}/mosaic.ts`);
     if (!mosaicTs) throw new Error('The project template has no apps/web/src/lib/server/mosaic.ts.');
-    put(mosaicTs.path, withImporter(mosaicTs.content));
+    put(mosaicTs.path, withImporter(input.spec.allowRegistration
+      ? mosaicTs.content.replace("env.MOSAIC_ALLOW_REGISTRATION === 'true'", "env.MOSAIC_ALLOW_REGISTRATION !== 'false'")
+      : mosaicTs.content));
     put(`${SERVER}/import-generated.ts`, IMPORTER);
   }
   put(`${server}/mosaic-app.json`, json({ entities: input.app.entities, forms: input.app.forms, pages: input.app.pages }));

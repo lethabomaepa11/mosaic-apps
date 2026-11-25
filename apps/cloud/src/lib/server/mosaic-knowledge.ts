@@ -4,8 +4,9 @@
  * the free Groq tier allows ~8k tokens per minute across prompt and answer.
  */
 export const MOSAIC_KNOWLEDGE = `MOSAIC PLATFORM (you are building a Mosaic app):
-- A Mosaic app is one SvelteKit project with a same-origin API. Entities are the source of truth: each entity becomes a physical PostgreSQL table, a validated REST CRUD API (/api/entities/<name>), pickers and forms. Migrations are computed automatically.
+- SvelteKit and Next.js apps share the Mosaic runtime and a same-origin API. Entities define PostgreSQL tables, validated APIs, pickers and forms. Migrations are computed automatically.
 - Pages, forms, navigation and theme are database records published through the API (no rebuild). Sign-in (/login), users, roles, audit and soft delete are built in.
+- Set allowRegistration true if the brief calls for people to create their own accounts. Default to false for internal, staff-managed, or invitation-only apps. Self-registered users get the viewer role. Give viewer explicit read/create access for their tasks and reserve sensitive records, updates, and deletes for administrators. Permissions are entity-wide, so do not promise per-user record ownership.
 - You describe the app as an APP SPEC; Mosaic compiles it. Do not invent other files or components.
 
 ENTITIES:
@@ -19,10 +20,11 @@ ENTITIES:
 - permissions per action (read/create/update/delete) are role-name lists; [] means any signed-in user; "admin" can always do everything. Keep delete for admins unless the brief says otherwise.
 
 PAGES:
-- kind "list" + entity: a full CRUD screen for that entity (searchable sortable table, create, edit, delete, record detail). EVERY entity needs exactly one list page.
-- kind "dashboard": stat cards per entity plus a recent-records table (set entity to the most important one).
-- kind "home": public landing page at route "/" (only if the brief wants a public homepage).
-- route: "/" or "/kebab-path"; no params, not /api or /login. access "authenticated" for business screens. inMenu true for main navigation. icon: a simple lucide name (home, grid, users, box, calendar, clipboard, file-text, settings...).
+- Start with the tasks someone opens the app to do. Put those tasks in the main navigation using kind "workflow" and custom sections. Each workflow needs a live records, metric or form section. Use workflow language for page titles and actions, for example "Reading schedule" with meetings, "RSVP for a meeting" opening the response form, and "Vote for the next book" opening the vote form.
+- A page can have up to six ordered sections, with keys kind, title, body, entity. "spotlight" is domain-specific introductory copy (entity ""). "records" shows real records from the named entity. "metric" shows its live count. "form" opens the entity's working submission form with the section title as the action label. Use body for relevant instructions or "".
+- "home" is the landing page at "/". "dashboard" with sections shows only the chosen blocks, so choose metrics and records useful for the role. Public pages can show spotlight sections. Workflows and business data require sign-in. The app already has /login.
+- "list" + entity provides an admin-style management table. Include or let Mosaic generate a list for each entity. Set inMenu false for secondary management screens when the workflow already gives users the relevant task.
+- route: "/" or "/kebab-path"; no params. /api, /f, /login, /logout and /studio are platform routes. icon: a simple lucide name such as calendar, clipboard, or book-open.
 
 SAMPLE DATA: 2-4 realistic records per entity, each record a plain object of fieldName to string value (e.g. {"fullName":"Thandi Nkosi","email":"thandi@example.com"}). For ref fields use the target record's labelField value. Enum values must be one of the options. Dates as YYYY-MM-DD.
 

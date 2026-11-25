@@ -33,12 +33,12 @@ async function specCall(input: { name: string; system: string; user: string; sch
 /** Developer: writes the first spec, or revises the current one for a change request. */
 export async function developSpec(input: { brief: string; answers: Answer[]; options: string; current?: AppSpec; change?: string; config?: AiConfig; onWait?: (seconds: number) => void }): Promise<{ thinking: string[]; spec: AppSpec }> {
   const task = input.current
-    ? `CURRENT APP SPEC (JSON):\n${JSON.stringify(input.current)}\n\nREQUESTED CHANGE:\n${input.change}\n\nReturn the complete updated spec. Keep existing entity and field names unless the change requires renaming (renames lose data).`
+    ? `CURRENT APP SPEC (JSON):\n${JSON.stringify(input.current)}\n\nREQUESTED CHANGE:\n${input.change}\n\nReturn the complete updated spec. Keep existing entity and field names unless the change requires renaming (renames lose data). Preserve public registration and permissions unless the request changes who can sign up or what they can do.`
     : 'Write the complete app spec for this brief.';
   return specCall({
     name: 'mosaic_app_spec', config: input.config, onWait: input.onWait,
     system: `You are a senior Mosaic developer. ${MOSAIC_KNOWLEDGE}\n${NOTE}`,
-    user: `${briefBlock(input.brief, input.answers)}\n\nOPTIONS: ${input.options}\n\n${task}`,
+    user: `${briefBlock(input.brief, input.answers)}\n\nOPTIONS: ${input.options}\n\n${task}\nGive the primary user a task-focused starting screen with domain-specific sections and action labels. Choose a compact menu based on the brief.`,
     schema: specAnswer,
   });
 }
@@ -57,7 +57,7 @@ export async function fixSpec(input: { brief: string; answers: Answer[]; spec: A
 export async function reviewSpec(input: { brief: string; answers: Answer[]; spec: AppSpec; config?: AiConfig; onWait?: (seconds: number) => void }): Promise<{ thinking: string[]; approved: boolean; issues: ReviewIssue[] }> {
   return aiJson({
     name: 'mosaic_review', maxTokens: 2000, config: input.config, onWait: input.onWait,
-    system: `You are a strict but practical reviewer of Mosaic MVPs. ${MOSAIC_KNOWLEDGE}\nThe app below already passed automated CRUD tests. Judge whether it is a complete, sensible MVP for the brief: every workflow possible, CRUD for every core record, correct relationships, statuses/dates/amounts the domain needs, sensible roles and permissions, clear navigation, realistic sample data. Report only issues that block the MVP (at most 5), each with a concrete fix. Approve when nothing blocks the MVP. ${NOTE}`,
+    system: `You are a strict but practical reviewer of Mosaic MVPs. ${MOSAIC_KNOWLEDGE}\nThe app below already passed automated CRUD tests. Check that someone can find and complete each main task from the navigation and workflow sections. For a multi-step brief, missing task-specific screens or actions is a blocking issue even if records can be entered in management tables. Also check relationships, statuses, roles, permissions, and sample data. Report at most 5 blocking issues with concrete fixes. Approve when nothing blocks the MVP. ${NOTE}`,
     user: `${briefBlock(input.brief, input.answers)}\n\nAPP:\n${describeSpec(input.spec)}`,
     schema: { type: 'object', additionalProperties: false, required: ['thinking', 'approved', 'issues'], properties: { thinking, approved: { type: 'boolean' }, issues: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['area', 'problem', 'fix'], properties: { area: { type: 'string' }, problem: { type: 'string' }, fix: { type: 'string' } } } } } },
   });

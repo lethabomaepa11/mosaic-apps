@@ -15,9 +15,11 @@ export interface SpecEntity {
   name: string; label: string; labelPlural: string; icon: string; description: string; labelField: string;
   fields: SpecField[]; permissions: { read: string[]; create: string[]; update: string[]; delete: string[] };
 }
-export interface SpecPage { slug: string; title: string; route: string; kind: 'home' | 'dashboard' | 'list'; entity: string; description: string; access: 'public' | 'authenticated'; inMenu: boolean; icon: string }
+const SECTION_KINDS = ['spotlight', 'records', 'metric', 'form'] as const;
+interface SpecSection { kind: typeof SECTION_KINDS[number]; title: string; body: string; entity: string }
+export interface SpecPage { slug: string; title: string; route: string; kind: 'home' | 'dashboard' | 'list' | 'workflow'; entity: string; description: string; access: 'public' | 'authenticated'; inMenu: boolean; icon: string; sections?: SpecSection[] }
 export interface SpecSample { entity: string; records: Array<Array<{ field: string; value: string }>> }
-export interface AppSpec { name: string; summary: string; roles: string[]; entities: SpecEntity[]; pages: SpecPage[]; sampleData: SpecSample[]; workflows: string[] }
+export interface AppSpec { name: string; summary: string; allowRegistration?: boolean; roles: string[]; entities: SpecEntity[]; pages: SpecPage[]; sampleData: SpecSample[]; workflows: string[] }
 
 const str = { type: 'string' } as const;
 const strList = { type: 'array', items: str } as const;
@@ -25,7 +27,7 @@ export const APP_SPEC_SCHEMA = {
   type: 'object', additionalProperties: false,
   required: ['name', 'summary', 'roles', 'entities', 'pages', 'sampleData', 'workflows'],
   properties: {
-    name: str, summary: str, roles: strList, workflows: strList,
+    name: str, summary: str, roles: strList, workflows: strList, allowRegistration: { type: 'boolean' },
     entities: { type: 'array', items: { type: 'object', additionalProperties: false,
       required: ['name', 'label', 'labelPlural', 'icon', 'description', 'labelField', 'fields', 'permissions'],
       properties: {
@@ -41,7 +43,10 @@ export const APP_SPEC_SCHEMA = {
       } } },
     pages: { type: 'array', items: { type: 'object', additionalProperties: false,
       required: ['slug', 'title', 'route', 'kind', 'entity', 'description', 'access', 'inMenu', 'icon'],
-      properties: { slug: str, title: str, route: str, kind: { type: 'string', enum: ['home', 'dashboard', 'list'] }, entity: str, description: str, access: { type: 'string', enum: ['public', 'authenticated'] }, inMenu: { type: 'boolean' }, icon: str } } },
+      properties: { slug: str, title: str, route: str, kind: { type: 'string', enum: ['home', 'dashboard', 'list', 'workflow'] }, entity: str, description: str, access: { type: 'string', enum: ['public', 'authenticated'] }, inMenu: { type: 'boolean' }, icon: str,
+        sections: { type: 'array', maxItems: 6, items: { type: 'object', additionalProperties: false, required: ['kind', 'title', 'body', 'entity'],
+          properties: { kind: { type: 'string', enum: SECTION_KINDS }, title: str, body: str, entity: str } } },
+      } } },
     sampleData: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['entity', 'records'],
       properties: { entity: str, records: { type: 'array', items: { type: 'object', additionalProperties: { type: 'string' } } } } } },
   },
@@ -59,7 +64,7 @@ const text = (value: unknown, fallback = '') => typeof value === 'string' ? valu
 export function normalizeSpec(raw: any): AppSpec {
   const spec = raw && typeof raw === 'object' ? raw : {};
   return {
-    name: text(spec.name, 'App'), summary: text(spec.summary), roles: strings(spec.roles), workflows: strings(spec.workflows),
+    name: text(spec.name, 'App'), summary: text(spec.summary), allowRegistration: spec.allowRegistration === true, roles: strings(spec.roles), workflows: strings(spec.workflows),
     entities: (Array.isArray(spec.entities) ? spec.entities : []).map((entity: any) => {
       const fields: SpecField[] = (Array.isArray(entity?.fields) ? entity.fields : []).map((field: any) => {
         const type = FIELD_TYPES.has(field?.type) ? field.type as SpecFieldType : 'string';
@@ -79,8 +84,10 @@ export function normalizeSpec(raw: any): AppSpec {
     }),
     pages: (Array.isArray(spec.pages) ? spec.pages : []).map((page: any) => ({
       slug: text(page?.slug, text(page?.route).replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '') || 'home'), title: text(page?.title, text(page?.slug)), route: text(page?.route, '/'),
-      kind: ['home', 'dashboard', 'list'].includes(page?.kind) ? page.kind : 'list', entity: text(page?.entity), description: text(page?.description),
+      kind: ['home', 'dashboard', 'list', 'workflow'].includes(page?.kind) ? page.kind : 'list', entity: text(page?.entity), description: text(page?.description),
       access: page?.access === 'public' ? 'public' : 'authenticated', inMenu: page?.inMenu !== false, icon: text(page?.icon),
+      sections: Array.isArray(page?.sections) ? page.sections.filter((section: any) => SECTION_KINDS.includes(section?.kind)).slice(0, 6)
+        .map((section: any) => ({ kind: section.kind, title: text(section.title).trim(), body: text(section.body).trim(), entity: text(section.entity) })) : undefined,
     })),
     sampleData: (Array.isArray(spec.sampleData) ? spec.sampleData : []).map((sample: any) => ({
       entity: text(sample?.entity),
@@ -146,11 +153,12 @@ export function autoRepair(input: AppSpec): { spec: AppSpec; repairs: string[] }
   spec.sampleData = spec.sampleData.filter((sample) => names.has(sample.entity));
   for (const page of spec.pages) {
     if (page.entity) page.entity = renamedEntities.get(page.entity) ?? page.entity;
-    page.route = page.route.startsWith('/')
+    for (const section of page.sections ?? []) if (section.entity) section.entity = renamedEntities.get(section.entity) ?? snake(section.entity);
+    page.route = page.kind === 'home' ? '/' : page.route.startsWith('/')
       ? page.route.toLowerCase().replace(/\/:[a-z]+/gi, '').replace(/[^a-z0-9\-/]/g, '-').replace(/\/+$/, '') || '/'
       : `/${kebab(page.route)}`;
   }
-  spec.pages = spec.pages.filter((page) => !(page.kind === 'list' && !names.has(page.entity)) && !page.route.startsWith('/api') && page.route !== '/login');
+  spec.pages = spec.pages.filter((page) => !(page.kind === 'list' && !names.has(page.entity)) && !reservedPageRoute(page.route));
   const routes = new Set<string>();
   for (const page of spec.pages) { while (routes.has(page.route)) page.route = `${page.route}-2`; routes.add(page.route); }
   for (const entity of spec.entities) {
@@ -158,7 +166,7 @@ export function autoRepair(input: AppSpec): { spec: AppSpec; repairs: string[] }
     let route = `/${kebab(entity.labelPlural || entity.name)}`;
     while (routes.has(route)) route = `${route}-list`;
     routes.add(route);
-    spec.pages.push({ slug: route.slice(1), title: entity.labelPlural || entity.label, route, kind: 'list', entity: entity.name, description: `Manage ${(entity.labelPlural || entity.label).toLowerCase()}`, access: 'authenticated', inMenu: true, icon: entity.icon });
+    spec.pages.push({ slug: route.slice(1), title: entity.labelPlural || entity.label, route, kind: 'list', entity: entity.name, description: `Manage ${(entity.labelPlural || entity.label).toLowerCase()}`, access: 'authenticated', inMenu: !spec.pages.some((page) => page.kind === 'workflow'), icon: entity.icon });
     repairs.push(`Added a list page for ${entity.label}`);
   }
   return { spec, repairs };
@@ -167,6 +175,7 @@ export function autoRepair(input: AppSpec): { spec: AppSpec; repairs: string[] }
 const ENTITY_NAME = /^[a-z][a-z0-9_]{1,40}$/;
 const FIELD_NAME = /^[a-z][a-zA-Z0-9]{0,40}$/;
 const SYSTEM_FIELDS = new Set(['id', 'createdAt', 'updatedAt', 'deletedAt']);
+const reservedPageRoute = (route: string) => /^\/(api|f|login|logout|studio)(\/|$)/.test(route);
 
 /** Deterministic checks the developer agent must satisfy before anything runs. */
 export function validateSpec(spec: AppSpec): string[] {
@@ -197,11 +206,16 @@ export function validateSpec(spec: AppSpec): string[] {
   }
   const routes = new Set<string>();
   for (const page of spec.pages) {
-    if (!/^\/[a-z0-9\-/]*$/.test(page.route)) issues.push(`Page "${page.slug}": route must look like /path (lowercase, no params).`);
-    if (page.route.startsWith('/api') || page.route === '/login') issues.push(`Page "${page.slug}": route ${page.route} is reserved.`);
+    if (!/^\/(?:[a-z0-9-]+(?:\/[a-z0-9-]+)*)?$/.test(page.route)) issues.push(`Page "${page.slug}": route must look like /path (lowercase, no params).`);
+    if (reservedPageRoute(page.route)) issues.push(`Page "${page.slug}": route ${page.route} is reserved.`);
     if (routes.has(page.route)) issues.push(`Page "${page.slug}": duplicate route ${page.route}.`);
     routes.add(page.route);
     if (page.kind === 'list' && (!page.entity || !entityNames.has(page.entity))) issues.push(`Page "${page.slug}": list pages need an existing entity.`);
+    if (page.kind === 'workflow' && !page.sections?.some((section) => section.kind !== 'spotlight')) issues.push(`Page "${page.slug}": a workflow needs a live records, metric, or form section.`);
+    for (const section of page.sections ?? []) {
+      if (!section.title || (section.kind !== 'spotlight' && !entityNames.has(section.entity))) issues.push(`Page "${page.slug}": ${section.kind} sections need a title and live sections need an existing entity.`);
+      if (page.access === 'public' && section.kind !== 'spotlight') issues.push(`Page "${page.slug}": live sections require sign-in.`);
+    }
   }
   for (const entity of spec.entities) {
     if (!spec.pages.some((page) => page.kind === 'list' && page.entity === entity.name)) issues.push(`Entity "${entity.name}" has no list page, so users cannot manage its records.`);
@@ -253,7 +267,9 @@ export function compileSpec(spec: AppSpec): CompiledApp {
   const entities: EntityDef[] = spec.entities.map((entity) => ({
     name: entity.name, label: entity.label, labelPlural: entity.labelPlural, icon: entity.icon || undefined, description: entity.description,
     softDelete: true, timestamps: true, audit: true,
-    permissions: Object.fromEntries(Object.entries(entity.permissions).map(([action, roles]) => [action, roles.length ? roles : ['*']])),
+    permissions: Object.fromEntries(Object.entries(entity.permissions).map(([action, roles]) => [action,
+      spec.allowRegistration && action === 'delete' && (!roles.length || roles.includes('*')) ? ['admin'] : roles.length ? roles : ['*'],
+    ])),
     list: { defaultSort: '-createdAt', labelField: entity.labelField, columns: entity.fields.filter((field) => field.type !== 'text').slice(0, 6).map((field) => field.name), searchFields: entity.fields.filter((field) => field.searchable).map((field) => field.name) },
     fields: entity.fields.map(fieldDef),
   }));
@@ -271,10 +287,26 @@ export function compileSpec(spec: AppSpec): CompiledApp {
     if (page.kind === 'list' && page.entity) {
       const entity = byName.get(page.entity)!;
       children.push({ id: `${id}_table`, type: 'entityTable', props: { entity: entity.name, title: entity.labelPlural, columns: entities.find((item) => item.name === entity.name)!.list!.columns, pageSize: 20, sortable: true, searchable: true, allowCreate: true, allowEdit: true, allowDelete: true, drillDown: true } });
-    } else if (page.kind === 'dashboard' || page.kind === 'home') {
+    } else if (!page.sections?.length && (page.kind === 'dashboard' || page.kind === 'home')) {
       children.push({ id: `${id}_stats`, type: 'statRow', props: {}, children: spec.entities.slice(0, 4).map((entity, index) => ({ id: `${id}_stat${index}`, type: 'statCard', props: { label: entity.labelPlural, entity: entity.name } })) });
       const focus = page.entity ? byName.get(page.entity) : spec.entities[0];
       if (focus && page.access === 'authenticated') children.push({ id: `${id}_recent`, type: 'entityTable', props: { entity: focus.name, title: `Recent ${focus.labelPlural.toLowerCase()}`, pageSize: 8, sortable: true, searchable: true, allowCreate: true, allowEdit: true, allowDelete: false, drillDown: true } });
+    }
+    for (const [index, section] of (page.sections ?? []).entries()) {
+      const key = `${id}_section${index}`;
+      if (section.kind === 'records') {
+        const columns = entities.find((entity) => entity.name === section.entity)?.list?.columns;
+        children.push({ id: key, type: 'entityTable', props: { entity: section.entity, title: section.title, columns, pageSize: 8, allowCreate: false, allowEdit: false, allowDelete: false, drillDown: false } });
+        continue;
+      }
+      const content: FormNode[] = [{ id: `${key}_title`, type: 'heading', props: { level: 2, text: section.title } }];
+      if (section.body) content.push({ id: `${key}_copy`, type: 'text', props: { text: section.body } });
+      if (section.kind === 'metric') content.push({ id: `${key}_value`, type: 'statCard', props: { entity: section.entity, label: byName.get(section.entity)?.labelPlural } });
+      if (section.kind === 'form') {
+        const form = forms.find((item) => item.entity === section.entity);
+        if (form) content.push({ id: `${key}_action`, type: 'button', props: { label: section.title, variant: 'primary', events: { onclick: [{ type: 'navigate', target: 'form', to: form.slug }] } } });
+      }
+      children.push({ id: key, type: 'card', children: content });
     }
     return {
       id, slug: page.slug, route: page.route, name: page.title, description: page.description, version: 1, published: true,
@@ -298,7 +330,7 @@ export function blueprintFromSpec(spec: AppSpec) {
 /** One-line summary per entity/page for the reviewer (keeps prompts small on the 8k-token budget). */
 export function describeSpec(spec: AppSpec): string {
   const entities = spec.entities.map((entity) => `- ${entity.name} (${entity.label}): ${entity.fields.map((field) => `${field.name}:${field.type}${field.type === 'ref' ? `→${field.refEntity}` : ''}${field.type === 'enum' ? `[${field.options.join('|')}]` : ''}${field.required ? '*' : ''}`).join(', ')}; perms create=${entity.permissions.create.join('/') || '*'} delete=${entity.permissions.delete.join('/') || '*'}`).join('\n');
-  const pages = spec.pages.map((page) => `- ${page.route} ${page.kind}${page.entity ? `(${page.entity})` : ''} ${page.access}${page.inMenu ? ' menu' : ''}`).join('\n');
+  const pages = spec.pages.map((page) => `- ${page.route} ${page.kind}${page.entity ? `(${page.entity})` : ''} ${page.access}${page.inMenu ? ' menu' : ''}${page.sections?.length ? `: ${page.sections.map((section) => `${section.title} [${section.kind}${section.entity ? `/${section.entity}` : ''}]`).join(', ')}` : ''}`).join('\n');
   const samples = spec.sampleData.map((sample) => `${sample.entity}×${sample.records.length}`).join(', ');
-  return `Roles: ${spec.roles.join(', ')}\nEntities:\n${entities}\nPages (list pages give full create/edit/delete/detail):\n${pages}\nSample data: ${samples || 'none'}\nWorkflows: ${spec.workflows.join('; ')}`;
+  return `Roles: ${spec.roles.join(', ')}\nPublic registration: ${spec.allowRegistration === true}; new users have the viewer role\nEntities:\n${entities}\nPages (list pages give full create/edit/delete/detail):\n${pages}\nSample data: ${samples || 'none'}\nWorkflows: ${spec.workflows.join('; ')}`;
 }

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { autoRepair, normalizeSpec, validateSpec } from '../src/lib/server/spec';
+import { autoRepair, compileSpec, normalizeSpec, validateSpec } from '../src/lib/server/spec';
 import { equipmentSpec } from './fixtures/equipment-spec';
 
 test('mistakes seen in real generations are repaired without an AI round', () => {
@@ -49,4 +49,23 @@ test('missing keys and nulls from a drifted answer are filled with safe defaults
   assert.deepEqual(spec.entities[0]!.permissions, { read: [], create: [], update: [], delete: [] });
   assert.equal(spec.pages[0]!.access, 'authenticated');
   assert.deepEqual(validateSpec(autoRepair(spec).spec), []);
+});
+
+test('workflow pages compile domain-specific records and form actions and keep sign-up opt-in', () => {
+  const draft = structuredClone(equipmentSpec);
+  const workflow = draft.pages[1]!;
+  workflow.kind = 'workflow';
+  workflow.sections = [
+    { kind: 'records', title: 'Equipment to return', body: '', entity: 'loan' },
+    { kind: 'form', title: 'Lend equipment', body: 'Choose what to lend and who will borrow it.', entity: 'Loan' },
+  ];
+  const { spec } = autoRepair(normalizeSpec(draft));
+  assert.deepEqual(validateSpec(spec), []);
+  assert.equal(spec.allowRegistration, false);
+  const page = compileSpec(spec).pages.find((page) => page.slug === workflow.slug)!;
+  assert.equal(page.root.children?.find((node) => node.type === 'entityTable')?.props?.title, 'Equipment to return');
+  const action = page.root.children?.find((node) => node.type === 'card')?.children?.find((node) => node.type === 'button');
+  assert.deepEqual(action?.props?.events, { onclick: [{ type: 'navigate', target: 'form', to: 'loan-form' }] });
+  spec.pages[1]!.access = 'public';
+  assert.ok(validateSpec(spec).some((issue) => issue.includes('require sign-in')));
 });

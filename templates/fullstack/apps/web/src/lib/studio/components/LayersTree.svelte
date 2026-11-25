@@ -1,6 +1,6 @@
 <script lang="ts">
   import { findNode, walk, type FormNode } from '@mosaic-apps/core';
-  import { designer } from '#lib/studio/designer.svelte';
+  import { designer } from '../designer.svelte';
   import { draggable, dragState, dropzone, Icon, isContainerType, Menu, targetIndexFor, type DragPayload } from '@mosaic-apps/ui';
 
   interface Row {

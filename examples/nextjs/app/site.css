@@ -11,6 +11,11 @@ a { color:var(--accent); }
 .site-name { font-weight:700; color:var(--text); text-decoration:none; }
 main { max-width:72rem; margin:2rem auto; padding:0 1rem; }
 main section + section { margin-top:1rem; }
+.workflow-card { padding:1.25rem; border:1px solid var(--border); border-radius:.75rem; background:var(--surface); }
+.workflow-card > :first-child { margin-top:0; }
+.workflow-card > :last-child { margin-bottom:0; }
+.workflow-action { display:inline-block; padding:.5rem .85rem; border:1px solid var(--accent); border-radius:.4rem; font-weight:600; text-decoration:none; }
+.workflow-action:hover, .workflow-action:focus-visible { text-decoration:underline; }
 form { display:grid; width:min(100%,36rem); gap:.8rem; }
 label { display:grid; gap:.3rem; }
 input, select, textarea, button { font:inherit; color:inherit; }

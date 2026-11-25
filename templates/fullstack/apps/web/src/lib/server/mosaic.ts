@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { endpoints } from './endpoints';
 
 const env = process.env;
+export const allowRegistration = env.AUTH !== 'off' && env.MOSAIC_ALLOW_REGISTRATION === 'true';
 const databaseUrl = env.DATABASE_URL ?? '__DB_URL__';
 if (env.VERCEL && !/^postgres(ql)?:\/\//.test(databaseUrl)) {
   throw new Error('Vercel requires a persistent PostgreSQL DATABASE_URL (Neon, Supabase, or compatible PostgreSQL).');
@@ -20,7 +21,7 @@ export const mosaicServer = createMosaicServerProvider({
   },
   auth: {
     enabled: env.AUTH !== 'off',
-    allowRegistration: false,
+    allowRegistration,
     jwtSecret: env.MOSAIC_JWT_SECRET,
   },
   cors: false,

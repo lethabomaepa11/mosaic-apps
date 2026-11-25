@@ -1,6 +1,6 @@
 <script lang="ts">
   import CanvasNode from './CanvasNode.svelte';
-  import { designer } from '#lib/studio/designer.svelte';
+  import { designer } from '../designer.svelte';
 
   function clearCanvasSelection(event: MouseEvent) {
     const target = event.target;
