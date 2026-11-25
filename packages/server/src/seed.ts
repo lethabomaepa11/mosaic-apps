@@ -58,7 +58,7 @@ export async function seedPlatform(db: Db, opts: SeedOptions = {}): Promise<Seed
     [
       JSON.stringify({ id: 'pg_home_root', type: 'page', children: [
         { id: 'pg_home_title', type: 'heading', props: { text: 'Welcome', level: 1 } },
-        { id: 'pg_home_intro', type: 'text', props: { text: 'Build this page in Mosaic Studio.' } },
+        { id: 'pg_home_intro', type: 'text', props: { text: 'Build this page in Mosaic Studio.', muted: true } },
       ] }),
       JSON.stringify({ title: 'Home', description: 'Welcome page', layout: 'default' }),
     ],

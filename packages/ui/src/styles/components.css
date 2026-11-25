@@ -41,7 +41,7 @@
 .m-steps__step.done .m-steps__num { background: var(--m-success-soft); color: var(--m-success-fg); border-color: var(--m-success-border); }
 
 /* ---------- table ---------- */
-.m-table-wrap { overflow: auto; border: 1px solid var(--m-border); border-radius: var(--m-radius); background: var(--m-surface); box-shadow: var(--m-shadow-sm); }
+.m-table-wrap { max-width: 100%; overflow: auto; border: 1px solid var(--m-border); border-radius: var(--m-radius); background: var(--m-surface); box-shadow: var(--m-shadow-sm); }
 .m-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; font-variant-numeric: tabular-nums; }
 .m-table th {
   text-align: left; font-size: 0.75rem; letter-spacing: 0.01em;
@@ -53,10 +53,15 @@
 .m-table th.sortable:hover { color: var(--m-fg); }
 .m-table__sort { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; text-align: inherit; border-radius: 4px; }
 .m-table__sort:focus-visible { outline: 2px solid var(--m-primary); outline-offset: 2px; }
-.m-table td { height: 44px; padding: 8px var(--m-space-4); border-bottom: 1px solid var(--m-border); vertical-align: middle; }
+.m-table td { height: 44px; padding: 8px var(--m-space-4); border-bottom: 1px solid var(--m-border); vertical-align: middle; max-width: 20rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .m-table tbody tr { transition: background 0.1s; }
 .m-table tbody tr:hover { background: var(--m-surface-2); }
 .m-table tbody tr:last-child td { border-bottom: none; }
+/* actions stay pinned on the right while wide tables scroll horizontally */
+.m-table .m-table__actions { position: sticky; right: 0; width: 1%; max-width: none; overflow: visible; white-space: nowrap; background: var(--m-surface); box-shadow: -1px 0 0 var(--m-border); }
+.m-table th.m-table__actions { z-index: 2; background: var(--m-surface-2); }
+.m-table tbody tr:hover .m-table__actions { background: var(--m-surface-2); }
+.m-table__actions > .m-row { flex-wrap: nowrap; }
 .m-table td.m-table__empty { height: auto; padding: var(--m-space-6) var(--m-space-4); text-align: center; color: var(--m-fg-muted); }
 .m-table tbody tr:has(> .m-table__empty):hover { background: transparent; }
 .m-pagination { display: flex; align-items: center; justify-content: space-between; gap: var(--m-space-3); padding: var(--m-space-3) 0; font-size: 0.8125rem; color: var(--m-fg-muted); flex-wrap: wrap; }

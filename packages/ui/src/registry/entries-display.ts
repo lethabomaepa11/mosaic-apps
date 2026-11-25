@@ -2,6 +2,7 @@
 
 import type { ComponentDef } from './types.js';
 import Heading from '../components/Heading.svelte';
+import Text from '../components/Text.svelte';
 import Divider from '../components/Divider.svelte';
 import StatCard from '../components/StatCard.svelte';
 import Grid from '../components/Grid.svelte';
@@ -19,6 +20,8 @@ export const DISPLAY_ENTRIES: ComponentDef[] = [
     inspector: [{ key: 'src', label: 'Image URL', kind: 'string', placeholder: 'https://…' }, { key: 'alt', label: 'Alt text', kind: 'string' }, { key: 'width', label: 'Width', kind: 'string', placeholder: '100% or 320px' }, { key: 'height', label: 'Height', kind: 'string', placeholder: 'auto or 240px' }, { key: 'fit', label: 'Image fit', kind: 'select', options: [{ value: 'cover', label: 'Cover' }, { value: 'contain', label: 'Contain' }, { value: 'fill', label: 'Fill' }, { value: 'none', label: 'Natural size' }] }, { key: 'href', label: 'Link URL', kind: 'string' }, { key: 'caption', label: 'Caption', kind: 'string' }] },
   { type: 'heading', label: 'Heading', category: 'Display', icon: 'heading', component: Heading, defaults: { text: 'Heading', level: 1 },
     inspector: [{ key: 'text', label: 'Text', kind: 'string' }, { key: 'level', label: 'Level', kind: 'select', options: [{ value: '1', label: 'H1' }, { value: '2', label: 'H2' }, { value: '3', label: 'H3' }, { value: '4', label: 'H4' }] }, { key: 'muted', label: 'Muted', kind: 'boolean' }] },
+  { type: 'text', label: 'Text', category: 'Display', icon: 'text', component: Text, defaults: { text: 'Write something here.', size: 'md' }, pages: true,
+    inspector: [{ key: 'text', label: 'Text', kind: 'text' }, { key: 'size', label: 'Size', kind: 'select', options: [{ value: 'sm', label: 'Small' }, { value: 'md', label: 'Normal' }, { value: 'lg', label: 'Large' }] }, { key: 'muted', label: 'Muted', kind: 'boolean' }] },
   { type: 'divider', label: 'Divider', category: 'Display', icon: 'divider', component: Divider, defaults: {} },
   { type: 'statCard', label: 'Stat card', category: 'Display', icon: 'trendingUp', component: StatCard, defaults: { label: 'Metric', value: '0' },
     inspector: [{ key: 'label', label: 'Label', kind: 'string' }, { key: 'value', label: 'Value (static)', kind: 'string' }, { key: 'entity', label: 'Or entity (live count)', kind: 'entityRef' }, { key: 'trend', label: 'Trend text', kind: 'string' }, { key: 'trendDir', label: 'Trend direction', kind: 'select', options: [{ value: 'up', label: 'Up' }, { value: 'down', label: 'Down' }] }, { key: 'icon', label: 'Icon', kind: 'string' }],

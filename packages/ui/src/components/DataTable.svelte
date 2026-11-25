@@ -10,6 +10,8 @@
     onrowclick?: (row: T) => void;
     emptyText?: string;
     actions?: Snippet<[T]>;
+    /** Custom cell content (booleans keep the built-in check mark). */
+    cell?: Snippet<[T, Props<T>['columns'][number]]>;
     loading?: boolean;
   }
 </script>
@@ -26,7 +28,7 @@
     sortable?: boolean;
   }
 
-  let { columns, rows, sortBy, sortDir, onsort, onrowclick, emptyText = 'No records', actions, loading }: Props<T> = $props();
+  let { columns, rows, sortBy, sortDir, onsort, onrowclick, emptyText = 'No records', actions, cell, loading }: Props<T> = $props();
 
   function cellValue(row: T, col: Column): string {
     const v = row[col.key];
@@ -65,7 +67,7 @@
             {/if}
           </th>
         {/each}
-        {#if actions}<th style="width:1%"></th>{/if}
+        {#if actions}<th class="m-table__actions" aria-label="Actions"></th>{/if}
       </tr>
     </thead>
     <tbody>
@@ -77,15 +79,17 @@
         {#each rows as row, i (i)}
           <tr class:clickable={!!onrowclick} onclick={(event) => onRowClick(event, row)}>
             {#each columns as col (col.key)}
-              <td style:text-align={col.align ?? 'left'}>
+              <td style:text-align={col.align ?? 'left'} title={typeof row[col.key] === 'boolean' ? undefined : cellValue(row, col) || undefined}>
                 {#if typeof row[col.key] === 'boolean'}
                   {#if row[col.key]}<Icon name="check" size={14} />{:else}—{/if}
+                {:else if cell}
+                  {@render cell(row, col)}
                 {:else}
                   {cellValue(row, col)}
                 {/if}
               </td>
             {/each}
-            {#if actions}<td style="white-space:nowrap">{@render actions(row)}</td>{/if}
+            {#if actions}<td class="m-table__actions">{@render actions(row)}</td>{/if}
           </tr>
         {/each}
       {/if}

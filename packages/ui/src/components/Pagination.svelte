@@ -36,8 +36,9 @@
   </div>
   <label class="m-row" style="gap:6px">
     <span class="m-small m-muted">Rows</span>
-    <select class="m-select" style="width:auto" value={String(pageSize)} onchange={(e) => onpagesize?.(Number((e.currentTarget as HTMLSelectElement).value))}>
-      {#each pageSizes as s (s)}<option value={s}>{s}</option>{/each}
+    <!-- `selected` per option: a one-way `value` on the select is applied before the each-block options exist, leaving it blank -->
+    <select class="m-select" style="width:auto" onchange={(e) => onpagesize?.(Number((e.currentTarget as HTMLSelectElement).value))}>
+      {#each pageSizes.includes(pageSize) ? pageSizes : [...pageSizes, pageSize].sort((a, b) => a - b) as s (s)}<option value={s} selected={s === pageSize}>{s}</option>{/each}
     </select>
   </label>
 </div>

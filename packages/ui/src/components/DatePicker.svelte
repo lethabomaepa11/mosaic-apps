@@ -106,7 +106,7 @@
   :global(.m-date-picker__segment) { border-radius:4px; padding:2px; }
   :global(.m-date-picker__trigger) { display:grid; place-items:center; margin-left:auto; padding:4px; border:0; border-radius:4px; color:var(--m-fg-muted); background:transparent; cursor:pointer; }
   :global(.m-date-picker__trigger:hover) { background:var(--m-surface-2); color:var(--m-fg); }
-  :global(.m-date-picker__content) { z-index:60; padding:12px; border:1px solid var(--m-border); border-radius:var(--m-radius); background:var(--m-surface); box-shadow:var(--m-shadow-lg); }
+  :global(.m-date-picker__content) { z-index:var(--m-z-popover); padding:12px; border:1px solid var(--m-border); border-radius:var(--m-radius); background:var(--m-surface); box-shadow:var(--m-shadow-lg); }
   :global(.m-date-picker__header) { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
   :global(.m-date-picker__heading) { font-size:13px; font-weight:600; }
   :global(.m-date-picker__grid) { border-collapse:collapse; }

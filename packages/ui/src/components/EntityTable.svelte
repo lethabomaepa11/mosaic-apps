@@ -1,12 +1,14 @@
 <script lang="ts">
   import type { EntityDef, FieldDef } from '@mosaic-apps/core';
-  import { allFields, entityLabelPlural } from '@mosaic-apps/core';
+  import { allFields, entityLabelPlural, enumOptions } from '@mosaic-apps/core';
   import type { MosaicClient } from '../client/api';
   import DataTable from './DataTable.svelte';
   import Pagination from './Pagination.svelte';
   import SearchField from './SearchField.svelte';
   import EntityForm from '../render/EntityForm.svelte';
   import Modal from './Modal.svelte';
+  import Badge from './Badge.svelte';
+  import { formatCell, refIncludes } from '../lib/format';
   import ShadcnButton from '../shadcn/button/Button.svelte';
   import { toast } from '../stores/toast.svelte';
   import type { Snippet } from 'svelte';
@@ -41,6 +43,8 @@
   let editorOpen = $state(false);
   let editorMode = $state<'create' | 'edit'>('create');
   let editTarget = $state<Record<string, unknown> | undefined>(undefined);
+  let sizeOverride = $state<number | null>(null);
+  const size = $derived(sizeOverride ?? pageSize);
 
   // Resolve entity def from string or use directly
   $effect(() => {
@@ -65,6 +69,7 @@
     key: f.name,
     label: f.label ?? f.name,
     sortable: sortable && f.sortable !== false && !f.system,
+    render: (row: Record<string, unknown>) => formatCell(f, row),
   })));
 
   $effect(() => {
@@ -79,7 +84,8 @@
     try {
       const res = await client.listRecords(name, {
         page,
-        pageSize,
+        pageSize: size,
+        include: refIncludes(cols),
         sort: sortBy ? [{ field: sortBy, dir: sortDir }] : undefined,
         q: q || undefined,
       });
@@ -137,9 +143,14 @@
       {@render actions?.(row)}
     </div>
   {/snippet}
-  <DataTable columns={tableColumns} rows={rows} {sortBy} {sortDir} {onsort} onrowclick={selectRow} actions={rowActions} {loading} />
+  {#snippet cell(row: Record<string, unknown>, col: { key: string })}
+    {@const field = cols.find((f) => f.name === col.key)}
+    {@const option = field?.type === 'enum' ? enumOptions(field).find((o) => o.value === row[col.key]) : undefined}
+    {#if option}<Badge text={option.label ?? option.value} color={option.color} />{:else}{formatCell(field, row)}{/if}
+  {/snippet}
+  <DataTable columns={tableColumns} rows={rows} {sortBy} {sortDir} {onsort} onrowclick={selectRow} actions={rowActions} {cell} {loading} />
   {#if !client}<p class="m-small m-muted" style="padding:12px 16px">Connect a runtime API client to load this table.</p>{/if}
-  <Pagination {page} {pageSize} {total} onpage={(p) => { page = p; load(); }} />
+  <Pagination {page} pageSize={size} {total} onpage={(p) => { page = p; load(); }} onpagesize={(n) => { sizeOverride = n; page = 1; }} />
   {#if selectedRecord && entityDef && client}
     <section class="m-entity-detail">
       <header class="m-row" style="justify-content:space-between"><strong>{entityDef.label ?? entityDef.name} details</strong><ShadcnButton variant="ghost" size="sm" class="m-btn m-btn--ghost m-btn--sm" onclick={() => selectedRecord = null}>Back to table</ShadcnButton></header>

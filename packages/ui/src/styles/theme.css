@@ -68,6 +68,7 @@
   /* Z-index */
   --z-modal: 1000;
   --z-drawer: 1010;
+  --z-popover: 1100; /* floating content (select, menu, date picker) must sit above modals and drawers */
   --z-toast: 1200;
 
   /* Mosaic legacy tokens (--m-*) for backward compat */
@@ -121,6 +122,7 @@
   --m-space-6: var(--space-6);
   --m-z-modal: var(--z-modal);
   --m-z-drawer: var(--z-drawer);
+  --m-z-popover: var(--z-popover);
   --m-z-toast: var(--z-toast);
 
   /* shadcn-svelte compatible CSS variables (light mode) */
