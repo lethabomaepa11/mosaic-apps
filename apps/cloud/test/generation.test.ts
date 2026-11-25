@@ -102,18 +102,23 @@ test('clinic submissions resolve the patient by email and accept a visible provi
       { name: 'provider', permissions: { read: ['viewer'], create: ['admin'], update: ['admin'], delete: ['admin'] }, fields: [{ name: 'name', required: true }] },
       { name: 'appointment', permissions: { create: ['viewer'] }, fields: [
         { name: 'reason', required: true },
+        { name: 'scheduledAt', type: 'datetime', required: true },
+        { name: 'requestedAt', type: 'datetime' },
+        { name: 'rescheduleRequestedAt', type: 'datetime' },
         { name: 'patient', type: 'ref', refEntity: 'patient', required: true },
         { name: 'provider', type: 'ref', refEntity: 'provider', required: true },
         { name: 'status', type: 'enum', options: ['Requested', 'Confirmed'], required: true },
       ], submission: { profile: { entity: 'patient', emailField: 'email' }, selectable: ['provider'], managed: [
         { field: 'patient', source: 'profile', value: 'email' },
         { field: 'status', source: 'constant', value: 'Requested' },
+        { field: 'requestedAt', source: 'now', value: '' },
+        { field: 'rescheduleRequestedAt', source: 'empty', value: '' },
       ] } },
     ],
     sampleData: [
       { entity: 'patient', records: [{ name: 'Patient A', email: 'patient@example.com' }] },
       { entity: 'provider', records: [{ name: 'Provider A' }] },
-      { entity: 'appointment', records: [{ reason: 'Checkup', patient: 'Patient A', provider: 'Provider A', status: 'Requested' }] },
+      { entity: 'appointment', records: [{ reason: 'Checkup', patient: 'Patient A', provider: 'Provider A', status: 'Requested', scheduledAt: '2026-12-01T09:30:00Z' }] },
     ],
   }));
   assert.deepEqual(validateSpec(spec), []);
@@ -121,8 +126,10 @@ test('clinic submissions resolve the patient by email and accept a visible provi
   const app = compileSpec(spec);
   assert.deepEqual(app.entities.find((entity) => entity.name === 'patient')?.permissions?.read, ['admin']);
   assert.deepEqual(app.entities.find((entity) => entity.name === 'provider')?.permissions?.read, ['viewer']);
-  assert.deepEqual(app.workflows?.[0]?.input.properties, { reason: { type: 'string' }, provider: { type: 'string', format: 'uuid' } });
-  assert.deepEqual(app.forms.find((form) => form.entity === 'appointment')?.root.children?.[0]?.children?.map((node) => node.props?.binding), ['reason', 'provider']);
+  assert.deepEqual(app.workflows?.[0]?.input.properties, {
+    reason: { type: 'string' }, scheduledAt: { type: 'string', format: 'date-time' }, provider: { type: 'string', format: 'uuid' },
+  });
+  assert.deepEqual(app.forms.find((form) => form.entity === 'appointment')?.root.children?.[0]?.children?.map((node) => node.props?.binding), ['reason', 'scheduledAt', 'provider']);
   for (const framework of ['sveltekit', 'nextjs'] as const) {
     const files = generateProjectFiles({ name: spec.name, slug: 'clinic', spec, app, framework });
     const openApi = JSON.parse(files.find((file) => file.path === 'mosaic/openapi.json')!.content);

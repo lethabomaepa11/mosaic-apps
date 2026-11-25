@@ -1,7 +1,7 @@
 import { buildEntitySchema, buildInsertSql, canAccessEntity, formatIssues, getEntity, HttpError, ident, isAdmin, writeAudit } from '@mosaic-apps/server';
 
 /**
- * @typedef {{ field: string, source: 'constant' | 'userId' | 'userEmail' | 'profile', value: string }} ManagedValue
+ * @typedef {{ field: string, source: 'constant' | 'userId' | 'userEmail' | 'profile' | 'now' | 'empty', value: string }} ManagedValue
  * @typedef {{ entity: string, label: string, roles: string[], profile?: { entity: string, emailField: string }, selectable?: string[],
  *   managed: ManagedValue[], input: { type: 'object', properties: Record<string, unknown>, required: string[], additionalProperties: false } }} CreateWorkflow
  */
@@ -49,8 +49,10 @@ export function createWorkflowEndpoints(workflows) {
         /** @type {Record<string, unknown>} */
         const values = { ...body };
         for (const value of workflow.managed) {
+          if (value.source === 'empty') continue;
           values[value.field] = value.source === 'profile' ? profile[value.value]
-            : value.source === 'userId' ? user.id : value.source === 'userEmail' ? user.email : value.value;
+            : value.source === 'userId' ? user.id : value.source === 'userEmail' ? user.email
+            : value.source === 'now' ? new Date().toISOString() : value.value;
           if (values[value.field] == null) throw new HttpError(403, 'Your profile is missing information required for this workflow', 'PROFILE_UNAVAILABLE');
         }
         const parsed = buildEntitySchema(entity, 'create').safeParse(values);

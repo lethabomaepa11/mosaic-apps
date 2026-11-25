@@ -11,10 +11,11 @@ export interface SpecField {
   // No nullable keys: models drop them under strict schemas. Empty string means "none".
   options: string[]; refEntity: string; format: '' | 'email' | 'url' | 'phone' | 'money';
 }
+const MANAGED_SOURCES = ['constant', 'userId', 'userEmail', 'profile', 'now', 'empty'] as const;
 export interface SpecEntity {
   name: string; label: string; labelPlural: string; icon: string; description: string; labelField: string;
   fields: SpecField[]; permissions: { read: string[]; create: string[]; update: string[]; delete: string[] };
-  submission?: { profile?: { entity: string; emailField: string }; selectable?: string[]; managed: Array<{ field: string; source: 'constant' | 'userId' | 'userEmail' | 'profile'; value: string }> };
+  submission?: { profile?: { entity: string; emailField: string }; selectable?: string[]; managed: Array<{ field: string; source: typeof MANAGED_SOURCES[number]; value: string }> };
 }
 const SECTION_KINDS = ['spotlight', 'records', 'metric', 'form'] as const;
 interface SpecSection { kind: typeof SECTION_KINDS[number]; title: string; body: string; entity: string }
@@ -38,7 +39,7 @@ export const APP_SPEC_SCHEMA = {
           profile: { type: 'object', additionalProperties: false, required: ['entity', 'emailField'], properties: { entity: str, emailField: str } },
           selectable: strList,
           managed: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['field', 'source', 'value'], properties: {
-            field: str, source: { type: 'string', enum: ['constant', 'userId', 'userEmail', 'profile'] }, value: str,
+            field: str, source: { type: 'string', enum: MANAGED_SOURCES }, value: str,
           } } },
         } },
         fields: { type: 'array', items: { type: 'object', additionalProperties: false,
@@ -86,7 +87,7 @@ export function normalizeSpec(raw: any): AppSpec {
       });
       const permissions = entity?.permissions ?? {};
       const managed = Array.isArray(entity?.submission?.managed) ? entity.submission.managed.flatMap((item: any) =>
-        item && ['constant', 'userId', 'userEmail', 'profile'].includes(item.source)
+        item && MANAGED_SOURCES.includes(item.source)
           ? [{ field: camel(text(item.field)), source: item.source, value: text(item.value) }] : []) : [];
       const profile = entity?.submission?.profile;
       return {
@@ -182,7 +183,8 @@ export function autoRepair(input: AppSpec): { spec: AppSpec; repairs: string[] }
       if (field.type !== 'ref' || submission.selectable?.includes(field.name)) continue;
       const values = submission.managed.filter((item) => item.field === field.name);
       const current = values[0];
-      if (values.length > 1 || current?.source === 'constant' || (!current && !(ownRefs.length === 1 && ownRefs[0] === field))) continue;
+      if (values.length > 1 || (current && !['profile', 'userId', 'userEmail'].includes(current.source))
+        || (!current && !(ownRefs.length === 1 && ownRefs[0] === field))) continue;
       const sources = profileReferenceFields(profileEntity, field);
       if (current?.source === 'profile' && sources.includes(current.value)) continue;
       if (sources.length !== 1) continue;
@@ -286,7 +288,9 @@ export function validateSpec(spec: AppSpec): string[] {
       const target = entity.fields.find((field) => field.name === value.field);
       const from = profile?.fields.find((field) => field.name === value.value);
       const profileId = value.value === 'id' && target?.type === 'ref' && target.refEntity === profile?.name;
-      if (managedNames.has(value.field) || !target || (value.source === 'profile' && !profileId && (!from || from.type !== target.type || from.refEntity !== target.refEntity))
+      if ((value.source === 'now' || value.source === 'empty') && (target?.type !== 'datetime' || (value.source === 'empty' && target.required))) {
+        issues.push(`${entity.name}.${value.field}: "now" requires a datetime; "empty" requires an optional datetime.`);
+      } else if (managedNames.has(value.field) || !target || (value.source === 'profile' && !profileId && (!from || from.type !== target.type || from.refEntity !== target.refEntity))
         || (target.type === 'ref' && value.source !== 'profile') || (value.source === 'constant' && target.type === 'enum' && !target.options.includes(value.value))) {
         issues.push(`${entity.name}.${value.field}: invalid server-managed value. A link to the signed-in profile itself uses source "profile" and value "id". For another managed link use a profile field that references the same entity.`);
       }
