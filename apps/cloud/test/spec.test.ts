@@ -68,6 +68,15 @@ test('sample records are understood in every shape models produce', () => {
   }
 });
 
+test('generated appointment form distinguishes calendar dates from times', () => {
+  const { spec } = autoRepair(normalizeSpec({ entities: [{
+    name: 'appointment', fields: [{ name: 'scheduledAt', type: 'datetime' }, { name: 'followUpDate', type: 'date' }],
+  }] }));
+  const fields = compileSpec(spec).forms[0]?.root.children?.[0]?.children;
+  assert.equal(fields?.[0]?.props?.withTime, true);
+  assert.equal(fields?.[1]?.props?.withTime, undefined);
+});
+
 test('missing keys and nulls from a drifted answer are filled with safe defaults', () => {
   const spec = normalizeSpec({ name: 'X', entities: [{ name: 'item', fields: [{ name: 'title', type: 'string' }, { name: 'kind', type: 'weird' }] }], pages: [{ route: '/items', kind: 'list', entity: 'item' }] });
   assert.equal(spec.entities[0]!.fields[1]!.type, 'string');

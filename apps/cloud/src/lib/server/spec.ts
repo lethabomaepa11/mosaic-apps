@@ -346,7 +346,8 @@ function formNode(field: SpecField, id: string): FormNode {
     case 'int': return { id, type: 'numberField', props };
     case 'decimal': return { id, type: field.format === 'money' ? 'currencyField' : 'numberField', props };
     case 'boolean': return { id, type: 'switch', props };
-    case 'date': case 'datetime': return { id, type: 'datePicker', props };
+    case 'date': return { id, type: 'datePicker', props };
+    case 'datetime': return { id, type: 'datePicker', props: { ...props, withTime: true } };
     case 'enum': return { id, type: 'selectField', props: { ...props, options: fieldDef(field).options } };
     case 'ref': return { id, type: 'refSelect', props: { ...props, entity: field.refEntity } };
     default: return { id, type: 'textField', props: { ...props, format: field.format || undefined } };
