@@ -1,7 +1,6 @@
 <script lang="ts">
   import { page as current } from '$app/state';
   import { FormRenderer, PageRenderer, Icon, Toaster, createClient } from '@mosaic-apps/ui';
-  import PreviewDesigner from '#lib/PreviewDesigner.svelte';
   let { data } = $props();
   // The preview's API is same-origin and member-only; Cloud forwards it to the project's Mosaic server.
   const client = $derived(createClient({ baseUrl: `${data.app.base}/api` }));
@@ -15,7 +14,13 @@
 <div class="preview-app min-h-screen bg-base-200 text-base-content" data-theme={data.app.theme}>
   {#if data.status === 'studio' && artifact}
     {#key `${artifact.kind}:${artifact.id}`}
-      <PreviewDesigner {client} base={data.app.base} {artifact} entities={data.studioEntities} forms={data.studioForms} pages={data.studioPages} />
+      {#await import('#lib/PreviewDesigner.svelte')}
+        <p class="p-4" role="status">Opening the designer…</p>
+      {:then { default: PreviewDesigner }}
+        <PreviewDesigner {client} base={data.app.base} {artifact} entities={data.studioEntities} forms={data.studioForms} pages={data.studioPages} />
+      {:catch}
+        <p class="p-4" role="alert">The designer could not open. <a class="link" href={`${data.app.base}/studio`}>Back to Studio</a></p>
+      {/await}
     {/key}
   {:else}
   <div class="flex min-h-screen">
