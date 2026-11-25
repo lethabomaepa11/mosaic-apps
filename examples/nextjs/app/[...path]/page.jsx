@@ -6,5 +6,5 @@ export default async function PublishedPage({ params }) {
   const { path } = await params;
   const page = await publishedPage(path);
   if (!page) notFound();
-  return <main><MosaicNode node={page.root} /></main>;
+  return <main className="published-page"><MosaicNode node={page.root} /></main>;
 }

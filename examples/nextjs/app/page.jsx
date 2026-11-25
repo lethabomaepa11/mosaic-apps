@@ -3,7 +3,7 @@ import { MosaicNode } from './mosaic-node.jsx';
 
 export default async function Home() {
   const page = await publishedPage([]);
-  if (page) return <main><MosaicNode node={page.root} /></main>;
+  if (page) return <main className="published-page"><MosaicNode node={page.root} /></main>;
   return (
     <main style={{ maxWidth: 640, margin: '4rem auto', padding: '0 1rem', fontFamily: 'system-ui, sans-serif' }}>
       <h1>Mosaic on Next.js</h1>

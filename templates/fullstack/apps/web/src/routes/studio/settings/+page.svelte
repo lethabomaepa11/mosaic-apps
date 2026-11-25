@@ -64,7 +64,7 @@
   {#if tab === 'theme'}
     <ThemeEditor />
   {:else if tab === 'navigation'}
-    <NavigationEditor />
+    <NavigationEditor {client} name="__PROJECT_NAME__" />
   {:else if tab === 'users'}
     <SettingsUsers {users} {roles} onchange={(next) => (users = next)} />
   {:else if tab === 'roles'}

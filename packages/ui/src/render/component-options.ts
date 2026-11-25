@@ -26,9 +26,16 @@ export function eventActions(props: Record<string, unknown>, key: string): Compo
 
 const fonts = { sans: 'system-ui, sans-serif', serif: 'Georgia, serif', mono: 'monospace' };
 
+const spacingProps: PropDesc[] = ['padding', 'margin'].flatMap((property) => {
+  const label = property === 'padding' ? 'Padding' : 'Margin';
+  return ['', 'Top', 'Right', 'Bottom', 'Left'].map((side) => ({
+    key: property + side, label: `${label} ${side.toLowerCase() || 'all sides'} (px)`,
+    kind: 'number' as const, min: property === 'padding' ? 0 : -200, max: 200,
+  }));
+});
+
 export const appearanceProps: PropDesc[] = [
-  { key: 'padding', label: 'Padding (px)', kind: 'number', min: 0, max: 200 },
-  { key: 'margin', label: 'Margin (px)', kind: 'number', min: 0, max: 200 },
+  ...spacingProps,
   { key: 'fontSize', label: 'Font size (px)', kind: 'number', min: 8, max: 120 },
   { key: 'fontFamily', label: 'Font family', kind: 'select', options: [
     { value: 'default', label: 'Default' }, { value: 'sans', label: 'Sans serif' },
@@ -49,7 +56,7 @@ export function appearanceStyle(value: unknown): string {
     const amount = props[key];
     if (min === undefined || max === undefined || typeof amount !== 'number' || !Number.isFinite(amount) || amount < min || amount > max) continue;
     if (key === 'fontSize') style.push(`--m-component-font-size:${amount}px`, `font-size:${amount}px`);
-    else style.push(`${key}:${amount}px`);
+    else style.push(`${key.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)}:${amount}px`);
   }
   if (typeof fontFamily === 'string' && Object.hasOwn(fonts, fontFamily)) style.push(`font-family:${fonts[fontFamily as keyof typeof fonts]}`);
   if (fontWeight === '400' || fontWeight === '500' || fontWeight === '600' || fontWeight === '700') {

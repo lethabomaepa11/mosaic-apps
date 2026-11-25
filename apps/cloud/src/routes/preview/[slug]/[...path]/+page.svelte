@@ -1,5 +1,6 @@
 <script lang="ts">
   import { page as current } from '$app/state';
+  import { invalidateAll } from '$app/navigation';
   import { FormRenderer, PageRenderer, Icon, Toaster, createClient } from '@mosaic-apps/ui';
   let { data } = $props();
   // The preview's API is same-origin and member-only; Cloud forwards it to the project's Mosaic server.
@@ -9,12 +10,27 @@
   const editingPage = $derived(data.status === 'studio' ? data.studioPages.find((item) => item.slug === pageKey || item.id === pageKey) : undefined);
   const editingForm = $derived(data.status === 'studio' ? data.studioForms.find((item) => item.slug === formKey || item.id === formKey) : undefined);
   const artifact = $derived(editingPage ? { kind: 'page' as const, slug: editingPage.slug } : editingForm ? { kind: 'form' as const, slug: editingForm.slug } : undefined);
+  const navigationEditor = $derived(current.url.searchParams.has('sidebar'));
 </script>
 
 <svelte:head><title>{data.page?.settings?.title ?? data.page?.name ?? data.app.name} · {data.app.name}</title></svelte:head>
 
 <div class="preview-app min-h-screen bg-base-200 text-base-content" data-theme={data.app.theme}>
-  {#if data.status === 'studio' && artifact}
+  {#if data.status === 'studio' && navigationEditor}
+    <main class="mx-auto max-w-4xl p-4 md:p-8">
+      <div class="mb-4 flex gap-2">
+        <a class="btn btn-outline btn-sm" href={`${data.app.base}/studio`}>Back to Studio</a>
+        <a class="btn btn-outline btn-sm" href={data.app.base}>Open app preview</a>
+      </div>
+      {#await import('../../../../../../../templates/fullstack/apps/web/src/lib/studio/components/NavigationEditor.svelte')}
+        <p role="status">Opening sidebar canvas…</p>
+      {:then { default: NavigationEditor }}
+        <NavigationEditor {client} initial={data.navigation} name={data.app.name} onsave={invalidateAll} />
+      {:catch}
+        <p role="alert">Could not open the sidebar canvas.</p>
+      {/await}
+    </main>
+  {:else if data.status === 'studio' && artifact}
     {#key `${artifact.kind}:${artifact.slug}`}
       {#await import('#lib/PreviewDesigner.svelte')}
         <p class="p-4" role="status">Opening the designer…</p>
@@ -28,21 +44,24 @@
   <div class="flex min-h-screen">
     <aside class="hidden w-60 shrink-0 flex-col gap-0.5 border-r border-base-300 bg-base-100 p-3 md:flex">
       <a class="mb-3 flex items-center gap-2 px-2 py-1.5 font-semibold tracking-tight" href={data.app.base}><span class="grid size-7 place-items-center rounded-lg bg-primary text-xs font-bold text-primary-content">{data.app.name.slice(0, 1).toUpperCase()}</span><span class="truncate">{data.app.name}</span></a>
-      {#each data.nav as item (item.href)}
-        <a class={`flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition ${current.url.pathname === item.href || (item.route === '/' && current.url.pathname === data.app.base) ? 'bg-primary/10 font-medium text-primary' : 'opacity-75 hover:bg-base-200 hover:opacity-100'}`} href={item.href}><Icon name={item.icon} /> {item.label}</a>
+      {#each data.nav as item, index}
+        {#if item.section && item.section !== data.nav[index - 1]?.section}<p class="px-2.5 pt-2 text-xs font-medium opacity-70">{item.section}</p>{/if}
+        <a class={`flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition ${current.url.pathname === item.href ? 'bg-primary/10 font-medium text-primary' : 'opacity-75 hover:bg-base-200 hover:opacity-100'}`} href={item.href}><Icon name={item.icon} /> {item.label}</a>
       {/each}
       <div class="mt-auto flex flex-col gap-1 pt-3">
         <a class="btn btn-outline btn-sm justify-start" href={`${data.app.base}/studio`}>Open Studio</a>
+        <a class="btn btn-ghost btn-sm justify-start" href={`${data.app.base}/studio?sidebar`}>Edit sidebar</a>
         <a class="btn btn-ghost btn-sm justify-start" href={`${data.app.base}/login`}>Sign in</a>
       </div>
     </aside>
     <div class="min-w-0 flex-1">
       <nav class="flex gap-1 overflow-x-auto border-b border-base-300 bg-base-100 px-3 py-2 md:hidden">
-        {#each data.nav as item (item.href)}<a class={`whitespace-nowrap rounded-lg px-3 py-1.5 text-sm ${current.url.pathname === item.href ? 'bg-base-200 font-medium' : 'opacity-70'}`} href={item.href}>{item.label}</a>{/each}
+        {#each data.nav as item}<a class={`whitespace-nowrap rounded-lg px-3 py-1.5 text-sm ${current.url.pathname === item.href ? 'bg-base-200 font-medium' : 'opacity-70'}`} href={item.href}>{item.label}</a>{/each}
         <a class="btn btn-outline btn-sm whitespace-nowrap" href={`${data.app.base}/studio`}>Open Studio</a>
+        <a class="btn btn-ghost btn-sm whitespace-nowrap" href={`${data.app.base}/studio?sidebar`}>Edit sidebar</a>
         <a class="btn btn-ghost btn-sm whitespace-nowrap" href={`${data.app.base}/login`}>Sign in</a>
       </nav>
-      <main class="mx-auto max-w-6xl p-4 md:p-8">
+      <main class={data.status === 'ready' ? '' : 'mx-auto max-w-6xl p-4 md:p-8'}>
         {#if data.status === 'ready' && data.page}
           {#key data.page.id}<PageRenderer page={data.page} {client} scope={{ params: {}, query: Object.fromEntries(current.url.searchParams) }} />{/key}
         {:else if data.status === 'form' && data.form}
@@ -61,7 +80,7 @@
           </section>
         {:else if data.status === 'studio'}
           <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
-            <div><h1 class="text-2xl font-semibold">Preview Studio</h1><p class="text-sm opacity-70">Edit pages and forms in this preview.</p></div>
+            <div><h1 class="text-2xl font-semibold">Preview Studio</h1><p class="text-sm opacity-70">Edit pages, forms and navigation in this preview.</p></div>
             {#if data.app.liveUrl && data.app.studioAvailable}
               <a class="btn btn-primary btn-sm" href={`${data.app.liveUrl}/studio`} target="_blank" rel="noreferrer">Open live Studio</a>
             {:else}

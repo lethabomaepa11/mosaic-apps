@@ -94,7 +94,7 @@
       <Comp {...(node.props ?? {})} value={node.props?.value ?? ''} />
     </div>
   {:else if isRoot}
-    <div class="design-children" use:dropzone={{ id: node.id, onDrop }}>
+    <div class="design-children" style={appearanceStyle(node.props?.appearance)} use:dropzone={{ id: node.id, onDrop }}>
       {#if (node.children ?? []).length === 0}
         <div class="design-empty" data-mosaic-dnd="ignore">Drop components here</div>
       {:else}

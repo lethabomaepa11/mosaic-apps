@@ -31,6 +31,13 @@ projects use the same Mosaic runtime and database-first artifacts.
    Studio, open a page or form and choose **Edit** to use the visual designer. Saves
    apply to the preview database. On installations with persistent previews, they
    survive instance restarts.
+   Use **Edit sidebar** from Preview or the designer toolbar. Select a link on the
+   sidebar canvas to change its label, path, icon, or section, and use **Move up**
+   or **Move down** to reorder it. Save to apply it across the preview. Edit the live
+   sidebar separately in SvelteKit Studio under **Settings → Navigation** or in
+   Next.js Page Studio using **Edit sidebar**.
+   Under **Appearance**, set padding or margin for all sides, or override each side
+   individually. Select **Page root** to control spacing around the whole page.
    When a SvelteKit deployment is ready, **Open live Studio** edits the deployed
    app. **Live app** opens the deployed site separately.
 5. Send feedback in the chat while reviewing a preview. Cloud queues it as a change

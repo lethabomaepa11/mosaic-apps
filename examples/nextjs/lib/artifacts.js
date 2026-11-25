@@ -22,6 +22,20 @@ export function canManagePages(user) {
   return Boolean(user?.isAdmin || user?.permissions?.some((permission) => ['pages:manage', 'pages:*', '*'].includes(permission)));
 }
 
+export function canManageSettings(user) {
+  return Boolean(user?.isAdmin || user?.permissions?.some((permission) => ['settings:manage', 'settings:*', '*'].includes(permission)));
+}
+
+export const readNavigation = cache(async function readNavigation() {
+  const { rows: [setting] } = await (await mosaicServer()).db.query("SELECT value FROM mosaic_settings WHERE key = 'app.nav'");
+  const { data: pages } = Array.isArray(setting?.value) ? {} : await readMosaic('/pages?published=true');
+  const items = Array.isArray(setting?.value) ? setting.value : (pages ?? [])
+    .filter((page) => page.settings?.menu?.show !== false && !page.route.split('/').some((part) => part.startsWith(':')))
+    .sort((a, b) => (a.settings?.menu?.order ?? 99) - (b.settings?.menu?.order ?? 99))
+    .map((page) => ({ href: page.route, label: page.settings?.title ?? page.name, section: page.settings?.menu?.group }));
+  return items.filter((item) => typeof item?.label === 'string' && typeof item.href === 'string' && /^\/(?![/\\])/.test(item.href) && !/[\\\u0000-\u001f]/.test(item.href));
+});
+
 export async function readAuthPage(route) {
   const { data } = await readMosaic('/pages?published=true');
   return data?.find((page) => page.route === route);

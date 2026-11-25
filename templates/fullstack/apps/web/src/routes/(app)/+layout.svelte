@@ -8,7 +8,7 @@
 
   let { children, data } = $props();
   let user = $state<{ email: string; name: string; roles: string[] } | null>(null);
-  const navItems = $derived(data.navigation.length ? data.navigation : [{ label: 'Home', href: '/', icon: 'home' }]);
+  const navItems = $derived(data.navigation);
 
   onNavigate((navigation) => {
     if (!document.startViewTransition || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
@@ -51,7 +51,7 @@
     <div class="app-nav__brand"><span class="dot"></span> __PROJECT_NAME__</div>
     {#each navGroups as group (group.section)}
       {#if group.section}<div class="app-nav__section">{group.section}</div>{/if}
-      {#each group.items as item (item.href)}
+      {#each group.items as item}
         <a href={item.href} class:active={page.url.pathname === item.href} aria-current={page.url.pathname === item.href ? 'page' : undefined}><Icon name={item.icon ?? 'link'} /> {item.label}</a>
       {/each}
     {/each}
@@ -64,7 +64,7 @@
     {/if}
   </nav>
   {/if}
-  <main class:app-main={!bareLayout}>
+  <main class:app-main={!bareLayout} class:published-page={Boolean(page.data.mosaicPage)}>
     {@render children()}
   </main>
 </div>

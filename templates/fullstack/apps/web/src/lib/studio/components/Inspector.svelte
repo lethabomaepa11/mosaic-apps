@@ -86,6 +86,14 @@
             <span class="m-badge">{n.type}</span>
           </div>
           <p class="m-muted m-small">{n.type === 'form' ? 'Form metadata and behavior are configured in Form settings.' : 'Page metadata and behavior are configured in Page settings.'}</p>
+          {#if n.type === 'page'}
+            {@const appearance = n.props?.appearance as Record<string, unknown> | undefined}
+            <div class="inspector-tab">
+              {#each appearanceProps as prop (prop.key)}
+                <Control desc={prop} value={appearance?.[prop.key]} onChange={(v) => setProp('appearance', { ...appearance, [prop.key]: v })} />
+              {/each}
+            </div>
+          {/if}
         {:else}
           <p class="m-muted m-small">Unknown component type: {n.type}</p>
         {/if}

@@ -311,7 +311,7 @@ export function compileSpec(spec: AppSpec): CompiledApp {
     return {
       id, slug: page.slug, route: page.route, name: page.title, description: page.description, version: 1, published: true,
       settings: { title: page.title, requiresAuth: page.access === 'authenticated', menu: { show: page.inMenu, order: order + 1, icon: page.icon || undefined } },
-      root: { id: `${id}_root`, type: 'page', children },
+      root: { id: `${id}_root`, type: 'page', props: { appearance: { padding: 24 } }, children },
     } as PageDef;
   });
   pages.push(authPage(false));

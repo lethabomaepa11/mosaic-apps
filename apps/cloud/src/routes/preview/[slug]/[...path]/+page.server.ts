@@ -1,7 +1,7 @@
 import { error, redirect } from '@sveltejs/kit';
 import { walk, type FormDef, type PageDef } from '@mosaic-apps/core';
 import type { PageServerLoad } from './$types';
-import { previewPages, previewProject, previewRuntime } from '#lib/server/preview';
+import { previewNavigation, previewPages, previewProject, previewRuntime } from '#lib/server/preview';
 import { frameworkLabel } from '#lib/framework';
 import { transientCloudDbError } from '#lib/server/db';
 
@@ -30,16 +30,13 @@ export const load: PageServerLoad = async ({ params, locals, url }) => {
     return { app, status: 'sign-in' as const, page: null, nav: [], registering: path === '/signup', authTitle: typeof title === 'string' ? title : undefined };
   }
   const page = pages.find((item) => item.route === path) ?? (path === '/' ? pages.find((item) => item.settings?.menu?.show !== false) : undefined);
-  // Navigation mirrors the deployed app: published pages flagged for the menu, in menu order.
-  const nav = pages
-    .filter((item) => item.settings?.menu?.show !== false)
-    .sort((a, b) => (a.settings?.menu?.order ?? 99) - (b.settings?.menu?.order ?? 99))
-    .map((item) => ({ label: item.settings?.title ?? item.name, href: `${base}${item.route === '/' ? '' : item.route}`, route: item.route, icon: item.settings?.menu?.icon ?? 'link' }));
+  const navigation = await previewNavigation(project, pages);
+  const nav = navigation.map((item) => ({ ...item, href: `${base}${item.href === '/' ? '' : item.href}`, icon: item.icon ?? 'link' }));
   if (path === '/studio') {
     const { call } = await previewRuntime(project);
     const forms = await call('GET', '/api/forms?published=true');
     if (forms.status !== 200) return { app, status: 'unavailable' as const, page: null, nav };
-    return { app, status: 'studio' as const, page: null, nav,
+    return { app, status: 'studio' as const, page: null, nav, navigation,
       studioPages: pages.map(({ id, slug, name, route, settings }) => ({ id, slug, name, route, requiresAuth: settings?.requiresAuth })),
       studioForms: ((forms.body?.data ?? []) as FormDef[]).map(({ id, name, slug, entity }) => ({ id, name, slug, entity })),
       studioEntities: project.app_spec.entities.map(({ name, label, fields }) => ({ name, label, fields: fields.map(({ name, label, type }) => ({ name, label, type })) })),

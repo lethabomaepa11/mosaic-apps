@@ -1,6 +1,6 @@
 import { createHmac } from 'node:crypto';
 import { createMosaicServer, ident, signJwt, type MosaicServer } from '@mosaic-apps/server';
-import type { PageDef } from '@mosaic-apps/core';
+import type { NavItemDef, PageDef } from '@mosaic-apps/core';
 import { getCloudDb, hosted, readCloud } from './db';
 import { applyApp, inProcessCaller, seedAndSmokeTest, type MosaicCall } from './mosaic-runtime';
 import { compileSpec, type AppSpec, type CompiledApp } from './spec';
@@ -109,6 +109,17 @@ export async function previewPages(project: { id: string; slug: string; app_spec
   const pages = await call('GET', '/api/pages?published=true');
   if (pages.status !== 200) throw new Error(`Could not load preview pages (${pages.status}).`);
   return (pages.body?.data ?? []) as PageDef[];
+}
+
+export async function previewNavigation(project: PreviewProject, pages: PageDef[]): Promise<NavItemDef[]> {
+  const { server } = await previewRuntime(project);
+  const { rows: [setting] } = await server.db.query<{ value: NavItemDef[] }>("SELECT value FROM mosaic_settings WHERE key = 'app.nav'");
+  const items = Array.isArray(setting?.value) ? setting.value : pages
+    .filter((page) => page.settings?.menu?.show !== false && !page.route.split('/').some((part) => part.startsWith(':')))
+    .sort((a, b) => (a.settings?.menu?.order ?? 99) - (b.settings?.menu?.order ?? 99))
+    .map((page) => ({ label: page.settings?.title ?? page.name, href: page.route, icon: page.settings?.menu?.icon, section: page.settings?.menu?.group }));
+  return items.filter((item) => typeof item?.label === 'string' && typeof item.href === 'string' && /^\/(?![/\\])/.test(item.href) && !/[\\\u0000-\u001f]/.test(item.href))
+    .map(({ label, href, icon, section }) => ({ label, href, icon: typeof icon === 'string' ? icon : undefined, section: typeof section === 'string' ? section : undefined }));
 }
 
 /** Previews are private to the project's workspace members (the iframe is same-origin, so the Cloud session applies). */

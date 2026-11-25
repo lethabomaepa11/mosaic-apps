@@ -7,6 +7,7 @@
   import { ensureRoot, evaluateBoolean, type FormNode, type PageDef } from '@mosaic-apps/core';
   import type { MosaicClient } from '../client/api';
   import NodeRenderer from './NodeRenderer.svelte';
+  import { appearanceStyle } from './component-options';
   import { fade } from 'svelte/transition';
   import { getContext, setContext, onDestroy } from 'svelte';
   import { themeState } from '../lib/theme.svelte';
@@ -64,7 +65,7 @@
   {#if seo?.socialImage}<meta property="og:image" content={seo.socialImage} />{/if}
 </svelte:head>
 
-<div class={`m-root m-stack m-transition-${transition?.kind ?? 'fade'}`} style={`--m-enter-duration:${duration}ms;--m-enter-delay:${transition?.delay ?? 0}ms`} in:fade={{ duration, delay: transition?.delay ?? 0 }}>
+<div class={`m-root m-page-root m-stack m-transition-${transition?.kind ?? 'fade'}`} style={`--m-enter-duration:${duration}ms;--m-enter-delay:${transition?.delay ?? 0}ms;${appearanceStyle(root.props?.appearance)}`} in:fade={{ duration, delay: transition?.delay ?? 0 }}>
   {#each root.children ?? [] as child, index (child.id)}
     {@const childTransition = { ...(transition ?? {}), delay: (transition?.delay ?? 0) + index * 18 }}
     <NodeRenderer node={child} {visible} {disabled} {client} data={scope} transition={childTransition} />
@@ -72,6 +73,7 @@
 </div>
 
 <style>
+  .m-page-root { background:transparent; color:inherit; }
   .m-transition-slide { animation: m-enter-slide var(--m-enter-duration, 180ms) ease both; animation-delay: var(--m-enter-delay, 0ms); }
   .m-transition-scale { animation: m-enter-scale var(--m-enter-duration, 180ms) ease both; animation-delay: var(--m-enter-delay, 0ms); }
   .m-transition-blur { animation: m-enter-blur var(--m-enter-duration, 180ms) ease both; animation-delay: var(--m-enter-delay, 0ms); }

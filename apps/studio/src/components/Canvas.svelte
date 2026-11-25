@@ -12,7 +12,7 @@
 
 <div class="design-canvas">
   {#if designer.root}
-    <div class="design-form">
+    <div class:design-form={!designer.page}>
       <CanvasNode node={designer.root} depth={0} />
     </div>
   {:else}

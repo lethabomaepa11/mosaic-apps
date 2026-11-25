@@ -84,6 +84,7 @@ a { color: inherit; text-decoration: none; }
   padding: 26px;
   overflow: auto;
 }
+.app-main.published-page { padding: 0; }
 
 .app-header {
   display: flex;

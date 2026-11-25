@@ -17,10 +17,24 @@ function Table({ rows = [], columns = [], editHref }) {
   );
 }
 
-export async function MosaicNode({ node }) {
+export function MosaicNode({ node }) {
   const props = node.props ?? {};
   if (props.visibleIf === 'false') return null;
+  const style = {};
+  for (const property of ['padding', 'margin']) {
+    for (const side of ['', 'Top', 'Right', 'Bottom', 'Left']) {
+      const key = property + side, value = props.appearance?.[key];
+      if (Number.isFinite(value) && value >= (property === 'margin' ? -200 : 0) && value <= 200) style[key] = value;
+    }
+  }
+  const content = <NodeContent node={node} props={props} />;
+  return Object.keys(style).length ? <div style={style}>{content}</div> : content;
+}
+
+async function NodeContent({ node, props }) {
   switch (node.type) {
+    case 'page':
+      return node.children?.map((child) => <MosaicNode key={child.id} node={child} />);
     case 'heading': {
       const Heading = `h${Math.max(1, Math.min(4, Number(props.level) || 1))}`;
       return <Heading>{props.text}</Heading>;

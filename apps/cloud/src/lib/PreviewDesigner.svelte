@@ -74,6 +74,7 @@
 <div class="studio preview-designer">
   <header class="flex flex-wrap items-center gap-2 border-b border-base-300 bg-base-100 p-3">
     <a class="btn btn-outline btn-sm" href={`${base}/studio`}>Back to Studio</a>
+    <a class="btn btn-ghost btn-sm" href={`${base}/studio?sidebar`}>Edit sidebar</a>
     {#if ready}
       <h1 class="mr-auto text-lg font-semibold">{designer.page?.name ?? designer.form?.name}</h1>
       <button class="btn btn-ghost btn-sm" type="button" disabled={!designer.past.length || busy} onclick={() => designer.undo()}>Undo</button>

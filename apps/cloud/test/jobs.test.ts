@@ -10,7 +10,7 @@ delete process.env.VERCEL;
 const { getCloudDb, readCloud } = await import('../src/lib/server/db');
 const { claimJob, enqueueJob, queueLatestDelivery, runJob, runJobs } = await import('../src/lib/server/jobs');
 const { deleteProject, deploymentCredentials, readProjectForm, savePendingProject } = await import('../src/lib/server/projects');
-const { previewRuntime } = await import('../src/lib/server/preview');
+const { previewNavigation, previewPages, previewRuntime } = await import('../src/lib/server/preview');
 const { saveConnection } = await import('../src/lib/server/connections');
 const { createMosaicServer } = await import('@mosaic-apps/server');
 const { encryptProviderSecret } = await import('../src/lib/server/providers');
@@ -500,6 +500,11 @@ test('staged generation refines twice, previews individual features, and release
     assert.equal(await releaseCount(), 0);
     const project = (await db.query<Parameters<typeof previewRuntime>[0]>('SELECT id, slug, app_spec FROM cloud_projects WHERE id = $1', [projectId])).rows[0]!;
     const preview = await previewRuntime(project);
+    const pages = await previewPages(project);
+    assert.ok((await previewNavigation(project, pages)).some((item) => item.href === '/equipment'));
+    const customNav = [{ label: 'Inventory', href: '/equipment' }, { label: 'Home', href: '/' }];
+    assert.equal((await preview.call('PUT', '/api/settings', { key: 'app.nav', value: customNav })).status, 200);
+    assert.deepEqual((await previewNavigation(project, pages)).map(({ label, href }) => ({ label, href })), customNav);
     const created = await preview.call('POST', '/api/entities/equipment', { name: 'Preview equipment', status: 'available' });
     assert.equal(created.status, 201, JSON.stringify(created.body));
     assert.equal((await preview.call('GET', '/api/entities/loan')).status, 404);
@@ -517,6 +522,7 @@ test('staged generation refines twice, previews individual features, and release
     assert.equal(await releaseCount(), 0);
     assert.equal((await preview.call('GET', '/api/entities/loan')).status, 200);
     assert.equal((await preview.call('GET', `/api/entities/equipment/${created.body.data.id}`)).status, 200);
+    assert.deepEqual((await previewNavigation(project, await previewPages(project))).map(({ label, href }) => ({ label, href })), customNav);
     await step(); // Package the release.
     assert.equal((await checkpoint()).status, 'completed');
     assert.equal(await releaseCount(), 1);
