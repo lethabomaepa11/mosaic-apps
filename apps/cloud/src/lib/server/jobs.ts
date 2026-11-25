@@ -32,6 +32,23 @@ export async function enqueueJob(db: Db, input: { projectId: string; kind: JobKi
   return jobId;
 }
 
+export async function queueLatestDelivery(db: Db, projectId: string): Promise<string | undefined> {
+  return db.tx(async (tx) => {
+    await tx.query('SELECT id FROM cloud_projects WHERE id = $1 FOR UPDATE', [projectId]);
+    const active = await tx.query("SELECT 1 FROM cloud_jobs WHERE project_id = $1 AND status IN ('queued', 'running') LIMIT 1", [projectId]);
+    if (active.rows.length) return 'Wait for the current job to finish before delivering.';
+    const release = await tx.query<{ id: string }>("SELECT id FROM cloud_releases WHERE project_id = $1 AND status = 'ready' ORDER BY version DESC LIMIT 1", [projectId]);
+    if (!release.rows[0]) return 'Build a release before delivering.';
+    const connection = await tx.query(
+      `SELECT 1 FROM cloud_provider_connections connection JOIN cloud_projects project ON project.organization_id = connection.organization_id
+       WHERE project.id = $1 AND connection.status = 'connected' AND connection.provider IN ('github', 'vercel', 'neon') LIMIT 1`, [projectId],
+    );
+    if (!connection.rows.length) return 'Connect a provider in Settings before delivering.';
+    await enqueueJob(tx, { projectId, kind: 'deliver', metadata: { releaseId: release.rows[0].id }, stage: 'Waiting to deliver the latest release' });
+    await tx.query("UPDATE cloud_projects SET status = 'queued', updated_at = now() WHERE id = $1", [projectId]);
+  });
+}
+
 /** Claims the oldest runnable job, one at a time per project. Crashed jobs are requeued after STALE_MINUTES. */
 export async function claimJob(db: Db): Promise<ClaimedJob | undefined> {
   await db.query(

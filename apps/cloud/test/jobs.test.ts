@@ -8,7 +8,7 @@ process.env.GROQ_API_KEY = 'test-key';
 delete process.env.VERCEL;
 
 const { getCloudDb } = await import('../src/lib/server/db');
-const { claimJob, enqueueJob, runJob, runJobs } = await import('../src/lib/server/jobs');
+const { claimJob, enqueueJob, queueLatestDelivery, runJob, runJobs } = await import('../src/lib/server/jobs');
 const { encryptProviderSecret } = await import('../src/lib/server/providers');
 const { equipmentSpec } = await import('./fixtures/equipment-spec');
 const db = await getCloudDb();
@@ -81,8 +81,12 @@ test('a stalled running job is requeued and claimed again', async () => {
   await db.query("UPDATE cloud_jobs SET status = 'completed' WHERE id = $1", [jobId]);
 });
 
-test('delivery provisions Neon, commits to GitHub, deploys to Vercel, and tracks the deployment', async () => {
+test('connecting providers after generation lets the existing release reach GitHub, Neon and Vercel', async () => {
   const { organizationId, projectId } = await createProject();
+  await enqueueJob(db, { projectId, kind: 'generate', metadata: { prompt: 'Track customers' } });
+  await runDue();
+  assert.deepEqual((await jobsOf(projectId)).map((job) => job.kind), ['generate']);
+  assert.match(await queueLatestDelivery(db, projectId) ?? '', /Connect a provider/);
   for (const provider of ['neon', 'github', 'vercel']) await connect(organizationId, provider, provider === 'github' ? { login: 'octo' } : {});
   const calls: Array<{ method: string; url: string; body: any; auth: string | null }> = [];
   let deploymentState = 'BUILDING';
@@ -104,7 +108,8 @@ test('delivery provisions Neon, commits to GitHub, deploys to Vercel, and tracks
     return reply({ message: `unexpected ${url}` }, 500);
   }) as typeof fetch;
   try {
-    await enqueueJob(db, { projectId, kind: 'generate', metadata: { prompt: 'Track customers' } });
+    assert.equal(await queueLatestDelivery(db, projectId), undefined);
+    assert.match(await queueLatestDelivery(db, projectId) ?? '', /current job/);
     await runDue();
     // Deployment polling is delayed; make it due now instead of waiting.
     await db.query("UPDATE cloud_jobs SET run_after = now() WHERE project_id = $1 AND status = 'queued'", [projectId]);

@@ -3,18 +3,19 @@ import type { Actions, PageServerLoad } from './$types';
 import { getCloudDb, id } from '#lib/server/db';
 import { isDaisyTheme } from '#lib/themes';
 import type { ProjectBlueprint } from '#lib/server/groq';
-import { enqueueJob, kickJobs } from '#lib/server/jobs';
+import { enqueueJob, kickJobs, queueLatestDelivery } from '#lib/server/jobs';
+import { canManageConnections } from '#lib/server/connections';
 
 async function projectFor(projectId: string, userId: string) {
   const db = await getCloudDb();
   const result = await db.query<{
-    id: string; organization_id: string; name: string; slug: string; prompt: string; status: string;
+    id: string; organization_id: string; role: string; name: string; slug: string; prompt: string; status: string;
     include_home: boolean; include_login: boolean; app_framework: string; ui_system: string; ui_theme: string;
     blueprint: ProjectBlueprint | null; planner_model: string | null; planned_at: string | null;
     github_repository: string | null; vercel_project_id: string | null; neon_project_id: string | null;
   }>(
     // Explicit columns: this row is sent to the browser, and database_secret must never be.
-    `SELECT project.id, project.organization_id, project.name, project.slug, project.prompt, project.status,
+    `SELECT project.id, project.organization_id, membership.role, project.name, project.slug, project.prompt, project.status,
        project.include_home, project.include_login, project.app_framework, project.ui_system, project.ui_theme,
        project.blueprint, project.planner_model, project.planned_at, project.github_repository,
        project.vercel_project_id, project.neon_project_id
@@ -48,6 +49,16 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 };
 
 export const actions: Actions = {
+  deliver: async ({ params, locals }) => {
+    if (!locals.user) throw redirect(303, '/login');
+    const project = await projectFor(params.id, locals.user.id);
+    if (!project) throw error(404, 'Project not found');
+    if (!canManageConnections(project.role)) return fail(403, { deliveryMessage: 'Only workspace owners and admins can deliver a release.' });
+    const message = await queueLatestDelivery(await getCloudDb(), project.id);
+    if (message) return fail(409, { deliveryMessage: message });
+    kickJobs();
+    return { deliveryQueued: true };
+  },
   settings: async ({ params, request, locals }) => {
     if (!locals.user) throw redirect(303, '/login');
     const user = locals.user;

@@ -204,11 +204,19 @@
             {:else}<p class="mb-0 p-4 text-sm muted">The first release appears once generation finishes.</p>{/if}
           </div>
           <div class="grid gap-4 sm:grid-cols-3">
-            <div class="surface p-4"><div class="mb-2 flex items-center gap-2 text-sm font-semibold"><GitBranch size={15} /> GitHub</div>{#if data.project.github_repository}<a class="link link-hover break-all text-sm" href={`https://github.com/${data.project.github_repository}`} target="_blank" rel="noreferrer">{data.project.github_repository}</a>{:else}<p class="mb-0 text-sm muted">Not connected</p>{/if}</div>
-            <div class="surface p-4"><div class="mb-2 flex items-center gap-2 text-sm font-semibold"><Cloud size={15} /> Vercel</div>{#if production?.url}<a class="link link-hover break-all text-sm" href={production.url} target="_blank" rel="noreferrer">{production.url.replace('https://', '')}</a>{:else}<p class="mb-0 flex items-center gap-1.5 text-sm muted"><span class={`status-dot ${tone(production?.status ?? '')}`}></span>{(production?.status ?? 'not configured').replaceAll('_', ' ')}</p>{/if}</div>
+            <div class="surface p-4"><div class="mb-2 flex items-center gap-2 text-sm font-semibold"><GitBranch size={15} /> GitHub</div>{#if data.project.github_repository}<a class="link link-hover break-all text-sm" href={`https://github.com/${data.project.github_repository}`} target="_blank" rel="noreferrer">{data.project.github_repository}</a>{:else}<p class="mb-0 text-sm muted">No repository yet</p>{/if}</div>
+            <div class="surface p-4"><div class="mb-2 flex items-center gap-2 text-sm font-semibold"><Cloud size={15} /> Vercel</div>{#if production?.url}<a class="link link-hover break-all text-sm" href={production.url} target="_blank" rel="noreferrer">{production.url.replace('https://', '')}</a>{:else}<p class="mb-0 flex items-center gap-1.5 text-sm muted"><span class={`status-dot ${tone(production?.status ?? '')}`}></span>{!production || production.status === 'not_configured' ? 'No deployment yet' : production.status.replaceAll('_', ' ')}</p>{/if}</div>
             <div class="surface p-4"><div class="mb-2 flex items-center gap-2 text-sm font-semibold"><Database size={15} /> Database</div><p class="mb-0 text-sm muted">{data.project.neon_project_id ? 'Neon PostgreSQL provisioned' : 'Not provisioned'}</p></div>
           </div>
-          {#if !data.project.github_repository && !data.project.vercel_project_id}<p class="text-center text-sm muted"><a class="link link-primary" href="/settings/connections">Connect GitHub, Vercel or Neon</a> to deliver future releases automatically.</p>{/if}
+          <div class="flex flex-wrap items-center gap-3">
+            {#if data.releases.length && ['owner', 'admin'].includes(data.project.role)}
+              <form method="POST" action="?/deliver" use:enhance><button class="btn btn-primary btn-sm" disabled={busy}>Deliver latest</button></form>
+            {/if}
+            <a class="link link-primary text-sm" href="/settings/connections">Manage connections</a>
+          </div>
+          {#if !data.project.neon_project_id}<p class="text-sm muted">Vercel delivery requires a Neon connection to provision PostgreSQL.</p>{/if}
+          {#if form?.deliveryMessage}<div class="alert alert-error text-sm" role="alert">{form.deliveryMessage}</div>{/if}
+          {#if form?.deliveryQueued}<p class="text-sm muted" role="status">Delivery queued. Follow its progress in the activity feed.</p>{/if}
           <div class="surface overflow-hidden">
             <h3 class="border-b border-base-300 px-4 py-3 text-sm font-semibold">Activity</h3>
             {#if data.jobs.length}
