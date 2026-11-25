@@ -1,5 +1,7 @@
 import { publishedForm, readMosaic, recordFormProps } from '../lib/artifacts.js';
 import { RecordForm } from './record-form.jsx';
+import LocationMap from './location-map.jsx';
+import OAuthChoices from './login/oauth-choices.jsx';
 
 function safeLink(value) {
   return typeof value === 'string' && (/^https?:\/\//i.test(value) || /^\/(?![\/\\])/.test(value) && !value.includes('\\')) ? value : undefined;
@@ -35,6 +37,10 @@ async function NodeContent({ node, props }) {
   switch (node.type) {
     case 'page':
       return node.children?.map((child) => <MosaicNode key={child.id} node={child} />);
+    case 'map':
+      return <LocationMap {...props} />;
+    case 'oauthSignIn':
+      return <OAuthChoices provider={props.provider} next={props.next} />;
     case 'heading': {
       const Heading = `h${Math.max(1, Math.min(4, Number(props.level) || 1))}`;
       return <Heading>{props.text}</Heading>;

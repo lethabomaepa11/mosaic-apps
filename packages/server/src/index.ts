@@ -38,6 +38,8 @@ export { migrationRoutes } from './modules/migrations-routes.js';
 export { fileRoutes } from './modules/files.js';
 export { metaRoutes, PLATFORM_VERSION } from './modules/meta.js';
 export { authRoutes } from './modules/auth-routes.js';
+export type { OAuthOptions } from './modules/oauth.js';
+export type { NotificationOptions } from './modules/notifications.js';
 export { entityAdminRoutes } from './modules/entity-admin.js';
 export {
   endpointRegistryRoutes,

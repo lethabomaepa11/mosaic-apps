@@ -4,8 +4,14 @@ import type { ComponentDef } from './types.js';
 import Button from '../components/Button.svelte';
 import Menu from '../components/Menu.svelte';
 import Chart from '../components/Chart.svelte';
+import OAuthButtons from '../components/OAuthButtons.svelte';
 
 export const NAV_ENTRIES: ComponentDef[] = [
+  { type: 'oauthSignIn', label: 'OAuth sign-in', category: 'Navigation', icon: 'keyRound', pages: true, component: OAuthButtons, defaults: { provider: 'all', next: '/' },
+    inspector: [
+      { key: 'provider', label: 'Provider', kind: 'select', options: [{ value: 'all', label: 'All configured providers' }, { value: 'google', label: 'Google' }, { value: 'github', label: 'GitHub' }] },
+      { key: 'next', label: 'After sign-in', kind: 'string', help: 'Use a path on this app, such as /dashboard.' },
+    ] },
   { type: 'button', label: 'Button', category: 'Navigation', icon: 'button', component: Button, defaults: { label: 'Button', variant: 'primary' },
     inspector: [{ key: 'label', label: 'Label', kind: 'string' }, { key: 'variant', label: 'Variant', kind: 'select', options: [{ value: 'primary', label: 'Primary' }, { value: 'secondary', label: 'Secondary' }, { value: 'ghost', label: 'Ghost' }, { value: 'danger', label: 'Danger' }] }, { key: 'size', label: 'Size', kind: 'select', options: [{ value: 'sm', label: 'Small' }, { value: 'md', label: 'Medium' }, { value: 'lg', label: 'Large' }] }, { key: 'block', label: 'Full width', kind: 'boolean' }] },
   { type: 'iconButton', label: 'Icon button', category: 'Navigation', icon: 'circle', component: Button, defaults: { label: '＋', icon: true, variant: 'secondary' },

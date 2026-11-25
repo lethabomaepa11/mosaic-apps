@@ -152,7 +152,6 @@ export function generateProjectFiles(input: { name: string; slug: string; spec: 
     put('package.json', json(manifest));
     put('package-lock.json', json(lock));
     put('mosaic.config.json', json({ name: input.name, slug: input.slug, framework, auth: true, demo: false, pwa: false, web: { port: 3000 }, api: { port: 3000 } }));
-    put('.env.example', 'DATABASE_URL=pglite://./data\n# Set a stable random MOSAIC_JWT_SECRET of at least 32 characters before production.\nMOSAIC_JWT_SECRET=\nADMIN_EMAIL=\nADMIN_PASSWORD=\n');
     put('README.md', `# ${input.name}\n\nA Mosaic Cloud app on Next.js. Run \`npm ci\` and \`npm run dev\` from this directory. First startup imports the generated app into embedded PostgreSQL under \`data/\`. The local sign-in is \`admin@mosaic.local\` / \`admin1234\` unless you set credentials in \`.env\`.\n\nFor production, use the Next.js preset at the repository root and set \`DATABASE_URL\` to durable PostgreSQL. Set a stable \`MOSAIC_JWT_SECRET\` of at least 32 characters and unique \`ADMIN_EMAIL\` and \`ADMIN_PASSWORD\` values. Check \`/api/health\` after startup.\n\nPublished pages use their configured routes. Published entity forms use \`/f/<slug>\`. Manage the app through the same-origin Mosaic API at \`/api\`.\n`);
   } else {
     const mosaicTs = out.get(`${SERVER}/mosaic.ts`);

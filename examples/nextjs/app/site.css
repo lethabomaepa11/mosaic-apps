@@ -28,6 +28,7 @@ main.published-page { max-width:none; margin:0; padding:0; }
 .sidebar-studio nav { display:grid; align-content:start; gap:.25rem; padding:.75rem; border:1px solid var(--border); border-radius:.6rem; background:var(--surface); }
 .sidebar-studio nav button { width:100%; text-align:left; }
 .sidebar-studio button[aria-pressed="true"] { color:var(--accent); border-color:var(--accent); }
+.location-map { display:block; width:100%; min-height:200px; aspect-ratio:2; border:0; object-fit:cover; border-radius:.75rem; }
 main section + section { margin-top:1rem; }
 .workflow-card { padding:1.25rem; border:1px solid var(--border); border-radius:.75rem; background:var(--surface); }
 .workflow-card > :first-child { margin-top:0; }

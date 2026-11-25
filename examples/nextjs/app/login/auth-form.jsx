@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 
-export default function AuthForm({ allowRegistration, registering, page }) {
+export default function AuthForm({ allowRegistration, registering, page, children }) {
   const [error, setError] = useState('');
   const [pending, setPending] = useState(false);
   let title = registering ? 'Create an account' : 'Sign in';
@@ -57,6 +57,7 @@ export default function AuthForm({ allowRegistration, registering, page }) {
       <button type="submit" disabled={pending}>{pending ? 'Please wait…' : submitLabel}</button>
       {error && <p role="alert">{error}</p>}
     </form>
+    {children}
     {allowRegistration && <p><a href={registering ? '/login' : '/signup'}>{alternateLabel}</a></p>}
   </main>;
 }

@@ -1,5 +1,6 @@
 .next/
 .env*
+!.env.example
 .mosaic-data/
 node_modules/
 data/

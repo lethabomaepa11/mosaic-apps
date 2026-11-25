@@ -33,7 +33,7 @@ async function start(project: PreviewProject, databaseUrl: string): Promise<Prev
   const jwtSecret = secretFor(project.id, 'jwt');
   const server = await createMosaicServer({
     databaseUrl, database: { poolMax: 2, idleTimeoutMillis: 5_000 },
-    auth: { jwtSecret }, cors: false,
+    auth: { jwtSecret, oauth: false }, notifications: false, cors: false,
     seed: { admin: { email: ADMIN_EMAIL, password: secretFor(project.id, 'admin') }, demo: false },
   });
   try {

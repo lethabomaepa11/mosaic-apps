@@ -108,6 +108,14 @@ CREATE TABLE IF NOT EXISTS mosaic_roles (
   permissions  text[] NOT NULL DEFAULT '{}'
 );
 
+CREATE TABLE IF NOT EXISTS mosaic_oauth_identities (
+  provider text NOT NULL,
+  subject text NOT NULL,
+  user_id uuid NOT NULL REFERENCES mosaic_users(id) ON DELETE CASCADE,
+  PRIMARY KEY (provider, subject),
+  UNIQUE (provider, user_id)
+);
+
 CREATE TABLE IF NOT EXISTS mosaic_audit_log (
   id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   action     text NOT NULL,

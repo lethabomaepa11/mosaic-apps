@@ -3,12 +3,24 @@
   import { page } from '$app/state';
   import { client } from '#lib/client';
   import { toast } from '@mosaic-apps/ui';
+  import { onMount } from 'svelte';
 
   import type { authPageLayout } from '#lib/server/auth-page';
   let { data }: { data: { registering: boolean; allowRegistration: boolean; layout: Awaited<ReturnType<typeof authPageLayout>> } } = $props();
   let fields = $state({ name: '', email: '', password: '' });
   let error = $state('');
   let busy = $state(false);
+  let oauth = $state<{ signedIn: boolean; providers: Array<{ id: string; label: string }> }>();
+  const oauthError = $derived(page.url.searchParams.get('oauth'));
+  onMount(async () => {
+    try {
+      const response = await fetch('/api/auth/oauth');
+      if (response.ok) oauth = (await response.json()).data;
+    } catch { /* Password sign-in remains available. */ }
+  });
+  function oauthUrl(provider: string) {
+    return `/api/auth/oauth/${provider}/start?next=${encodeURIComponent(page.url.searchParams.get('next') ?? '/')}`;
+  }
 
   async function submit(e: Event) {
     e.preventDefault();
@@ -55,4 +67,18 @@
     </button>
     {#if data.allowRegistration}<a href={data.registering ? '/login' : '/signup'}>{data.layout.alternateLabel}</a>{/if}
   </form>
+  {#if oauthError}
+    <p role="alert" class="m-field__error">{oauthError === 'existing' ? 'This email already has an account. Sign in with your password, then return here to link the provider.' : 'Could not complete provider sign-in. Try again or sign in with your password.'}</p>
+  {/if}
+  {#if oauth?.providers.length}
+    <div class="m-stack" aria-label="Sign-in providers">
+      {#each oauth.providers as item (item.id)}
+        {#if oauth.signedIn}
+          <form method="POST" action={oauthUrl(item.id)}><button class="m-btn m-btn--secondary m-btn--block" type="submit">Link {item.label} account</button></form>
+        {:else}
+          <a class="m-btn m-btn--secondary m-btn--block" href={oauthUrl(item.id)} data-sveltekit-reload onclick={() => client.setToken(null)}>Continue with {item.label}</a>
+        {/if}
+      {/each}
+    </div>
+  {/if}
 </div>

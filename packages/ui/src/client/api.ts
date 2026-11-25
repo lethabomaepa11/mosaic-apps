@@ -95,6 +95,10 @@ export class MosaicClient {
     return this.request('POST', '/auth/logout');
   }
 
+  sendNotification(input: { title: string; message: string; to?: string }): Promise<{ sent: true; provider: 'ntfy' | 'resend' }> {
+    return this.request('POST', '/notifications', input);
+  }
+
   changePassword(currentPassword: string, newPassword: string): Promise<void> {
     return this.request('POST', '/auth/change-password', { currentPassword, newPassword });
   }

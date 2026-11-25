@@ -71,6 +71,9 @@ the preview pages. In the deployed app, use the visual Studio on SvelteKit or
 **Page Studio** on Next.js to edit and publish page JSON. The app itself processes
 credentials through its auth API.
 
+See [App integrations](./app-integrations.md) for configuring OAuth, notifications,
+and maps in the framework and scaffold.
+
 **Source & delivery** also lets you download the app. Install dependencies and run
 `npm run dev` from the repository root. The generated pages and forms import on
 first start. Next.js downloads include a lockfile, so use `npm ci`. Both frameworks

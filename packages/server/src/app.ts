@@ -9,6 +9,8 @@ import { ensurePlatformTables } from './platform.js';
 import { listEntities, syncEntitiesDir } from './entities/registry.js';
 import { resolveUser, type AuthEnv } from './modules/auth.js';
 import { authRoutes } from './modules/auth-routes.js';
+import { oauthRoutes, type OAuthOptions } from './modules/oauth.js';
+import { notificationOptions, notificationRoutes, type NotificationOptions } from './modules/notifications.js';
 import { crudRoutes } from './crud/router.js';
 import { entityAdminRoutes } from './modules/entity-admin.js';
 import { artifactRoutes } from './modules/artifacts.js';
@@ -42,6 +44,7 @@ export interface MosaicServerConfig {
     jwtSecret?: string;
     tokenTtlSeconds?: number;
     allowRegistration?: boolean;
+    oauth?: OAuthOptions | false;
   };
   /** Enable/disable CORS, or restrict browser access to an explicit origin list. */
   cors?: boolean | { origins: string[] };
@@ -49,6 +52,7 @@ export interface MosaicServerConfig {
   entitiesDir?: string;
   uploadsDir?: string;
   publicFiles?: boolean;
+  notifications?: NotificationOptions | false;
   /** Package/project endpoints mounted under `/api/extensions`. */
   endpoints?: MosaicEndpointRegistration[];
   /** `true` seeds default admin + demo data; or pass explicit options */
@@ -139,12 +143,20 @@ export async function createMosaicServer(config: MosaicServerConfig): Promise<Mo
   );
 
   // ---- modules ----
-  app.route('/api/auth', authRoutes({ db, secret: jwtSecret, enabled: authEnabled, tokenTtl, allowRegistration }));
+  const auth = { db, secret: jwtSecret, enabled: authEnabled, tokenTtl, allowRegistration };
+  app.route('/api/auth', authRoutes(auth));
+  const oauthOrigin = process.env.MOSAIC_OAUTH_ORIGIN;
+  app.route('/api/auth/oauth', oauthRoutes(auth, config.auth?.oauth === false ? undefined : config.auth?.oauth ?? (oauthOrigin ? {
+    origin: oauthOrigin,
+    google: { clientId: process.env.MOSAIC_GOOGLE_CLIENT_ID ?? '', clientSecret: process.env.MOSAIC_GOOGLE_CLIENT_SECRET ?? '' },
+    github: { clientId: process.env.MOSAIC_GITHUB_CLIENT_ID ?? '', clientSecret: process.env.MOSAIC_GITHUB_CLIENT_SECRET ?? '' },
+  } : undefined)));
   app.route('/api/entities', entityAdminRoutes(db));
   app.route('/api/entities', crudRoutes({ db, authEnabled }));
   app.route('/api/forms', artifactRoutes({ db, kind: 'form', managePerm: 'forms:manage' }));
   app.route('/api/pages', artifactRoutes({ db, kind: 'page', managePerm: 'pages:manage' }));
   app.route('/api/settings', settingsRoutes(db));
+  app.route('/api/notifications', notificationRoutes(db, config.notifications === false ? undefined : config.notifications ?? notificationOptions(process.env)));
   app.route('/api/nav', navRoutes(db));
   app.route('/api/theme', themeRoutes(db));
   app.route('/api/ref-lists', refListRoutes(db));

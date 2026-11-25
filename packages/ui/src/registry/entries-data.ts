@@ -7,8 +7,20 @@ import Pagination from '../components/Pagination.svelte';
 import Toolbar from '../components/Toolbar.svelte';
 import FilterBar from '../components/FilterBar.svelte';
 import Subform from '../components/Subform.svelte';
+import Map from '../components/Map.svelte';
 
 export const DATA_ENTRIES: ComponentDef[] = [
+  {
+    type: 'map', label: 'Map', category: 'Data', icon: 'mapPin', pages: true, component: Map,
+    defaults: { provider: 'openstreetmap', title: 'Location map', latitude: -26.2041, longitude: 28.0473 },
+    inspector: [
+      { key: 'provider', label: 'Provider', kind: 'select', options: [{ value: 'openstreetmap', label: 'OpenStreetMap' }, { value: 'mapbox', label: 'Mapbox' }] },
+      { key: 'title', label: 'Accessible title', kind: 'string' },
+      { key: 'latitude', label: 'Latitude', kind: 'number', min: -85, max: 85 },
+      { key: 'longitude', label: 'Longitude', kind: 'number', min: -180, max: 180 },
+      { key: 'mapboxToken', label: 'Mapbox public token', kind: 'string', help: 'Use a pk. token restricted to your website.' },
+    ],
+  },
   {
     type: 'subform',
     label: 'Embedded form',
