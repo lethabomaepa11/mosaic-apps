@@ -18,6 +18,15 @@ export function signIn(path) {
   redirect(`/login?next=${encodeURIComponent(path)}`);
 }
 
+export function canManagePages(user) {
+  return Boolean(user?.isAdmin || user?.permissions?.some((permission) => ['pages:manage', 'pages:*', '*'].includes(permission)));
+}
+
+export async function readAuthPage(route) {
+  const { data } = await readMosaic('/pages?published=true');
+  return data?.find((page) => page.route === route);
+}
+
 export async function publishedPage(segments) {
   const { data: pages } = await readMosaic('/pages?published=true&includeRestrictedRoutes=true');
   if (!pages) throw new Error('Mosaic pages are unavailable.');

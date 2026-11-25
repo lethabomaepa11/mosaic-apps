@@ -270,6 +270,13 @@
               {/if}
               <label class="block text-xs font-medium">Theme<select class="select select-sm select-bordered mt-1 w-full" name="uiTheme" value={form?.uiTheme ?? data.project.ui_theme}>{#each DAISY_THEME_CHOICES as theme}<option value={theme.value}>{theme.label}</option>{/each}</select></label>
             </div>
+            {#if data.project.blueprint && ['owner', 'admin'].includes(data.project.role)}
+              <input type="hidden" name="registrationSettings" value="1" />
+              <label class="flex items-start gap-3 text-sm">
+                <input class="checkbox checkbox-primary checkbox-sm mt-0.5" type="checkbox" name="allowRegistration" checked={data.project.allow_registration} />
+                <span><strong>Allow public sign-up</strong><span class="block text-xs muted">Anyone with the app URL can create an account after the next release.</span></span>
+              </label>
+            {/if}
             <div class="flex flex-wrap gap-2 text-xs"><span class="chip">{data.project.include_home ? 'Homepage' : 'No homepage'}</span><span class="chip">{data.project.include_login ? 'Sign-in' : 'Public only'}</span><span class="chip font-mono">{data.project.slug}</span></div>
             {#if form?.settingsMessage}<div class="alert alert-error text-sm" role="alert">{form.settingsMessage}</div>{/if}
             {#if form?.settingsSaved}<div class="alert alert-success text-sm" role="status">Design settings saved.</div>{/if}

@@ -16,7 +16,7 @@ export const load: PageServerLoad = async ({ params, locals, url }) => {
   const app = { id: project.id, name: project.name, slug: project.slug, theme: project.ui_theme, framework: frameworkLabel(project.app_framework), base,
     liveUrl: project.live_url?.replace(/\/$/, ''), studioAvailable: project.app_framework !== 'nextjs', allowRegistration: project.app_spec?.allowRegistration === true };
   const path = `/${params.path ?? ''}`.replace(/\/$/, '') || '/';
-  if (path === '/login') return { app, status: 'sign-in' as const, page: null, nav: [] };
+  if (path === '/signup' && !app.allowRegistration) throw error(404, 'Sign-up is closed.');
   if (!project.app_spec) return { app, status: 'building' as const, page: null, nav: [] };
 
   const pages = await previewPages(project).catch((cause) => {
@@ -24,6 +24,11 @@ export const load: PageServerLoad = async ({ params, locals, url }) => {
     return undefined;
   });
   if (!pages) return { app, status: 'unavailable' as const, page: null, nav: [] };
+  if (path === '/login' || path === '/signup') {
+    const authPage = pages.find((item) => item.route === path);
+    const title = authPage?.root.children?.find((node) => node.type === 'heading')?.props?.text;
+    return { app, status: 'sign-in' as const, page: null, nav: [], registering: path === '/signup', authTitle: typeof title === 'string' ? title : undefined };
+  }
   const page = pages.find((item) => item.route === path) ?? (path === '/' ? pages.find((item) => item.settings?.menu?.show !== false) : undefined);
   // Navigation mirrors the deployed app: published pages flagged for the menu, in menu order.
   const nav = pages
@@ -35,7 +40,7 @@ export const load: PageServerLoad = async ({ params, locals, url }) => {
     const forms = await call('GET', '/api/forms?published=true');
     if (forms.status !== 200) return { app, status: 'unavailable' as const, page: null, nav };
     return { app, status: 'studio' as const, page: null, nav,
-      studioPages: pages.map(({ id, name, route, settings }) => ({ id, name, route, requiresAuth: settings?.requiresAuth })),
+      studioPages: pages.map(({ id, slug, name, route, settings }) => ({ id, slug, name, route, requiresAuth: settings?.requiresAuth })),
       studioForms: ((forms.body?.data ?? []) as FormDef[]).map(({ id, name, slug, entity }) => ({ id, name, slug, entity })),
       studioEntities: project.app_spec.entities.map(({ name, label, fields }) => ({ name, label, fields: fields.map(({ name, label, type }) => ({ name, label, type })) })),
     };

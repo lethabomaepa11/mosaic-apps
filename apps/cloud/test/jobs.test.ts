@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import test from 'node:test';
 
-process.env.CLOUD_DATABASE_URL = 'pglite://memory';
+process.env.CLOUD_DATABASE_URL = process.env.TEST_CLOUD_QUEUE_DATABASE_URL ?? 'pglite://memory';
 process.env.CLOUD_ADMIN_EMAIL = '';
 process.env.GROQ_API_KEY = 'test-key';
 delete process.env.VERCEL;
@@ -31,9 +31,9 @@ const baseFetch = globalThis.fetch;
 let providerFetch: typeof fetch = baseFetch;
 globalThis.fetch = (async (input: string | URL, init: RequestInit = {}) => String(input).includes('api.groq.com') ? groqReply(JSON.parse(String(init.body))) : providerFetch(input, init)) as typeof fetch;
 
-async function createProject(framework = 'sveltekit') {
-  const organizationId = randomUUID(), projectId = randomUUID();
-  await db.query('INSERT INTO cloud_organizations (id, name, slug) VALUES ($1, $2, $3)', [organizationId, 'Org', `org-${organizationId}`]);
+async function createProject(framework = 'sveltekit', existingWorkspace?: string) {
+  const organizationId = existingWorkspace ?? randomUUID(), projectId = randomUUID();
+  if (!existingWorkspace) await db.query('INSERT INTO cloud_organizations (id, name, slug) VALUES ($1, $2, $3)', [organizationId, 'Org', `org-${organizationId}`]);
   await db.query("INSERT INTO cloud_projects (id, organization_id, name, slug, prompt, status, app_framework) VALUES ($1, $2, 'Northstar CRM', $3, 'Track customers and invoices', 'queued', $4)", [projectId, organizationId, `northstar-${projectId.slice(0, 6)}`, framework]);
   await db.query("INSERT INTO cloud_environments (id, project_id, name, kind) VALUES ($1, $2, 'Production', 'production')", [randomUUID(), projectId]);
   await db.query('INSERT INTO cloud_conversations (id, project_id) VALUES ($1, $2)', [randomUUID(), projectId]);
@@ -116,6 +116,105 @@ test('a stalled running job is requeued and claimed again', async () => {
   assert.equal(claimed?.id, jobId);
   assert.equal(claimed?.attempts, 2);
   await db.query("UPDATE cloud_jobs SET status = 'completed' WHERE id = $1", [jobId]);
+});
+
+test('expired workers cannot write or finish a replacement lease', async () => {
+  const { projectId } = await createProject();
+  const jobId = await enqueueJob(db, { projectId, kind: 'generate' });
+  const before = (await claimJob(db))!;
+  let unblock!: () => void;
+  const stalled = new Promise<void>((resolve) => { unblock = resolve; });
+  let started!: () => void;
+  const active = new Promise<void>((resolve) => { started = resolve; });
+  const old = runJob(db, before, { generate: async ({ stage }) => { started(); await stalled; await stage('stale write', 99); } });
+  await active;
+  await db.query("UPDATE cloud_jobs SET lease_expires_at = now() - interval '1 second' WHERE id = $1", [jobId]);
+  const after = (await claimJob(db))!;
+  assert.equal(after.id, jobId);
+  assert.notEqual(after.lease_id, before.lease_id);
+  await runJob(db, after, { generate: async ({ stage }) => { await stage('finished by replacement', 99); } });
+  unblock();
+  await old;
+  const { rows: [row] } = await db.query('SELECT status, stage FROM cloud_jobs WHERE id = $1', [jobId]);
+  assert.deepEqual(row, { status: 'completed', stage: 'finished by replacement' });
+});
+
+test('queue claims serialize a workspace without blocking another workspace', async () => {
+  const first = await createProject();
+  const second = await createProject('sveltekit', first.organizationId);
+  const third = await createProject();
+  const firstJob = await enqueueJob(db, { projectId: first.projectId, kind: 'generate' });
+  await db.query("UPDATE cloud_jobs SET created_at = now() - interval '1 hour' WHERE id = $1", [firstJob]);
+  const secondJob = await enqueueJob(db, { projectId: second.projectId, kind: 'generate' });
+  const thirdJob = await enqueueJob(db, { projectId: third.projectId, kind: 'generate' });
+  const claims = await Promise.all([claimJob(db), claimJob(db), claimJob(db)]);
+  const active = claims.filter((job) => job !== undefined);
+  if (active.length < 2) {
+    const remaining = await claimJob(db);
+    if (remaining) active.push(remaining);
+  }
+  assert.deepEqual(new Set(active.map((job) => job.id)), new Set([firstJob, thirdJob]));
+  assert.equal(active.length, 2);
+  for (const job of active) await runJob(db, job, { generate: async () => {} });
+  assert.equal((await claimJob(db))?.id, secondJob);
+  await db.query("UPDATE cloud_jobs SET status = 'completed' WHERE id = $1", [secondJob]);
+});
+
+test('preview Studio slugs open and save artifacts when runtime IDs differ', async () => {
+  const { applyApp, inProcessCaller, loginToken } = await import('../src/lib/server/mosaic-runtime');
+  const { compileSpec } = await import('../src/lib/server/spec');
+  const admin = { email: 'preview-test@example.test', password: 'preview-only-password' };
+  const servers = await Promise.all([1, 2].map(() => createMosaicServer({ databaseUrl: 'pglite://memory', seed: { admin, demo: false } })));
+  try {
+    const callers = await Promise.all(servers.map(async (server) => {
+      const call = inProcessCaller(server, await loginToken(inProcessCaller(server, ''), admin.email, admin.password));
+      assert.deepEqual((await applyApp(call, compileSpec(equipmentSpec), { allowDestructive: false })).errors, []);
+      return call;
+    }));
+    for (const path of ['/api/pages/dashboard', '/api/forms/loan-form']) {
+      const fromListRuntime = await callers[0]!('GET', path);
+      const fromEditorRuntime = await callers[1]!('GET', path);
+      assert.equal(fromEditorRuntime.status, 200);
+      assert.notEqual(fromListRuntime.body.data.id, fromEditorRuntime.body.data.id);
+      const { name, root, version } = fromListRuntime.body.data;
+      const saved = await callers[1]!('PUT', `${path}/save-and-publish`, { name, schema: root, expectedVersion: version });
+      assert.equal(saved.status, 200);
+    }
+  } finally {
+    await Promise.all(servers.map((server) => server.close()));
+  }
+});
+
+test('PostgreSQL previews retain edits across runtimes and isolate projects', { skip: !process.env.TEST_CLOUD_PREVIEW_DATABASE_URL }, async () => {
+  const { previewRuntime, discardPreview } = await import('../src/lib/server/preview');
+  const { drainPreviewCleanup, withPreviewSchema } = await import('../src/lib/server/preview-schema');
+  const left = await createProject(), right = await createProject();
+  process.env.CLOUD_PREVIEW_DATABASE_URL = process.env.TEST_CLOUD_PREVIEW_DATABASE_URL;
+  const preview = (projectId: string) => previewRuntime({ id: projectId, slug: projectId, app_spec: equipmentSpec });
+  try {
+    const first = await preview(left.projectId);
+    const created = await first.call('POST', '/api/entities/employee', { fullName: 'Only in the left project' });
+    assert.equal(created.status, 201);
+    const recordId = created.body.data.id;
+    const page = (await first.call('GET', '/api/pages/home')).body.data;
+    page.root.children[0].props.text = 'Edited preview heading';
+    assert.equal((await first.call('PUT', `/api/pages/${page.id}/save-and-publish`, { name: page.name, schema: page.root, expectedVersion: page.version })).status, 200);
+    await discardPreview(left.projectId);
+    const restarted = await preview(left.projectId);
+    assert.equal((await restarted.call('GET', `/api/entities/employee/${recordId}`)).status, 200);
+    assert.equal((await restarted.call('GET', '/api/pages/home')).body.data.root.children[0].props.text, 'Edited preview heading');
+    assert.equal((await (await preview(right.projectId)).call('GET', `/api/entities/employee/${recordId}`)).status, 404);
+  } finally {
+    for (const projectId of [left.projectId, right.projectId]) {
+      await discardPreview(projectId);
+      await db.query('INSERT INTO cloud_preview_cleanup (project_id) VALUES ($1)', [projectId]);
+      await drainPreviewCleanup(db);
+      await withPreviewSchema(projectId, async (previewDb, schema) => {
+        assert.equal((await previewDb.query('SELECT 1 FROM pg_namespace WHERE nspname = $1', [schema])).rowCount, 0);
+      });
+    }
+    delete process.env.CLOUD_PREVIEW_DATABASE_URL;
+  }
 });
 
 for (const framework of ['sveltekit', 'nextjs']) {

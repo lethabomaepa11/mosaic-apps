@@ -1,48 +1,66 @@
 import { createHmac } from 'node:crypto';
-import { createMosaicServer, type MosaicServer } from '@mosaic-apps/server';
+import { createMosaicServer, ident, signJwt, type MosaicServer } from '@mosaic-apps/server';
 import type { PageDef } from '@mosaic-apps/core';
-import { hosted, readCloud } from './db';
-import { applyApp, inProcessCaller, loginToken, seedAndSmokeTest, type MosaicCall } from './mosaic-runtime';
+import { getCloudDb, hosted, readCloud } from './db';
+import { applyApp, inProcessCaller, seedAndSmokeTest, type MosaicCall } from './mosaic-runtime';
 import { compileSpec, type AppSpec, type CompiledApp } from './spec';
+import { previewDatabaseUrl, withPreviewSchema } from './preview-schema';
 
 /**
  * Each project's live preview is a real Mosaic app running inside Cloud with its own
  * database (never the Cloud control database). Its content is fully derived from the
  * verified spec, so an empty database is rebuilt on start: locally it persists under
- * ./data/previews; on serverless hosts it is in-memory per instance.
+ * ./data/previews. Hosted previews use separate schemas in a dedicated configured database.
  */
-interface PreviewRuntime { server: MosaicServer; call: MosaicCall; token: string }
+interface PreviewRuntime { server: MosaicServer; call: MosaicCall; token: () => string }
 const MAX_RUNNING = hosted ? 2 : 8;
 const cache = globalThis as typeof globalThis & { __mosaicPreviews?: Map<string, Promise<PreviewRuntime>> };
 const running: Map<string, Promise<PreviewRuntime>> = (cache.__mosaicPreviews ??= new Map());
 
-export function discardPreview(projectId: string): void {
+export async function discardPreview(projectId: string): Promise<void> {
   const runtime = running.get(projectId);
   running.delete(projectId);
-  void runtime?.then((item) => item.server.close()).catch(() => {});
+  await runtime?.then((item) => item.server.close()).catch(() => {});
 }
 
 const secretFor = (projectId: string, purpose: string) =>
   createHmac('sha256', process.env.CLOUD_SESSION_SECRET ?? 'mosaic-local-preview').update(`${purpose}:${projectId}`).digest('base64url');
 const ADMIN_EMAIL = 'preview-admin@mosaic.local';
 
-async function start(project: { id: string; slug: string; app_spec: AppSpec | null }): Promise<PreviewRuntime> {
+type PreviewProject = { id: string; slug: string; app_spec: AppSpec | null };
+
+async function start(project: PreviewProject, databaseUrl: string): Promise<PreviewRuntime> {
+  const jwtSecret = secretFor(project.id, 'jwt');
   const server = await createMosaicServer({
-    databaseUrl: hosted ? 'pglite://memory' : `pglite://./data/previews/${project.slug.replace(/[^a-z0-9-]/g, '')}`,
-    auth: { jwtSecret: secretFor(project.id, 'jwt') }, cors: false,
+    databaseUrl, database: { poolMax: 2, idleTimeoutMillis: 5_000 },
+    auth: { jwtSecret }, cors: false,
     seed: { admin: { email: ADMIN_EMAIL, password: secretFor(project.id, 'admin') }, demo: false },
   });
   try {
-    const token = await loginToken(inProcessCaller(server, ''), ADMIN_EMAIL, secretFor(project.id, 'admin'));
-    const call = inProcessCaller(server, token);
-    const entities = await call('GET', '/api/entities');
-    if (entities.status !== 200) throw new Error('Preview could not load its entity definitions.');
-    if (project.app_spec && !(entities.body?.data ?? []).length) await publish(call, project.app_spec, compileSpec(project.app_spec));
-    return { server, call, token };
+    const { rows: [admin] } = await server.db.query<{ id: string }>('SELECT id FROM mosaic_users WHERE email = $1', [ADMIN_EMAIL]);
+    if (!admin) throw new Error('Preview could not load its service account.');
+    const token = () => signJwt({ sub: admin.id, email: ADMIN_EMAIL, roles: ['admin'] }, jwtSecret, 120);
+    const call: MosaicCall = (...args) => inProcessCaller(server, token())(...args);
+    const { rows: [state] } = await server.db.query<{ exists: boolean; initialized: boolean }>(`SELECT
+      to_regclass('mosaic_preview_state') IS NOT NULL AS exists,
+      EXISTS (SELECT 1 FROM mosaic_entities) AS initialized`);
+    await server.db.query('CREATE TABLE IF NOT EXISTS mosaic_preview_state (key text PRIMARY KEY)');
+    // Preserve visual edits in previews created before the publication markers were introduced.
+    if (!state.exists && state.initialized) await server.db.query("INSERT INTO mosaic_preview_state VALUES ('initialized') ON CONFLICT DO NOTHING");
+    const runtime = { server, call, token };
+    if (project.app_spec) await publishOnce(runtime, 'initialized', project.app_spec, compileSpec(project.app_spec));
+    return runtime;
   } catch (cause) {
     await server.close().catch(() => {});
     throw cause;
   }
+}
+
+async function publishOnce(runtime: PreviewRuntime, key: string, spec: AppSpec, app: CompiledApp): Promise<void> {
+  const marker = await runtime.server.db.query('SELECT 1 FROM mosaic_preview_state WHERE key = $1', [key]);
+  if (marker.rows.length) return;
+  await publish(runtime.call, spec, app);
+  await runtime.server.db.query("INSERT INTO mosaic_preview_state (key) VALUES ($1), ('initialized') ON CONFLICT DO NOTHING", [key]);
 }
 
 async function publish(call: MosaicCall, spec: AppSpec, app: CompiledApp): Promise<void> {
@@ -60,22 +78,30 @@ async function publish(call: MosaicCall, spec: AppSpec, app: CompiledApp): Promi
   }
 }
 
-export function previewRuntime(project: { id: string; slug: string; app_spec: AppSpec | null }): Promise<PreviewRuntime> {
+export function previewRuntime(project: PreviewProject): Promise<PreviewRuntime> {
   let runtime = running.get(project.id);
   if (!runtime) {
-    runtime = start(project).catch((cause) => { running.delete(project.id); throw cause; });
+    const initialize = previewDatabaseUrl() ? withPreviewSchema(project.id, async (db, schema, url) => {
+      const exists = await (await getCloudDb()).query('SELECT 1 FROM cloud_projects WHERE id = $1', [project.id]);
+      if (!exists.rows.length) throw new Error('The preview project no longer exists.');
+      await db.query(`CREATE SCHEMA IF NOT EXISTS ${ident(schema)}`);
+      return start(project, url);
+    }) : start(project, hosted ? 'pglite://memory' : `pglite://./data/previews/${project.slug.replace(/[^a-z0-9-]/g, '')}`);
+    runtime = initialize.catch((cause) => { if (running.get(project.id) === runtime) running.delete(project.id); throw cause; });
     running.set(project.id, runtime);
     if (running.size > MAX_RUNNING) {
-      discardPreview(running.keys().next().value!);
+      void discardPreview(running.keys().next().value!);
     }
   }
   return runtime;
 }
 
 /** Called after every verified build: the preview iframe shows the new release immediately. */
-export async function publishToPreview(project: { id: string; slug: string }, spec: AppSpec, app: CompiledApp): Promise<void> {
-  const runtime = await previewRuntime({ ...project, app_spec: spec });
-  await publish(runtime.call, spec, app);
+export async function publishToPreview(project: { id: string; slug: string }, spec: AppSpec, app: CompiledApp, jobId: string): Promise<void> {
+  const runtime = await previewRuntime({ ...project, app_spec: null });
+  const apply = () => publishOnce(runtime, jobId, spec, app);
+  if (previewDatabaseUrl()) await withPreviewSchema(project.id, apply);
+  else await apply();
 }
 
 export async function previewPages(project: { id: string; slug: string; app_spec: AppSpec | null }): Promise<PageDef[]> {

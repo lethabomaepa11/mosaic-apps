@@ -8,10 +8,11 @@ and delivers it to the user's own GitHub, Neon and Vercel accounts.
 1. **Prompt.** Anyone can type a prompt on `/`. Signed-out visitors keep their prompt
    (HttpOnly cookie) through sign-up, sign-in or "Continue with GitHub", and the project
    starts as soon as they are in.
-2. **Durable job.** Creating a project or sending a chat message only queues a job in
-   `cloud_jobs` and returns. The runner (`src/lib/server/jobs.ts`) works after the
-   response via `waitUntil`; reopening the builder resumes stalled jobs, and failed jobs
-   can be retried. Nothing reloads the page; the builder polls job state.
+2. **Durable job.** Creating a project or sending a chat message queues a job in
+   `cloud_jobs`. A dedicated worker polls the queue independently of the browser.
+   Jobs use renewable leases, and an expired lease can be claimed again up to three
+   attempts. Each workspace gets one active job at a time. The web runner can also
+   process jobs via `waitUntil` when a dedicated worker is unavailable.
 3. **Agents** (`src/lib/server/agents.ts`, `build-app.ts`), all primed with a condensed
    Mosaic knowledge pack (`mosaic-knowledge.ts`, from `docs/` and the template skill):
    - **Planner** asks at most one round of clarifying questions, only when the answer
@@ -25,8 +26,8 @@ and delivers it to the user's own GitHub, Neon and Vercel accounts.
      developer, and every change is re-verified. A broken app is never shipped.
    Each step's thinking streams into the chat, labelled by agent.
 4. **Live preview.** The verified app is published to a real Mosaic server inside Cloud
-   with its own database (`preview.ts`; local PGlite under `data/previews`, in-memory on
-   serverless). `/preview/<slug>` renders its published pages with `PageRenderer`
+   with its own schema when a dedicated preview database is configured. Local PGlite
+   lives under `data/previews`. `/preview/<slug>` renders published pages with `PageRenderer`
    through a member-only same-origin API proxy; the preview admin token never reaches
    the browser.
 5. **Release.** Each build stores a versioned release: the full `mosaic create` project
@@ -69,6 +70,23 @@ npm run dev -w @mosaic-apps/cloud
 Open `http://127.0.0.1:3010`. With no environment file, local development uses PGlite in
 `apps/cloud/data/cloud` and creates `admin@mosaic.local` / `admin1234`. Put local secrets
 (at least `GROQ_API_KEY`) in `apps/cloud/.env`; it is gitignored and loaded in dev only.
+
+## Dedicated worker and persistent previews
+
+Run `npm run worker -w @mosaic-apps/cloud` in a supervised, long-running Node
+process with the same Cloud database, signing secret, provider key, and AI
+configuration as the web deployment. Build `@mosaic-apps/core` and
+`@mosaic-apps/server` first and keep the checkout's development dependencies available
+for `tsx`. Set `NODE_ENV=production` for the worker. After the worker is running,
+set `CLOUD_DEDICATED_WORKER=true` on the web deployment to turn off request-based
+dispatch. Unfinished jobs become eligible after their worker's lease expires.
+
+Set `CLOUD_PREVIEW_DATABASE_URL` on the web and worker to a separate PostgreSQL
+database the operator owns. Use a direct connection whose role can create schemas.
+Each Cloud project gets a schema scoped by its project ID. Studio edits and preview
+records survive instance restarts. Cloud queues schema removal after project deletion.
+Preview connection pools are bounded per instance. Hosted previews created without
+this configuration use temporary data.
 
 ## Verification
 

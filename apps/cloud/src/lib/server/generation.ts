@@ -36,6 +36,8 @@ export async function importGeneratedApp(server, email, password) {
         const existing = await call('GET', base + '/' + item.slug, undefined, [404]);
         const payload = { name: item.name, slug: item.slug, description: item.description, schema: item.root, settings: item.settings,
           ...(kind === 'forms' ? { entity: item.entity, dataSource: item.dataSource } : { route: item.route }) };
+        if (kind === 'pages' && !existing && ['auth-login', 'auth-signup'].includes(item.slug)
+          && (await call('GET', base + '?published=true')).some((page) => page.route === item.route)) continue;
         if (kind === 'pages' && item.route === '/') {
           const home = existing ?? (await call('GET', base + '?published=true')).find((page) => page.route === '/');
           if (home?.id === 'pg_home' && home.version === 1 && home.root?.id === 'pg_home_root') {
@@ -86,6 +88,8 @@ export async function importGeneratedApp(server: MosaicServer): Promise<MosaicSe
       for (const item of items as Array<Record<string, any>>) {
         const existing = await call('GET', \`/api/\${kind}/\${item.slug}\`);
         const payload = { name: item.name, slug: item.slug, description: item.description, schema: item.root, settings: item.settings, ...(kind === 'forms' ? { entity: item.entity, dataSource: item.dataSource } : { route: item.route }) };
+        if (kind === 'pages' && existing.status === 404 && ['auth-login', 'auth-signup'].includes(item.slug)
+          && (await call('GET', '/api/pages?published=true')).body?.data?.some((page: { route: string }) => page.route === item.route)) continue;
         if (kind === 'pages' && item.route === '/') {
           const home = existing.body?.data ?? (await call('GET', '/api/pages?published=true')).body?.data?.find((page: { route: string }) => page.route === '/');
           if (home?.id === 'pg_home' && home.version === 1 && home.root?.id === 'pg_home_root') {
@@ -165,16 +169,20 @@ export function generateProjectFiles(input: { name: string; slug: string; spec: 
   return [...out.values()].sort((a, b) => a.path.localeCompare(b.path));
 }
 
-export async function persistGeneratedRelease(db: Db, input: Parameters<typeof generateProjectFiles>[0] & { projectId: string }) {
+export async function persistGeneratedRelease(db: Db, input: Parameters<typeof generateProjectFiles>[0] & { projectId: string; jobId: string }) {
   const files = generateProjectFiles(input);
   const checksum = createHash('sha256').update(files.map((file) => `${file.path}\0${file.content}`).join('\0')).digest('hex');
   const releaseId = id();
-  const version = await db.tx(async (tx) => {
+  return db.tx(async (tx) => {
+    const { rows: [previous] } = await tx.query<{ id: string; version: number; checksum: string; fileCount: number }>(
+      `SELECT release.id, release.version, release.checksum, release.file_count AS "fileCount" FROM cloud_releases release
+       JOIN cloud_jobs job ON release.id::text = job.metadata->>'generatedReleaseId' WHERE job.id = $1`, [input.jobId]);
+    if (previous) return previous;
     const versions = await tx.query<{ version: number }>('SELECT COALESCE(MAX(version), 0) + 1 AS version FROM cloud_releases WHERE project_id = $1', [input.projectId]);
     const next = Number(versions.rows[0]?.version ?? 1);
     await tx.query('INSERT INTO cloud_releases (id, project_id, version, status, checksum, file_count) VALUES ($1, $2, $3, $4, $5, $6)', [releaseId, input.projectId, next, 'ready', checksum, files.length]);
     for (const file of files) await tx.query('INSERT INTO cloud_release_files (release_id, path, content, mode) VALUES ($1, $2, $3, $4)', [releaseId, file.path, file.content, file.mode ?? '100644']);
-    return next;
+    await tx.query("UPDATE cloud_jobs SET metadata = metadata || jsonb_build_object('generatedReleaseId', $2::text) WHERE id = $1", [input.jobId, releaseId]);
+    return { id: releaseId, version: next, checksum, fileCount: files.length };
   });
-  return { id: releaseId, version, checksum, fileCount: files.length };
 }

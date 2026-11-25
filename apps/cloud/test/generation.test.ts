@@ -28,13 +28,20 @@ test('the generated entities replace the demo ones, and nothing is left unfilled
   assert.match(files.find((file) => file.path === 'apps/web/package.json')!.content, /"@equipment-loans\/web"/);
 });
 
+test('a Vercel install can load the generated Vite config from the web workspace alone', () => {
+  const files = project();
+  const config = files.find((file) => file.path === 'apps/web/vite.config.ts');
+  assert.match(config!.content, /from '\.\/scripts\/vercel-adapter\.ts'/);
+  assert.ok(files.some((file) => file.path === 'apps/web/scripts/vercel-adapter.ts'));
+});
+
 test('the app imports its generated pages and forms on first boot', () => {
   const files = project();
   const mosaic = files.find((file) => file.path === 'apps/web/src/lib/server/mosaic.ts')!.content;
   assert.match(mosaic, /createMosaicServerProvider\(\(\) => createMosaicServer\(\{/);
   assert.match(mosaic, /\}\)\.then\(importGeneratedApp\)\);/);
   const app = JSON.parse(files.find((file) => file.path === 'apps/web/src/lib/server/mosaic-app.json')!.content);
-  assert.deepEqual(app.pages.map((page: { route: string }) => page.route), ['/', '/dashboard', '/equipment', '/employees', '/loans']);
+  assert.deepEqual(app.pages.map((page: { route: string }) => page.route), ['/', '/dashboard', '/equipment', '/employees', '/loans', '/login']);
   assert.ok(files.some((file) => file.path === 'apps/web/src/lib/server/import-generated.ts'));
 });
 

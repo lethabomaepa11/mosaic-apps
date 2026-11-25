@@ -79,7 +79,7 @@ export async function introspectTables(db: Db, tables: string[]): Promise<Schema
     `SELECT table_name, column_name, data_type, udt_name, is_nullable, column_default,
             character_maximum_length, numeric_precision, numeric_scale
        FROM information_schema.columns
-      WHERE table_schema = 'public' AND table_name IN (${placeholders})`,
+      WHERE table_schema = current_schema() AND table_name IN (${placeholders})`,
     tables,
   );
   for (const row of cols.rows) {
@@ -103,7 +103,7 @@ export async function introspectTables(db: Db, tables: string[]): Promise<Schema
        FROM information_schema.table_constraints tc
        JOIN information_schema.key_column_usage kcu
          ON kcu.constraint_name = tc.constraint_name AND kcu.table_schema = tc.table_schema
-      WHERE tc.table_schema = 'public' AND tc.constraint_type = 'PRIMARY KEY'
+      WHERE tc.table_schema = current_schema() AND tc.constraint_type = 'PRIMARY KEY'
         AND tc.table_name IN (${placeholders})
       ORDER BY kcu.ordinal_position`,
     tables,
@@ -115,7 +115,7 @@ export async function introspectTables(db: Db, tables: string[]): Promise<Schema
        FROM information_schema.table_constraints tc
        JOIN information_schema.key_column_usage kcu
          ON kcu.constraint_name = tc.constraint_name AND kcu.table_schema = tc.table_schema
-      WHERE tc.table_schema = 'public' AND tc.constraint_type = 'UNIQUE'
+      WHERE tc.table_schema = current_schema() AND tc.constraint_type = 'UNIQUE'
         AND tc.table_name IN (${placeholders})
       ORDER BY tc.constraint_name, kcu.ordinal_position`,
     tables,
@@ -132,16 +132,15 @@ export async function introspectTables(db: Db, tables: string[]): Promise<Schema
   }
 
   const checks = await db.query<{ table_name: string; constraint_name: string; definition: string }>(
-    `SELECT c.conrelid::regclass::text AS table_name, c.conname AS constraint_name,
+    `SELECT t.relname AS table_name, c.conname AS constraint_name,
             pg_get_constraintdef(c.oid) AS definition
        FROM pg_constraint c
-       JOIN pg_namespace n ON n.oid = c.connamespace
-      WHERE n.nspname = 'public' AND c.contype = 'c'`,
+       JOIN pg_class t ON t.oid = c.conrelid
+      WHERE c.connamespace = current_schema()::regnamespace AND c.contype = 'c' AND t.relname IN (${placeholders})`,
+    tables,
   );
   for (const row of checks.rows) {
-    // regclass::text quotes reserved words (e.g. "order") - normalise
-    const tname = row.table_name.replace(/^public\./, '').replace(/^"|"$/g, '');
-    const table = snapshot[tname];
+    const table = snapshot[row.table_name];
     if (!table) continue;
     table.checks.push({ name: row.constraint_name, columns: [], definition: row.definition });
   }
@@ -164,15 +163,14 @@ export async function introspectTables(db: Db, tables: string[]): Promise<Schema
          ON kcu.constraint_name = tc.constraint_name AND kcu.table_schema = tc.table_schema
        JOIN information_schema.constraint_column_usage ccu
          ON ccu.constraint_name = tc.constraint_name AND ccu.table_schema = tc.table_schema
-       JOIN pg_constraint c ON c.conname = tc.constraint_name AND c.connamespace = 'public'::regnamespace
-      WHERE tc.table_schema = 'public' AND tc.constraint_type = 'FOREIGN KEY'
+       JOIN pg_constraint c ON c.conname = tc.constraint_name AND c.connamespace = current_schema()::regnamespace
+      WHERE tc.table_schema = current_schema() AND tc.constraint_type = 'FOREIGN KEY'
         AND tc.table_name IN (${placeholders})
       GROUP BY tc.table_name, tc.constraint_name`,
     tables,
   );
   for (const row of fks.rows) {
-    const tname = row.table_name.replace(/^public\./, '').replace(/^"|"$/g, '');
-    const table = snapshot[tname];
+    const table = snapshot[row.table_name];
     if (!table) continue;
     table.foreignKeys.push({
       name: row.constraint_name,
@@ -185,7 +183,7 @@ export async function introspectTables(db: Db, tables: string[]): Promise<Schema
 
   const idx = await db.query<{ table_name: string; indexname: string; indexdef: string }>(
     `SELECT tablename AS table_name, indexname, indexdef FROM pg_indexes
-      WHERE schemaname = 'public' AND tablename IN (${placeholders})`,
+      WHERE schemaname = current_schema() AND tablename IN (${placeholders})`,
     tables,
   );
   for (const row of idx.rows) {

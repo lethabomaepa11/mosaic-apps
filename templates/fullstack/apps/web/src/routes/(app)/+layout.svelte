@@ -3,12 +3,12 @@
   import { page } from '$app/state';
   import { onNavigate } from '$app/navigation';
   import { applyThemeConfig, Icon } from '@mosaic-apps/ui';
-  import type { NavItemDef, ThemeConfig } from '@mosaic-apps/core';
+  import type { NavItemDef } from '@mosaic-apps/core';
   import { client } from '#lib/client';
 
-  let { children } = $props();
+  let { children, data } = $props();
   let user = $state<{ email: string; name: string; roles: string[] } | null>(null);
-  let navItems = $state<NavItemDef[]>([{ label: 'Home', href: '/', icon: 'home' }]);
+  const navItems = $derived(data.navigation.length ? data.navigation : [{ label: 'Home', href: '/', icon: 'home' }]);
 
   onNavigate((navigation) => {
     if (!document.startViewTransition || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
@@ -27,13 +27,12 @@
     groups.set(key, group);
     return groups;
   }, new Map<string, NavItemDef[]>())].map(([section, items]) => ({ section, items })));
-  const bareLayout = $derived(page.url.pathname === '/login' || page.data.mosaicPage?.settings?.layout === 'bare');
+  const bareLayout = $derived(['/login', '/signup'].includes(page.url.pathname) || page.data.mosaicPage?.settings?.layout === 'bare');
 
   onMount(async () => {
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
-    const [me, nav, theme] = await Promise.allSettled([client.me(), client.getNav(), client.getTheme()]);
+    const [me, theme] = await Promise.allSettled([client.me(), client.getTheme()]);
     if (me.status === 'fulfilled') user = me.value;
-    if (nav.status === 'fulfilled' && nav.value.items.length) navItems = nav.value.items;
     if (theme.status === 'fulfilled') applyThemeConfig(theme.value);
   });
 
@@ -48,12 +47,12 @@
 
 <div class:app-shell={!bareLayout}>
   {#if !bareLayout}
-  <nav class="app-nav">
+  <nav class="app-nav" aria-label="Main navigation">
     <div class="app-nav__brand"><span class="dot"></span> __PROJECT_NAME__</div>
     {#each navGroups as group (group.section)}
       {#if group.section}<div class="app-nav__section">{group.section}</div>{/if}
       {#each group.items as item (item.href)}
-        <a href={item.href} class:active={page.url.pathname === item.href}><Icon name={item.icon ?? 'link'} /> {item.label}</a>
+        <a href={item.href} class:active={page.url.pathname === item.href} aria-current={page.url.pathname === item.href ? 'page' : undefined}><Icon name={item.icon ?? 'link'} /> {item.label}</a>
       {/each}
     {/each}
     <div class="app-nav__spacer"></div>

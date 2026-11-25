@@ -105,7 +105,12 @@ ALTER TABLE cloud_projects ADD COLUMN IF NOT EXISTS database_secret jsonb;
 ALTER TABLE cloud_jobs ADD COLUMN IF NOT EXISTS attempts integer NOT NULL DEFAULT 0;
 ALTER TABLE cloud_jobs ADD COLUMN IF NOT EXISTS run_after timestamptz NOT NULL DEFAULT now();
 ALTER TABLE cloud_jobs ADD COLUMN IF NOT EXISTS log jsonb NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE cloud_jobs ADD COLUMN IF NOT EXISTS lease_id uuid;
+ALTER TABLE cloud_jobs ADD COLUMN IF NOT EXISTS lease_expires_at timestamptz;
 CREATE INDEX IF NOT EXISTS cloud_jobs_queue_idx ON cloud_jobs (status, run_after);
+CREATE TABLE IF NOT EXISTS cloud_preview_cleanup (
+  project_id uuid PRIMARY KEY, created_at timestamptz NOT NULL DEFAULT now()
+);
 `;
 
 // Kept on globalThis so a dev hot-reload of this module reuses the open database: a second

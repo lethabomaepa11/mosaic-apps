@@ -80,7 +80,7 @@ export function crudRoutes(deps: CrudDeps): Hono<AuthEnv> {
     );
     const counts = await deps.db.query<{ relname: string; tuples: number }>(
       `SELECT relname, GREATEST(reltuples, 0)::bigint AS tuples FROM pg_class
-        WHERE relkind = 'r' AND relnamespace = 'public'::regnamespace`,
+        WHERE relkind = 'r' AND relnamespace = current_schema()::regnamespace`,
     );
     const countMap = new Map(counts.rows.map((r) => [r.relname, Number(r.tuples)]));
     return ok(

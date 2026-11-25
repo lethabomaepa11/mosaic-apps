@@ -4,16 +4,18 @@
   let { data } = $props();
   // The preview's API is same-origin and member-only; Cloud forwards it to the project's Mosaic server.
   const client = $derived(createClient({ baseUrl: `${data.app.base}/api` }));
-  const editingPage = $derived(data.status === 'studio' ? data.studioPages.find((item) => item.id === current.url.searchParams.get('page')) : undefined);
-  const editingForm = $derived(data.status === 'studio' ? data.studioForms.find((item) => item.id === current.url.searchParams.get('form')) : undefined);
-  const artifact = $derived(editingPage ? { kind: 'page' as const, id: editingPage.id } : editingForm ? { kind: 'form' as const, id: editingForm.id } : undefined);
+  const pageKey = $derived(current.url.searchParams.get('page'));
+  const formKey = $derived(current.url.searchParams.get('form'));
+  const editingPage = $derived(data.status === 'studio' ? data.studioPages.find((item) => item.slug === pageKey || item.id === pageKey) : undefined);
+  const editingForm = $derived(data.status === 'studio' ? data.studioForms.find((item) => item.slug === formKey || item.id === formKey) : undefined);
+  const artifact = $derived(editingPage ? { kind: 'page' as const, slug: editingPage.slug } : editingForm ? { kind: 'form' as const, slug: editingForm.slug } : undefined);
 </script>
 
 <svelte:head><title>{data.page?.settings?.title ?? data.page?.name ?? data.app.name} · {data.app.name}</title></svelte:head>
 
 <div class="preview-app min-h-screen bg-base-200 text-base-content" data-theme={data.app.theme}>
   {#if data.status === 'studio' && artifact}
-    {#key `${artifact.kind}:${artifact.id}`}
+    {#key `${artifact.kind}:${artifact.slug}`}
       {#await import('#lib/PreviewDesigner.svelte')}
         <p class="p-4" role="status">Opening the designer…</p>
       {:then { default: PreviewDesigner }}
@@ -51,11 +53,11 @@
           </section>
         {:else if data.status === 'sign-in'}
           <section class="mx-auto mt-10 max-w-sm rounded-xl border border-base-300 bg-base-100 p-8">
-            <h1 class="text-2xl font-semibold">Sign in to {data.app.name}</h1>
+            <h1 class="text-2xl font-semibold">{data.authTitle ?? (data.registering ? 'Create an account' : `Sign in to ${data.app.name}`)}</h1>
             <p class="my-4 text-sm opacity-70">Use your Cloud session to open this private preview.</p>
             <a class="btn btn-primary w-full" href={data.app.base}>Continue to preview</a>
-            {#if data.app.liveUrl}<a class="btn btn-outline mt-2 w-full" href={`${data.app.liveUrl}/login`} target="_blank" rel="noreferrer">Sign in to live app</a>{/if}
-            {#if data.app.liveUrl && data.app.allowRegistration}<a class="btn btn-ghost mt-2 w-full" href={`${data.app.liveUrl}/login?mode=signup`} target="_blank" rel="noreferrer">Create an app account</a>{/if}
+            {#if data.app.liveUrl}<a class="btn btn-outline mt-2 w-full" href={`${data.app.liveUrl}/${data.registering ? 'signup' : 'login'}`} target="_blank" rel="noreferrer">{data.registering ? 'Create a live app account' : 'Sign in to live app'}</a>{/if}
+            {#if data.app.allowRegistration}<a class="btn btn-ghost mt-2 w-full" href={`${data.app.base}/${data.registering ? 'login' : 'signup'}`}>{data.registering ? 'Back to sign in' : 'Create an account'}</a>{/if}
           </section>
         {:else if data.status === 'studio'}
           <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
@@ -70,13 +72,13 @@
             <section class="rounded-xl border border-base-300 bg-base-100 p-5">
               <h2 class="mb-2 font-semibold">Pages</h2>
               <ul class="divide-y divide-base-300">
-                {#each data.studioPages as item (item.route)}<li class="flex items-center justify-between gap-3 py-2 text-sm"><a class="link" href={`${data.app.base}${item.route}`}>{item.name}</a><a class="btn btn-outline btn-xs" aria-label={`Edit ${item.name}`} href={`?page=${encodeURIComponent(item.id)}`}>Edit</a></li>{/each}
+                {#each data.studioPages as item (item.route)}<li class="flex items-center justify-between gap-3 py-2 text-sm"><a class="link" href={`${data.app.base}${item.route}`}>{item.name}</a><a class="btn btn-outline btn-xs" aria-label={`Edit ${item.name}`} href={`?page=${encodeURIComponent(item.slug)}`}>Edit</a></li>{/each}
               </ul>
             </section>
             <section class="rounded-xl border border-base-300 bg-base-100 p-5">
               <h2 class="mb-2 font-semibold">Forms</h2>
               <ul class="divide-y divide-base-300">
-                {#each data.studioForms as item (item.slug)}<li class="flex items-center justify-between gap-3 py-2 text-sm"><a class="link" href={`${data.app.base}/f/${item.slug}`}>{item.name}</a><a class="btn btn-outline btn-xs" aria-label={`Edit ${item.name}`} href={`?form=${encodeURIComponent(item.id)}`}>Edit</a></li>{/each}
+                {#each data.studioForms as item (item.slug)}<li class="flex items-center justify-between gap-3 py-2 text-sm"><a class="link" href={`${data.app.base}/f/${item.slug}`}>{item.name}</a><a class="btn btn-outline btn-xs" aria-label={`Edit ${item.name}`} href={`?form=${encodeURIComponent(item.slug)}`}>Edit</a></li>{/each}
               </ul>
             </section>
           </div>

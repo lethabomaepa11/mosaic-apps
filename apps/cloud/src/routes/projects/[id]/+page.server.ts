@@ -10,7 +10,7 @@ import { deleteProject } from '#lib/server/projects';
 async function projectFor(projectId: string, userId: string) {
   const result = await readCloud((db) => db.query<{
     id: string; organization_id: string; role: string; name: string; slug: string; prompt: string; status: string;
-    include_home: boolean; include_login: boolean; app_framework: string; ui_system: string; ui_theme: string;
+    include_home: boolean; include_login: boolean; app_framework: string; ui_system: string; ui_theme: string; allow_registration: boolean;
     blueprint: ProjectBlueprint | null; planner_model: string | null; planned_at: string | null;
     github_repository: string | null; vercel_project_id: string | null; neon_project_id: string | null;
   }>(
@@ -18,7 +18,8 @@ async function projectFor(projectId: string, userId: string) {
     `SELECT project.id, project.organization_id, membership.role, project.name, project.slug, project.prompt, project.status,
        project.include_home, project.include_login, project.app_framework, project.ui_system, project.ui_theme,
        project.blueprint, project.planner_model, project.planned_at, project.github_repository,
-       project.vercel_project_id, project.neon_project_id
+       project.vercel_project_id, project.neon_project_id,
+       COALESCE(project.app_spec->'allowRegistration' = 'true'::jsonb, false) AS allow_registration
      FROM cloud_projects project
      JOIN cloud_memberships membership ON membership.organization_id = project.organization_id
      WHERE project.id = $1 AND membership.user_id = $2`, [projectId, userId],
@@ -76,6 +77,8 @@ export const actions: Actions = {
     const form = await request.formData();
     const requestedTheme = String(form.get('uiTheme') ?? 'corporate');
     const requestedUiSystem = project.app_framework === 'nextjs' ? 'mosaic' : String(form.get('uiSystem') ?? 'daisyui');
+    const registration = form.has('registrationSettings') ? form.get('allowRegistration') === 'on' : undefined;
+    if (registration !== undefined && !canManageConnections(project.role)) return fail(403, { settingsMessage: 'Only workspace owners and admins can change public sign-up.' });
     if (!isDaisyTheme(requestedTheme) || !['daisyui', 'mosaic'].includes(requestedUiSystem)) {
       return fail(400, { settingsMessage: 'Choose a supported UI system and theme.' });
     }
@@ -91,8 +94,9 @@ export const actions: Actions = {
         [id(), project.organization_id, user.id, project.id, JSON.stringify({ appFramework: project.app_framework, uiSystem: requestedUiSystem, uiTheme: requestedTheme })],
       );
       // The built-in preview reads these settings live; the job carries them into source, Git and Vercel.
-      const changed = requestedTheme !== project.ui_theme || requestedUiSystem !== project.ui_system;
-      if (changed && project.blueprint) await enqueueJob(tx, { projectId: project.id, kind: 'generate', metadata: { reuseBlueprint: true, userId: user.id }, stage: 'Waiting to apply design settings' });
+      const registrationChanged = registration !== undefined && registration !== project.allow_registration;
+      const changed = registrationChanged || requestedTheme !== project.ui_theme || requestedUiSystem !== project.ui_system;
+      if (changed && project.blueprint) await enqueueJob(tx, { projectId: project.id, kind: 'generate', metadata: { reuseBlueprint: true, userId: user.id, allowRegistration: registrationChanged ? registration : undefined }, stage: 'Waiting to apply app settings' });
     });
     kickJobs();
     return { settingsSaved: true, uiSystem: requestedUiSystem, uiTheme: requestedTheme };

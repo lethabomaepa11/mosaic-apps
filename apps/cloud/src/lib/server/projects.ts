@@ -90,12 +90,16 @@ export async function deleteProject(projectId: string, userId: string, confirmat
     await tx.query('DELETE FROM cloud_releases WHERE project_id = $1', [projectId]);
     await tx.query('DELETE FROM cloud_environments WHERE project_id = $1', [projectId]);
     await tx.query('DELETE FROM cloud_projects WHERE id = $1', [projectId]);
+    if (process.env.CLOUD_PREVIEW_DATABASE_URL) await tx.query('INSERT INTO cloud_preview_cleanup (project_id) VALUES ($1) ON CONFLICT DO NOTHING', [projectId]);
     await tx.query(
       `INSERT INTO cloud_audit_log (id, organization_id, user_id, action, target_type, target_id)
        VALUES ($1, $2, $3, 'project.delete', 'project', $4)`, [id(), project.organization_id, userId, projectId],
     );
   });
-  if (!result) discardPreview(projectId);
+  if (!result) {
+    void discardPreview(projectId);
+    if (process.env.CLOUD_PREVIEW_DATABASE_URL) kickJobs();
+  }
   return result;
 }
 

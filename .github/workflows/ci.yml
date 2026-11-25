@@ -53,10 +53,14 @@ jobs:
       - name: Run tests
         run: |
           docker exec ${{ job.services.postgres.id }} createdb -U mosaic mosaic_registry_test
+          docker exec ${{ job.services.postgres.id }} createdb -U mosaic mosaic_cloud_queue_test
+          docker exec ${{ job.services.postgres.id }} createdb -U mosaic mosaic_cloud_preview_test
           npm run test
         env:
           TEST_POSTGRES_URL: postgres://mosaic:mosaic@127.0.0.1:5432/mosaic_test
           TEST_ENTITY_REGISTRY_DATABASE_URL: postgres://mosaic:mosaic@127.0.0.1:5432/mosaic_registry_test
+          TEST_CLOUD_QUEUE_DATABASE_URL: postgres://mosaic:mosaic@127.0.0.1:5432/mosaic_cloud_queue_test
+          TEST_CLOUD_PREVIEW_DATABASE_URL: postgres://mosaic:mosaic@127.0.0.1:5432/mosaic_cloud_preview_test
 
       - name: Check package lifecycles
         run: npm run release:check
@@ -77,6 +81,13 @@ jobs:
           npm run test:cloud-next
         env:
           TEST_CLOUD_NEXT_DATABASE_URL: postgres://mosaic:mosaic@127.0.0.1:5432/mosaic_cloud_next_test
+
+      - name: Test isolated Cloud-generated SvelteKit release
+        run: |
+          docker exec ${{ job.services.postgres.id }} createdb -U mosaic mosaic_cloud_svelte_test
+          npm run test:cloud-svelte
+        env:
+          TEST_CLOUD_SVELTE_DATABASE_URL: postgres://mosaic:mosaic@127.0.0.1:5432/mosaic_cloud_svelte_test
 
   windows-cli:
     runs-on: windows-latest

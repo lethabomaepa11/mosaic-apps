@@ -74,6 +74,11 @@ export async function applyApp(call: MosaicCall, app: CompiledApp, options: { al
     for (const artifact of artifacts as Array<Record<string, any>>) {
       const payload = { name: artifact.name, slug: artifact.slug, description: artifact.description, schema: artifact.root, settings: artifact.settings, ...(kind === 'forms' ? { entity: artifact.entity, dataSource: artifact.dataSource } : { route: artifact.route }) };
       let existing = await call('GET', `/api/${kind}/${artifact.slug}`);
+      if (kind === 'pages' && ['auth-login', 'auth-signup'].includes(artifact.slug)) {
+        if (existing.status === 200) continue;
+        const published = await call('GET', '/api/pages?published=true');
+        if (published.body?.data?.some((page: { route: string }) => page.route === artifact.route)) continue;
+      }
       if (existing.status === 404 && kind === 'pages' && artifact.route === '/') {
         const pages = await call('GET', '/api/pages?published=true');
         const home = pages.body?.data?.find((page: { route: string }) => page.route === '/');

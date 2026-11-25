@@ -15,7 +15,7 @@ const forward: RequestHandler = async ({ params, request, url, locals }) => {
     console.error('Could not open the preview API', cause);
     throw error(503, 'The preview API is temporarily unavailable.');
   });
-  const headers = new Headers({ authorization: `Bearer ${token}` });
+  const headers = new Headers({ authorization: `Bearer ${token()}` });
   const contentType = request.headers.get('content-type');
   if (contentType) headers.set('content-type', contentType);
   const body = ['GET', 'HEAD'].includes(request.method) ? undefined : await request.arrayBuffer();

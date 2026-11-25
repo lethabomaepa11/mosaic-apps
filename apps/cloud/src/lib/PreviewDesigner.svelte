@@ -11,10 +11,10 @@
 
   let { client, base, artifact, entities, forms, pages }: {
     client: MosaicClient; base: string;
-    artifact: { kind: 'page' | 'form'; id: string };
+    artifact: { kind: 'page' | 'form'; slug: string };
     entities: { name: string; fields: { name: string }[] }[];
-    forms: { id: string; name: string }[];
-    pages: { id: string; name: string }[];
+    forms: { slug: string; name: string }[];
+    pages: { slug: string; name: string }[];
   } = $props();
   let ready = $state(false);
   let busy = $state(false);
@@ -27,17 +27,17 @@
   onMount(() => {
     async function open() {
       try {
-        const page = artifact.kind === 'page' ? await client.getPage(artifact.id) : null;
-        const form = artifact.kind === 'form' ? await client.getForm(artifact.id) : null;
+        const page = artifact.kind === 'page' ? await client.getPage(artifact.slug) : null;
+        const form = artifact.kind === 'form' ? await client.getForm(artifact.slug) : null;
         if (!active) return;
         if (page) designer.loadPage(page);
         if (form) designer.loadForm(form);
         designer.entityOptionsByName = Object.fromEntries(entities.map(({ name, fields }) => [name, fields.map((field) => field.name)]));
         designer.bindingOptions = form?.entity ? designer.entityOptionsByName[form.entity] ?? [] : [];
-        designer.formOptions = forms.map(({ id, name }) => ({ value: id, label: name }));
+        designer.formOptions = forms.map(({ slug, name }) => ({ value: slug, label: name }));
         designer.artifactOptions = [
           ...designer.formOptions.map((item) => ({ ...item, kind: 'form' as const })),
-          ...pages.map(({ id, name }) => ({ value: id, label: name, kind: 'page' as const })),
+          ...pages.map(({ slug, name }) => ({ value: slug, label: name, kind: 'page' as const })),
         ];
         ready = true;
       } catch (cause) {
@@ -56,10 +56,10 @@
       const page = designer.page;
       const form = designer.form;
       if (page) {
-        const saved = await client.saveAndPublishPage({ ...$state.snapshot(page), expectedVersion: page.version });
+        const saved = await client.saveAndPublishPage({ ...$state.snapshot(page), id: artifact.slug, expectedVersion: page.version });
         if (active) designer.loadPage(saved);
       } else if (form) {
-        const saved = await client.saveAndPublishForm({ ...$state.snapshot(form), expectedVersion: form.version });
+        const saved = await client.saveAndPublishForm({ ...$state.snapshot(form), id: artifact.slug, expectedVersion: form.version });
         if (active) designer.loadForm(saved);
       }
       status = 'Saved to preview';

@@ -175,7 +175,7 @@ export function autoRepair(input: AppSpec): { spec: AppSpec; repairs: string[] }
 const ENTITY_NAME = /^[a-z][a-z0-9_]{1,40}$/;
 const FIELD_NAME = /^[a-z][a-zA-Z0-9]{0,40}$/;
 const SYSTEM_FIELDS = new Set(['id', 'createdAt', 'updatedAt', 'deletedAt']);
-const reservedPageRoute = (route: string) => /^\/(api|f|login|logout|studio)(\/|$)/.test(route);
+const reservedPageRoute = (route: string) => /^\/(api|f|login|signup|logout|studio)(\/|$)/.test(route);
 
 /** Deterministic checks the developer agent must satisfy before anything runs. */
 export function validateSpec(spec: AppSpec): string[] {
@@ -314,7 +314,25 @@ export function compileSpec(spec: AppSpec): CompiledApp {
       root: { id: `${id}_root`, type: 'page', children },
     } as PageDef;
   });
+  pages.push(authPage(false));
+  if (spec.allowRegistration) pages.push(authPage(true));
   return { entities, forms, pages };
+}
+
+function authPage(registering: boolean): PageDef {
+  const slug = registering ? 'signup' : 'login';
+  const name = registering ? 'Create an account' : 'Sign in';
+  const fields = registering ? ['name', 'email', 'password'] : ['email', 'password'];
+  return {
+    id: `pg_auth_${slug}`, slug: `auth-${slug}`, route: `/${slug}`, name, version: 1, published: true,
+    settings: { title: name, layout: 'bare', requiresAuth: false, menu: { show: false } },
+    root: { id: `auth_${slug}_root`, type: 'page', children: [
+      { id: `auth_${slug}_heading`, type: 'heading', props: { text: name, level: 1 } },
+      ...fields.map((binding) => ({ id: `auth_${slug}_${binding}`, type: 'textField', props: { binding, label: binding[0]!.toUpperCase() + binding.slice(1), format: binding === 'name' ? 'text' : binding, required: true } })),
+      { id: `auth_${slug}_submit`, type: 'button', props: { label: name, variant: 'primary' } },
+      { id: `auth_${slug}_switch`, type: 'text', props: { text: registering ? 'Already have an account? Sign in' : 'Create an account' } },
+    ] },
+  };
 }
 
 /** The older blueprint shape the builder UI and preview already render. */

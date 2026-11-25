@@ -24,7 +24,8 @@ projects use the same Mosaic runtime and database-first artifacts.
    appears in the chat while it works.
 4. Open **App**, **Sign in**, or **Open Studio** in the preview toolbar. In Preview
    Studio, open a page or form and choose **Edit** to use the visual designer. Saves
-   apply to the preview database, which can reset on a hosted instance restart.
+   apply to the preview database. On installations with persistent previews, they
+   survive instance restarts.
    When a SvelteKit deployment is ready, **Open live Studio** edits the deployed
    app. **Live app** opens the deployed site separately.
 5. Send changes in the chat. Theme and other settings changes apply to the preview at
@@ -44,9 +45,16 @@ book. Cloud can combine live records, counts, instructions, and working forms in
 task-oriented screens along with record management pages.
 
 If users should create their own accounts, request public sign-up in the brief or
-in a change. The generated app shows **Create an account** on its sign-in page.
-New accounts get the viewer role and can use the actions their entity permissions
-allow. For a staff-only app, describe who should manage accounts.
+turn on **Allow public sign-up** under the project's **Settings**. After the next
+release, **Create an account** on the sign-in page opens `/signup`. New accounts
+get the viewer role and can use the actions their entity permissions allow.
+For a staff-only app, keep public sign-up closed.
+
+Sign in and Create an account are published page definitions with editable titles,
+copy, field labels and order, and button labels. Use **Preview Studio** to edit
+the preview pages. In the deployed app, use the visual Studio on SvelteKit or
+**Page Studio** on Next.js to edit and publish page JSON. The app itself processes
+credentials through its auth API.
 
 **Source & delivery** also lets you download the app. Install dependencies and run
 `npm run dev` from the repository root. The generated pages and forms import on

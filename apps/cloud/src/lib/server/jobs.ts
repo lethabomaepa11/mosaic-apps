@@ -7,6 +7,7 @@ import { aiConfigFor } from './ai-settings';
 import type { Answer } from './agents';
 import { buildApp } from './build-app';
 import { publishToPreview } from './preview';
+import { drainPreviewCleanup } from './preview-schema';
 import { applyApp, httpCaller, loginToken } from './mosaic-runtime';
 import { randomBytes } from 'node:crypto';
 import { blueprintFromSpec, compileSpec, type AppSpec, type CompiledApp } from './spec';
@@ -16,12 +17,14 @@ import { createGitHubRepository, createVercelProject, deployToVercel, provisionN
 import { frameworkLabel, type AppFramework } from '../framework';
 
 export type JobKind = 'generate' | 'deliver' | 'vercel-status';
-export interface ClaimedJob { id: string; project_id: string; kind: JobKind; metadata: Record<string, any>; attempts: number }
-export interface JobContext { db: Db; job: ClaimedJob; stage(text: string, progress: number): Promise<void>; think(agent: string, message: string): Promise<void>; pause(questions: unknown[]): Promise<void>; enqueue(kind: JobKind, metadata: Record<string, unknown>, delaySeconds?: number): Promise<void>; requeue(delaySeconds: number, metadata: Record<string, unknown>): Promise<void> }
+export interface ClaimedJob { id: string; project_id: string; kind: JobKind; metadata: Record<string, any>; attempts: number; lease_id: string }
+export interface JobContext { db: Db; job: ClaimedJob; stage(text: string, progress: number): Promise<void>; think(agent: string, message: string): Promise<void>; pause(questions: unknown[], message: string): Promise<void>; enqueue(kind: JobKind, metadata: Record<string, unknown>, delaySeconds?: number): Promise<void>; requeue(delaySeconds: number, metadata: Record<string, unknown>): Promise<void> }
 export type JobHandler = (context: JobContext) => Promise<void>;
 
 const MAX_ATTEMPTS = 3;
-const STALE_MINUTES = 10;
+const LEASE_SECONDS = 90;
+const HEARTBEAT_MS = 20_000;
+class JobLeaseLost extends Error {}
 
 export async function enqueueJob(db: Db, input: { projectId: string; kind: JobKind; metadata?: Record<string, unknown>; stage?: string; delaySeconds?: number }): Promise<string> {
   const jobId = id();
@@ -50,29 +53,64 @@ export async function queueLatestDelivery(db: Db, projectId: string): Promise<st
   });
 }
 
-/** Claims the oldest runnable job, one at a time per project. Crashed jobs are requeued after STALE_MINUTES. */
+/** Locks the workspace before claiming so two workers cannot run jobs in it at once. */
 export async function claimJob(db: Db): Promise<ClaimedJob | undefined> {
-  await db.query(
+  const expired = await db.query<{ project_id: string; status: string }>(
     `UPDATE cloud_jobs SET status = CASE WHEN attempts >= $1 THEN 'failed' ELSE 'queued' END,
-       error = CASE WHEN attempts >= $1 THEN 'The job stopped responding.' ELSE error END,
-       finished_at = CASE WHEN attempts >= $1 THEN now() ELSE NULL END
-     WHERE status = 'running' AND started_at < now() - make_interval(mins => $2)`,
-    [MAX_ATTEMPTS, STALE_MINUTES],
+         error = CASE WHEN attempts >= $1 THEN 'The job stopped responding.' ELSE NULL END,
+         finished_at = CASE WHEN attempts >= $1 THEN now() ELSE NULL END, lease_id = NULL, lease_expires_at = NULL
+       WHERE id IN (SELECT id FROM cloud_jobs WHERE status = 'running'
+         AND COALESCE(lease_expires_at, started_at + interval '10 minutes') <= now() FOR UPDATE SKIP LOCKED)
+       RETURNING project_id, status`,
+    [MAX_ATTEMPTS],
   );
-  // shortcut: two workers can still claim two jobs of one project in the same instant; add a per-project advisory lock if that shows up.
-  const result = await db.query<ClaimedJob>(
-    `UPDATE cloud_jobs SET status = 'running', started_at = now(), attempts = attempts + 1, error = NULL
-     WHERE id = (
-       SELECT job.id FROM cloud_jobs job
-       WHERE job.status = 'queued' AND job.run_after <= now()
-         AND NOT EXISTS (SELECT 1 FROM cloud_jobs other WHERE other.project_id = job.project_id AND other.status = 'running')
-       ORDER BY job.created_at FOR UPDATE SKIP LOCKED LIMIT 1)
-     RETURNING id, project_id, kind, metadata, attempts`,
-  );
-  return result.rows[0];
+  const failed = expired.rows.filter((job) => job.status === 'failed').map((job) => job.project_id);
+  if (failed.length) await db.query(`UPDATE cloud_projects project SET status = 'failed', updated_at = now()
+    WHERE project.id = ANY($1::uuid[]) AND NOT EXISTS (SELECT 1 FROM cloud_jobs job
+      WHERE job.project_id = project.id AND job.status IN ('queued', 'running', 'waiting_input'))`, [failed]);
+  return db.tx(async (tx) => {
+    const { rows: [workspace] } = await tx.query<{ id: string }>(
+      `SELECT workspace.id FROM cloud_organizations workspace
+       JOIN LATERAL (
+         SELECT MIN(job.created_at) AS oldest FROM cloud_jobs job JOIN cloud_projects project ON project.id = job.project_id
+         WHERE project.organization_id = workspace.id AND job.status = 'queued' AND job.run_after <= now()
+       ) due ON due.oldest IS NOT NULL
+       WHERE NOT EXISTS (SELECT 1 FROM cloud_jobs job JOIN cloud_projects project ON project.id = job.project_id
+         WHERE project.organization_id = workspace.id AND job.status = 'running')
+       ORDER BY due.oldest FOR UPDATE OF workspace SKIP LOCKED LIMIT 1`,
+    );
+    if (!workspace) return undefined;
+    const { rows: [claimed] } = await tx.query<ClaimedJob>(
+      `UPDATE cloud_jobs SET status = 'running', started_at = now(), attempts = attempts + 1, error = NULL,
+         lease_id = $2, lease_expires_at = now() + make_interval(secs => $3)
+       WHERE id = (SELECT job.id FROM cloud_jobs job JOIN cloud_projects project ON project.id = job.project_id
+         WHERE project.organization_id = $1 AND job.status = 'queued' AND job.run_after <= now()
+           AND NOT EXISTS (SELECT 1 FROM cloud_jobs active JOIN cloud_projects owner ON owner.id = active.project_id
+             WHERE owner.organization_id = $1 AND active.status = 'running')
+         ORDER BY job.created_at FOR UPDATE OF job SKIP LOCKED LIMIT 1)
+       RETURNING id, project_id, kind, metadata, attempts, lease_id`,
+      [workspace.id, id(), LEASE_SECONDS],
+    );
+    return claimed;
+  });
 }
 
-export async function runJob(db: Db, job: ClaimedJob, handlers: Record<string, JobHandler> = HANDLERS): Promise<void> {
+export async function runJob(store: Db, job: ClaimedJob, handlers: Record<string, JobHandler> = HANDLERS): Promise<void> {
+  // Match project deletion's lock order. The lease remains locked throughout each write or transaction.
+  const guarded = <T>(fn: (tx: Db) => Promise<T>): Promise<T> => store.tx(async (tx) => {
+    await tx.query('SELECT id FROM cloud_projects WHERE id = $1 FOR UPDATE', [job.project_id]);
+    const lease = await tx.query(`SELECT 1 FROM cloud_jobs WHERE id = $1 AND lease_id = $2
+      AND status = 'running' AND lease_expires_at > clock_timestamp() FOR UPDATE`, [job.id, job.lease_id]);
+    if (!lease.rows.length) throw new JobLeaseLost();
+    return fn(tx);
+  });
+  const db: Db = { kind: store.kind, close: async () => {}, tx: guarded, query: (sql, params) => guarded((tx) => tx.query(sql, params)) };
+  const heartbeat = setInterval(() => {
+    void store.query(`UPDATE cloud_jobs SET lease_expires_at = now() + make_interval(secs => $3)
+      WHERE id = $1 AND lease_id = $2 AND status = 'running' AND lease_expires_at > clock_timestamp()`,
+    [job.id, job.lease_id, LEASE_SECONDS]).catch((cause) => console.error('Job heartbeat failed', cause));
+  }, HEARTBEAT_MS);
+  heartbeat.unref();
   const context: JobContext = {
     db, job,
     stage: async (text, progress) => {
@@ -82,26 +120,40 @@ export async function runJob(db: Db, job: ClaimedJob, handlers: Record<string, J
       await db.query("UPDATE cloud_jobs SET stage = $2, log = log || jsonb_build_array(jsonb_build_object('at', now(), 'agent', $3::text, 'message', $2::text)) WHERE id = $1", [job.id, message.slice(0, 400), agent]);
     },
     // Waiting for the user's answers: the completion update below only touches running jobs, so this sticks.
-    pause: async (questions) => {
-      await db.query("UPDATE cloud_jobs SET status = 'waiting_input', stage = 'Waiting for your answers', metadata = metadata || jsonb_build_object('questions', $2::jsonb) WHERE id = $1", [job.id, JSON.stringify(questions)]);
-      await db.query("UPDATE cloud_projects SET status = 'needs_input', updated_at = now() WHERE id = $1", [job.project_id]);
+    pause: async (questions, message) => {
+      await db.tx(async (tx) => {
+        await addMessage(tx, job.project_id, message);
+        await tx.query("UPDATE cloud_jobs SET status = 'waiting_input', stage = 'Waiting for your answers', lease_id = NULL, lease_expires_at = NULL, metadata = metadata || jsonb_build_object('questions', $2::jsonb) WHERE id = $1", [job.id, JSON.stringify(questions)]);
+        await tx.query("UPDATE cloud_projects SET status = 'needs_input', updated_at = now() WHERE id = $1", [job.project_id]);
+      });
     },
-    enqueue: async (kind, metadata, delaySeconds) => { await enqueueJob(db, { projectId: job.project_id, kind, metadata, delaySeconds }); },
+    enqueue: async (kind, metadata, delaySeconds) => {
+      await db.tx(async (tx) => {
+        const checkpoint = await tx.query("SELECT 1 FROM cloud_jobs WHERE id = $1 AND metadata ? $2", [job.id, `queued:${kind}`]);
+        if (checkpoint.rows.length) return;
+        const childId = await enqueueJob(tx, { projectId: job.project_id, kind, metadata, delaySeconds });
+        await tx.query('UPDATE cloud_jobs SET metadata = metadata || jsonb_build_object($2::text, $3::text) WHERE id = $1', [job.id, `queued:${kind}`, childId]);
+      });
+    },
     // Polling reschedules the same row (attempts reset) instead of piling up new jobs.
-    requeue: async (delaySeconds, metadata) => { await db.query("UPDATE cloud_jobs SET status = 'queued', attempts = 0, metadata = $2::jsonb, run_after = now() + make_interval(secs => $3) WHERE id = $1", [job.id, JSON.stringify(metadata), delaySeconds]); },
+    requeue: async (delaySeconds, metadata) => { await db.query("UPDATE cloud_jobs SET status = 'queued', attempts = 0, lease_id = NULL, lease_expires_at = NULL, metadata = $2::jsonb, run_after = now() + make_interval(secs => $3) WHERE id = $1", [job.id, JSON.stringify(metadata), delaySeconds]); },
   };
   try {
     const handler = handlers[job.kind];
     if (!handler) throw new Error(`Unknown job kind: ${job.kind}`);
+    await guarded(async () => {});
     await handler(context);
-    await db.query("UPDATE cloud_jobs SET status = 'completed', progress = 100, finished_at = now() WHERE id = $1 AND status = 'running'", [job.id]);
+    await db.query("UPDATE cloud_jobs SET status = 'completed', progress = 100, finished_at = now(), lease_id = NULL, lease_expires_at = NULL WHERE id = $1", [job.id]);
   } catch (cause) {
+    if (cause instanceof JobLeaseLost) return;
     const message = cause instanceof Error ? cause.message.slice(0, 500) : 'Unknown job error';
     console.error(`Job ${job.id} (${job.kind}) failed`, cause);
     await db.tx(async (tx) => {
-      await tx.query("UPDATE cloud_jobs SET status = 'failed', error = $2, finished_at = now(), log = log || jsonb_build_array(jsonb_build_object('at', now(), 'message', $2::text)) WHERE id = $1", [job.id, message]);
+      await tx.query("UPDATE cloud_jobs SET status = 'failed', error = $2, finished_at = now(), lease_id = NULL, lease_expires_at = NULL, log = log || jsonb_build_array(jsonb_build_object('at', now(), 'message', $2::text)) WHERE id = $1", [job.id, message]);
       await tx.query("UPDATE cloud_projects SET status = 'failed', updated_at = now() WHERE id = $1", [job.project_id]);
-    });
+    }).catch((failure) => { if (!(failure instanceof JobLeaseLost)) throw failure; });
+  } finally {
+    clearInterval(heartbeat);
   }
 }
 
@@ -112,7 +164,10 @@ export async function runJobs(db: Db, budgetMs = 240_000, handlers: Record<strin
   while (Date.now() < deadline) {
     const job = await claimJob(db);
     if (job) { await runJob(db, job, handlers); ran++; continue; }
-    const next = await db.query<{ wait: number | null }>("SELECT EXTRACT(EPOCH FROM (MIN(run_after) - now())) * 1000 AS wait FROM cloud_jobs WHERE status = 'queued'");
+    const next = await db.query<{ wait: number | null }>(`SELECT EXTRACT(EPOCH FROM (MIN(job.run_after) - now())) * 1000 AS wait
+      FROM cloud_jobs job JOIN cloud_projects project ON project.id = job.project_id
+      WHERE job.status = 'queued' AND NOT EXISTS (SELECT 1 FROM cloud_jobs active JOIN cloud_projects owner ON owner.id = active.project_id
+        WHERE owner.organization_id = project.organization_id AND active.status = 'running')`);
     const wait = next.rows[0]?.wait;
     if (wait === null || wait === undefined || Date.now() + Number(wait) > deadline) return ran;
     await new Promise((resolve) => setTimeout(resolve, Math.max(250, Math.min(Number(wait), 15_000))));
@@ -122,7 +177,11 @@ export async function runJobs(db: Db, budgetMs = 240_000, handlers: Record<strin
 
 /** Runs queued work after the response is sent; on Vercel this extends the function lifetime. */
 export function kickJobs(): void {
-  waitUntil(getCloudDb().then((db) => runJobs(db)).catch((cause) => console.error('Job runner failed', cause)));
+  if (process.env.CLOUD_DEDICATED_WORKER === 'true') return;
+  waitUntil(getCloudDb().then(async (db) => {
+    await drainPreviewCleanup(db).catch((cause) => console.error('Preview cleanup failed', cause));
+    await runJobs(db);
+  }).catch((cause) => console.error('Job runner failed', cause)));
 }
 
 async function providerToken(db: Db, projectId: string, provider: Provider) {
@@ -172,11 +231,19 @@ const generate: JobHandler = async ({ db, job, stage, think, pause, enqueue }) =
   const answers = (job.metadata.answers ?? []) as Answer[];
   let spec: AppSpec;
   let app: CompiledApp;
-  if (job.metadata.reuseBlueprint && project.app_spec) {
+  const verifiedSpec = job.metadata.verifiedSpec as AppSpec | undefined;
+  if (verifiedSpec || (job.metadata.reuseBlueprint && project.app_spec)) {
     // Settings-only change (e.g. theme): rebuild, commit and redeploy the same verified spec.
-    spec = project.app_spec;
+    spec = verifiedSpec ?? project.app_spec!;
+    if (!verifiedSpec && typeof job.metadata.allowRegistration === 'boolean') {
+      spec = { ...spec, allowRegistration: job.metadata.allowRegistration };
+      await db.tx(async (tx) => {
+        await tx.query('UPDATE cloud_projects SET app_spec = $2::jsonb, updated_at = now() WHERE id = $1', [project.id, JSON.stringify(spec)]);
+        await tx.query("UPDATE cloud_jobs SET metadata = metadata || jsonb_build_object('verifiedSpec', $2::jsonb) WHERE id = $1", [job.id, JSON.stringify(spec)]);
+      });
+    }
     app = compileSpec(spec);
-    await stage('Applying design settings', 40);
+    await stage(verifiedSpec ? 'Resuming verified build' : 'Applying design settings', 40);
   } else {
     const revising = Boolean(job.metadata.revise && project.app_spec);
     // Everything the user has said counts, not just the first prompt (answers, "just do it", extra detail).
@@ -198,18 +265,20 @@ const generate: JobHandler = async ({ db, job, stage, think, pause, enqueue }) =
       askQuestions: !revising && !askedBefore.rows.length && !notes.length && !job.metadata.answers && !job.metadata.skipQuestions,
     }, { think, progress: async (percent) => { await db.query('UPDATE cloud_jobs SET progress = $2 WHERE id = $1', [job.id, percent]); } });
     if (result.status === 'needs_input') {
-      await addMessage(db, project.id, `Before I build, a few quick questions:\n${result.questions.map((question) => `• ${question.question}`).join('\n')}`);
-      await pause(result.questions);
+      await pause(result.questions, `Before I build, a few quick questions:\n${result.questions.map((question) => `• ${question.question}`).join('\n')}`);
       return;
     }
     ({ spec, app } = result);
-    await db.query('UPDATE cloud_projects SET app_spec = $2::jsonb, blueprint = $3::jsonb, planner_model = $4, planned_at = now(), updated_at = now() WHERE id = $1', [project.id, JSON.stringify(spec), JSON.stringify(blueprintFromSpec(spec)), respondingModel]);
-    await addMessage(db, project.id, `${spec.summary}\n\nBuilt ${spec.entities.length} entities (${spec.entities.map((entity) => entity.labelPlural).join(', ')}) with ${spec.pages.length} pages, verified with real create/list/edit checks${result.reviewApproved ? ' and approved by the reviewer' : ''}.`);
+    await db.tx(async (tx) => {
+      await tx.query('UPDATE cloud_projects SET app_spec = $2::jsonb, blueprint = $3::jsonb, planner_model = $4, planned_at = now(), updated_at = now() WHERE id = $1', [project.id, JSON.stringify(spec), JSON.stringify(blueprintFromSpec(spec)), respondingModel]);
+      await addMessage(tx, project.id, `${spec.summary}\n\nBuilt ${spec.entities.length} entities (${spec.entities.map((entity) => entity.labelPlural).join(', ')}) with ${spec.pages.length} pages, verified with real create/list/edit checks${result.reviewApproved ? ' and approved by the reviewer' : ''}.`);
+      await tx.query("UPDATE cloud_jobs SET metadata = metadata || jsonb_build_object('verifiedSpec', $2::jsonb) WHERE id = $1", [job.id, JSON.stringify(spec)]);
+    });
   }
   await think('Verifier', 'Publishing the live preview…');
-  await publishToPreview(project, spec, app);
+  await publishToPreview(project, spec, app, job.id);
   await stage('Packaging the release', 90);
-  const release = await persistGeneratedRelease(db, { projectId: project.id, name: project.name, slug: project.slug, spec, app, framework: project.app_framework, theme: project.ui_theme });
+  const release = await persistGeneratedRelease(db, { projectId: project.id, jobId: job.id, name: project.name, slug: project.slug, spec, app, framework: project.app_framework, theme: project.ui_theme });
   const connected = await db.query<{ provider: string }>(
     `SELECT DISTINCT connection.provider FROM cloud_provider_connections connection JOIN cloud_projects project ON project.organization_id = connection.organization_id
      WHERE project.id = $1 AND connection.status = 'connected'`, [project.id],
@@ -240,6 +309,7 @@ async function deploySecrets(db: Db, project: ProjectRow): Promise<{ jwtSecret: 
 }
 
 const deliver: JobHandler = async ({ db, job, stage, think, enqueue }) => {
+  if (job.metadata['queued:vercel-status']) return;
   const project = await loadProject(db, job.project_id);
   const releaseId = String(job.metadata.releaseId);
   const { version, files } = await releaseFiles(db, releaseId);
@@ -291,9 +361,14 @@ const deliver: JobHandler = async ({ db, job, stage, think, enqueue }) => {
       DATABASE_URL: databaseUrl, MOSAIC_JWT_SECRET: secrets.jwtSecret, MOSAIC_DEPLOY_TARGET: 'vercel', AUTH: 'on',
       SEED: 'true', SEED_DEMO: 'false', ADMIN_EMAIL: secrets.adminEmail, ADMIN_PASSWORD: secrets.adminPassword, MOSAIC_DB_POOL_MAX: '2',
     };
-    const deployed = await useVercel(db, vercel, () => deployToVercel({ token: vercel.token, projectId: vercelProjectId, name: project.slug, files, env, teamId: vercel.metadata.teamId }));
+    let deploymentId = job.metadata.vercelDeploymentId as string | undefined;
+    if (!deploymentId) {
+      const deployed = await useVercel(db, vercel, () => deployToVercel({ token: vercel.token, projectId: vercelProjectId, name: project.slug, files, env, teamId: vercel.metadata.teamId }));
+      deploymentId = deployed.deploymentId;
+      await db.query("UPDATE cloud_jobs SET metadata = metadata || jsonb_build_object('vercelDeploymentId', $2::text) WHERE id = $1", [job.id, deploymentId]);
+    }
     await db.query("UPDATE cloud_environments SET status = 'building', updated_at = now() WHERE project_id = $1 AND kind = 'production'", [project.id]);
-    await enqueue('vercel-status', { deploymentId: deployed.deploymentId, releaseId, framework }, 10);
+    await enqueue('vercel-status', { deploymentId, releaseId, framework }, 10);
     await stage('Vercel deployment started', 90);
   } else {
     await db.query("UPDATE cloud_projects SET status = 'ready', updated_at = now() WHERE id = $1", [project.id]);
