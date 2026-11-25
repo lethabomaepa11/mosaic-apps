@@ -226,9 +226,10 @@ export async function verifyApp(spec: AppSpec, app: CompiledApp): Promise<string
           failures.push(`Submitting ${workflow.label} accepted an unavailable selection for ${field}.`);
         }
       }
-      const managed = workflow.managed[0];
-      if (managed && (await submit('POST', endpoint, { ...values, [managed.field]: 'forged' })).status !== 422) {
-        failures.push(`Submitting ${workflow.label} accepted a forged server-managed field.`);
+      for (const managed of workflow.managed) {
+        if ((await submit('POST', endpoint, { ...values, [managed.field]: 'forged' })).status !== 422) {
+          failures.push(`Submitting ${workflow.label} accepted a forged value for ${managed.field}.`);
+        }
       }
     }
     return failures;
