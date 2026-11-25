@@ -5,7 +5,7 @@
   // svelte-ignore state_referenced_locally
   let provider = $state(data.settings.provider); // editable form state, seeded from the saved choice
   const providers = [
-    { id: 'mosaic', name: 'Mosaic default', tag: 'Free', note: 'Groq · gpt-oss-120b' },
+    { id: 'mosaic', name: 'Mosaic default', tag: 'Free', note: 'Shared Groq · GPT-OSS 120B and 20B' },
     { id: 'openai', name: 'ChatGPT', tag: 'Your key', note: 'OpenAI API' },
     { id: 'anthropic', name: 'Claude', tag: 'Your key', note: 'Anthropic API' },
     { id: 'deepseek', name: 'DeepSeek', tag: 'Your key', note: 'DeepSeek API' },

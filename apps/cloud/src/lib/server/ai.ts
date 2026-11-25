@@ -2,29 +2,40 @@ import Anthropic from '@anthropic-ai/sdk';
 
 /**
  * Structured-output client shared by the planner, developer and reviewer agents.
- * Default: Mosaic's Groq key (gpt-oss-120b, free tier). Users may bring their own OpenAI,
+ * Default: Mosaic's shared Groq key. Users may bring their own OpenAI,
  * Anthropic (Claude) or DeepSeek key in their settings; jobs then run on that provider.
  */
 export class AiError extends Error {}
 
 export type AiProvider = 'mosaic' | 'openai' | 'anthropic' | 'deepseek';
-export interface AiConfig { provider: AiProvider; apiKey?: string; model?: string }
+export interface AiConfig { provider: AiProvider; apiKey?: string; model?: string; onModel?: (model: string) => Promise<void> | void }
 
 export const AI_PROVIDERS: Record<AiProvider, { label: string; defaultModel: string; keyUrl: string }> = {
-  mosaic: { label: 'Mosaic default (Groq gpt-oss-120b)', defaultModel: 'openai/gpt-oss-120b', keyUrl: '' },
+  mosaic: { label: 'Mosaic default (shared Groq)', defaultModel: 'openai/gpt-oss-120b', keyUrl: '' },
   openai: { label: 'ChatGPT (OpenAI API)', defaultModel: 'gpt-5-mini', keyUrl: 'https://platform.openai.com/api-keys' },
   anthropic: { label: 'Claude (Anthropic API)', defaultModel: 'claude-opus-5-5', keyUrl: 'https://console.anthropic.com/settings/keys' },
   deepseek: { label: 'DeepSeek', defaultModel: 'deepseek-chat', keyUrl: 'https://platform.deepseek.com/api_keys' },
 };
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+// shortcut: routing is local to this server instance, share counters if cross-instance throttling becomes frequent.
+const groqCooldowns = new Map<string, number>();
+const groqInFlight = new Map<string, number>();
+const groqFallbacks = ['openai/gpt-oss-20b', 'openai/gpt-oss-120b'];
 
-/** Groq/OpenAI report waits as "7.66s", "1m2.5s" or plain seconds. */
+function rateLimitError(provider: AiProvider, wait: number | null): AiError {
+  const retry = wait === null ? 'Try again later.' : wait >= 60_000 ? `Try again in about ${Math.ceil(wait / 60_000)} min.` : `Try again in about ${Math.ceil(wait / 1000)}s.`;
+  const service = provider === 'mosaic' ? 'Groq' : AI_PROVIDERS[provider].label;
+  return new AiError(`${service} rate limit reached. ${retry}${provider === 'mosaic' ? ' You can also use your own key in Settings → AI.' : ''}`);
+}
+
+/** Reset headers can contain durations or a standard HTTP date. */
 export function parseWait(value: string | null): number | null {
   if (!value) return null;
-  const match = value.match(/^(?:(\d+)m)?(?:([\d.]+)s?)?$/);
-  if (!match) return null;
-  const ms = (Number(match[1] ?? 0) * 60 + Number(match[2] ?? 0)) * 1000;
+  const match = value.trim().match(/^(?:(\d+)h)?(?:(\d+)m)?(?:([\d.]+)s?)?$/);
+  const ms = match
+    ? (Number(match[1] ?? 0) * 3600 + Number(match[2] ?? 0) * 60 + Number(match[3] ?? 0)) * 1000
+    : Date.parse(value) - Date.now();
   return Number.isFinite(ms) && ms > 0 ? ms : null;
 }
 
@@ -57,7 +68,15 @@ async function chatCompletionsJson<T>(input: AiRequest, config: AiConfig): Promi
     : config.provider === 'deepseek' ? { url: 'https://api.deepseek.com/chat/completions', key: config.apiKey }
     : { url: 'https://api.groq.com/openai/v1/chat/completions', key: process.env.GROQ_API_KEY?.trim() };
   if (!target.key) throw new AiError(config.provider === 'mosaic' ? 'GROQ_API_KEY is not configured, so the AI agents cannot run.' : `Add your ${AI_PROVIDERS[config.provider].label} key in Settings → AI.`);
-  const model = aiModel(config);
+  const shared = config.provider === 'mosaic';
+  const preferred = aiModel(config);
+  const candidates = shared ? [...new Set([preferred, ...groqFallbacks])] : [preferred];
+  const ready = (model: string) => (groqCooldowns.get(model) ?? 0) <= Date.now();
+  const earliestReset = () => Math.max(1, Math.min(...candidates.map((id) => groqCooldowns.get(id) ?? 0)) - Date.now());
+  const active = (model: string) => groqInFlight.get(model) ?? 0;
+  const models = shared ? candidates.filter(ready).sort((a, b) => active(a) - active(b)) : candidates;
+  let model = models.shift();
+  if (!model) throw rateLimitError(config.provider, earliestReset());
   // DeepSeek supports JSON mode but not JSON schemas, so the schema travels in the prompt.
   const schemaInPrompt = config.provider === 'deepseek';
   const system = schemaInPrompt ? `${input.system}\n\nReply with one JSON object only, matching this JSON Schema:\n${JSON.stringify(input.schema)}` : input.system;
@@ -74,25 +93,34 @@ async function chatCompletionsJson<T>(input: AiRequest, config: AiConfig): Promi
     if (config.provider === 'mosaic') Object.assign(body, { reasoning_effort: 'low', max_completion_tokens: input.maxTokens ?? 6000 });
     else if (config.provider === 'openai') body.max_completion_tokens = Math.max(input.maxTokens ?? 6000, 16000);
     else body.max_tokens = Math.min(Math.max(input.maxTokens ?? 6000, 8000), 8192);
+    const requestedModel = model;
+    if (shared) groqInFlight.set(requestedModel, active(requestedModel) + 1);
     const response = await fetch(target.url, {
       method: 'POST', headers: { authorization: `Bearer ${target.key}`, 'content-type': 'application/json' },
       body: JSON.stringify(body), signal: AbortSignal.timeout(180_000),
+    }).finally(() => {
+      if (shared) groqInFlight.set(requestedModel, active(requestedModel) - 1);
     });
     if (response.ok) {
-      const result = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
+      const result = await response.json() as { model?: string; choices?: Array<{ message?: { content?: string } }> };
       const content = result.choices?.[0]?.message?.content;
       if (!content) throw new AiError(`${input.name}: the model returned an empty answer.`);
-      return parseJson<T>(input.name, content);
+      const parsed = parseJson<T>(input.name, content);
+      await config.onModel?.(result.model ?? model);
+      return parsed;
     }
     const text = await response.text().catch(() => '');
     lastError = `${input.name} failed (${response.status}): ${text.slice(0, 400)}`;
     if (response.status === 401 || response.status === 403) throw new AiError(`Your ${AI_PROVIDERS[config.provider].label} key was rejected (${response.status}). Update it in Settings → AI.`);
     if (response.status === 429) {
       const wait = parseWait(response.headers.get('retry-after')) ?? parseWait(response.headers.get('x-ratelimit-reset-tokens'));
+      if (shared) {
+        groqCooldowns.set(model, Date.now() + (wait ?? 10_000) + 250);
+        const next = models.findIndex(ready);
+        if (next >= 0) { model = models.splice(next, 1)[0]!; continue; }
+      }
       if (retriedRateLimit || wait === null || wait > 10_000) {
-        const retry = wait === null ? 'Try again later.' : wait >= 60_000 ? `Try again in about ${Math.ceil(wait / 60_000)} min.` : `Try again in about ${Math.ceil(wait / 1000)}s.`;
-        const key = config.provider === 'mosaic' ? ' You can also use your own key in Settings → AI.' : '';
-        throw new AiError(`AI rate limit reached. ${retry}${key}`);
+        throw rateLimitError(config.provider, shared ? earliestReset() : wait);
       }
       retriedRateLimit = true;
       await input.onWait?.(Math.ceil(wait / 1000));
@@ -130,7 +158,9 @@ async function anthropicJson<T>(input: AiRequest, config: AiConfig): Promise<T> 
     if (message.stop_reason === 'refusal') throw new AiError(`${input.name}: Claude declined this request.`);
     const text = message.content.filter((block) => block.type === 'text').map((block) => (block as { text: string }).text).join('');
     if (!text) throw new AiError(`${input.name}: Claude returned an empty answer.`);
-    return parseJson<T>(input.name, text);
+    const parsed = parseJson<T>(input.name, text);
+    await config.onModel?.(message.model ?? aiModel(config));
+    return parsed;
   } catch (cause) {
     if (cause instanceof Anthropic.AuthenticationError || cause instanceof Anthropic.PermissionDeniedError) throw new AiError('Your Claude (Anthropic API) key was rejected. Update it in Settings → AI.');
     if (cause instanceof Anthropic.RateLimitError) throw new AiError('Claude rate limit reached for your key. Try again shortly.');

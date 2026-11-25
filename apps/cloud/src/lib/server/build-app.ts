@@ -25,12 +25,18 @@ export async function buildApp(
 ): Promise<BuildResult> {
   const config = input.ai;
   const shared = !config || config.provider === 'mosaic';
+  const reported = new Set<string>();
+  const modelConfig = (agent: AgentName): AiConfig => ({ ...(config ?? { provider: 'mosaic' }), onModel: async (model) => {
+    if (reported.has(model)) return;
+    reported.add(model);
+    await events.think(agent, `Response received from ${model}.`);
+  } });
   const onWait = (agent: AgentName) => (seconds: number) => events.think(agent, `Retrying in ${seconds}s after an AI rate limit${shared ? ' on the shared tier' : ''}…`);
   const say = async (agent: AgentName, notes: string[]) => { for (const note of notes.slice(0, 4)) await events.think(agent, note); };
 
   if (input.askQuestions) {
     await events.think('Planner', input.current ? 'Reading your change request…' : 'Reading your brief…');
-    const planned = await clarify({ brief: input.current ? `${input.change}\n\n(Existing app: ${input.current.summary})` : input.brief, options: input.options, config, onWait: onWait('Planner') });
+    const planned = await clarify({ brief: input.current ? `${input.change}\n\n(Existing app: ${input.current.summary})` : input.brief, options: input.options, config: modelConfig('Planner'), onWait: onWait('Planner') });
     await say('Planner', planned.thinking);
     const questions = planned.questions.filter((question) => question.question.trim()).slice(0, 3);
     if (questions.length) return { status: 'needs_input', questions };
@@ -38,7 +44,7 @@ export async function buildApp(
   await events.progress(15);
 
   await events.think('Developer', input.current ? 'Updating the app design for your change…' : 'Designing the data model, pages and sample data…');
-  let { thinking, spec } = await developSpec({ brief: input.brief, answers: input.answers, options: input.options, current: input.current, change: input.change, config, onWait: onWait('Developer') });
+  let { thinking, spec } = await developSpec({ brief: input.brief, answers: input.answers, options: input.options, current: input.current, change: input.change, config: modelConfig('Developer'), onWait: onWait('Developer') });
   await say('Developer', thinking);
   await events.progress(35);
 
@@ -64,7 +70,7 @@ export async function buildApp(
       if (reviews >= MAX_REVIEWS) return { status: 'built', spec, app, reviewApproved };
       reviews++;
       await events.think('Reviewer', 'Reviewing the app against your brief as an MVP…');
-      const review = await reviewSpec({ brief: input.brief, answers: input.answers, spec, config, onWait: onWait('Reviewer') });
+      const review = await reviewSpec({ brief: input.brief, answers: input.answers, spec, config: modelConfig('Reviewer'), onWait: onWait('Reviewer') });
       await say('Reviewer', review.thinking);
       if (review.approved || !review.issues.length) return { status: 'built', spec, app, reviewApproved: true };
       for (const issue of review.issues.slice(0, 3)) await events.think('Reviewer', `${issue.area}: ${issue.problem}`);
@@ -72,7 +78,7 @@ export async function buildApp(
     }
     if (round === MAX_FIX_ROUNDS) break;
     await events.think('Developer', `Fixing ${problems.length} issue${problems.length === 1 ? '' : 's'}…`);
-    const fixed = await fixSpec({ brief: input.brief, answers: input.answers, spec, problems, config, onWait: onWait('Developer') });
+    const fixed = await fixSpec({ brief: input.brief, answers: input.answers, spec, problems, config: modelConfig('Developer'), onWait: onWait('Developer') });
     await say('Developer', fixed.thinking);
     // A fix that drops the whole app is a model glitch, not a fix: keep the last design and retry.
     if (fixed.spec.entities.length) spec = fixed.spec;
