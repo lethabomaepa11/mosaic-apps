@@ -15,5 +15,7 @@ export const GET: RequestHandler = async ({ params, locals, cookies, url }) => {
   // CSRF: the callback must return this exact value, bound to this browser.
   const state = randomBytes(24).toString('base64url');
   cookies.set(OAUTH_STATE_COOKIE, `${provider}.${state}`, { path: '/settings/connections', httpOnly: true, sameSite: 'lax', secure: hosted, maxAge: 600 });
-  throw redirect(302, authorizeUrl(provider, config, url.origin, state));
+  throw redirect(302, authorizeUrl(provider, config, url.origin, state), {
+    external: [provider === 'github' ? 'https://github.com' : 'https://vercel.com'],
+  });
 };
