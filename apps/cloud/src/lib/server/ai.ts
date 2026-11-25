@@ -64,6 +64,7 @@ async function chatCompletionsJson<T>(input: AiRequest, config: AiConfig): Promi
   let user = input.user;
   let lastError = '';
   let schemaRetries = 0;
+  let retriedRateLimit = false;
   // Rate-limit waits do not use up the schema retries.
   for (let attempt = 0; attempt < 14; attempt++) {
     const body: Record<string, unknown> = {
@@ -87,7 +88,13 @@ async function chatCompletionsJson<T>(input: AiRequest, config: AiConfig): Promi
     lastError = `${input.name} failed (${response.status}): ${text.slice(0, 400)}`;
     if (response.status === 401 || response.status === 403) throw new AiError(`Your ${AI_PROVIDERS[config.provider].label} key was rejected (${response.status}). Update it in Settings → AI.`);
     if (response.status === 429) {
-      const wait = Math.min(parseWait(response.headers.get('retry-after')) ?? parseWait(response.headers.get('x-ratelimit-reset-tokens')) ?? 10_000, 65_000);
+      const wait = parseWait(response.headers.get('retry-after')) ?? parseWait(response.headers.get('x-ratelimit-reset-tokens'));
+      if (retriedRateLimit || wait === null || wait > 10_000) {
+        const retry = wait === null ? 'Try again later.' : wait >= 60_000 ? `Try again in about ${Math.ceil(wait / 60_000)} min.` : `Try again in about ${Math.ceil(wait / 1000)}s.`;
+        const key = config.provider === 'mosaic' ? ' You can also use your own key in Settings → AI.' : '';
+        throw new AiError(`AI rate limit reached. ${retry}${key}`);
+      }
+      retriedRateLimit = true;
       await input.onWait?.(Math.ceil(wait / 1000));
       await sleep(wait + 250);
       continue;
