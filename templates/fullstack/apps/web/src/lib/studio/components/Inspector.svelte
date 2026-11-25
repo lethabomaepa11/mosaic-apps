@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { getComponent, Tabs, toast, type PropDesc } from '@mosaic-apps/ui';
+  import { appearanceProps, componentEvents, eventActions, getComponent, Tabs, toast, type PropDesc } from '@mosaic-apps/ui';
   import { findNode, type FormNode } from '@mosaic-apps/core';
   import { designer } from '#lib/studio/designer.svelte';
   import Control from './Control.svelte';
@@ -45,12 +45,13 @@
         {#if def}
           {@const propertyProps = (def.inspector ?? []).filter((item) => !['visibleIf', 'disabledIf', 'actions'].includes(item.key))}
           {@const logicProps = [def.inspector?.find((item) => item.key === 'visibleIf') ?? { key: 'visibleIf', label: 'Visible when', kind: 'condition' as const, help: 'Safe expression or isolated JavaScript/TypeScript.' }, def.inspector?.find((item) => item.key === 'disabledIf') ?? { key: 'disabledIf', label: 'Disabled when', kind: 'condition' as const }]}
-          {@const actionProp = def.inspector?.find((item) => item.key === 'actions') ?? { key: 'actions', label: 'Actions', kind: 'actions' as const }}
+          {@const events = componentEvents(n.type, Array.isArray(n.props?.actions))}
+          {@const appearance = n.props?.appearance as Record<string, unknown> | undefined}
           <div class="m-row" style="justify-content:space-between;margin-bottom:12px">
             <div><strong>{def.label}</strong><div class="m-small m-muted">{n.type}</div></div>
             <button type="button" class="m-btn m-btn--ghost m-btn--sm" onclick={() => copyId(n.id)} title="Copy component ID">Copy ID</button>
           </div>
-          <Tabs tabs={[{id:'properties',label:'Properties'},{id:'logic',label:'Logic'},{id:'actions',label:'Actions'}]} bind:active={activeTab}>
+          <Tabs tabs={[{id:'properties',label:'Properties'},{id:'appearance',label:'Appearance'},{id:'logic',label:'Logic'}, ...(events.length ? [{id:'events',label:'Events'}] : [])]} bind:active={activeTab}>
             {#snippet children(tab)}
               <div class="inspector-tab">
                 {#if tab.id === 'properties'}
@@ -59,8 +60,18 @@
                   {:else}<p class="m-muted m-small">This component has no component-specific properties.</p>{/if}
                 {:else if tab.id === 'logic'}
                   {#each logicProps as prop (prop.key)}<div class="inspector-prop"><Control desc={prop} value={(n.props ?? {})[prop.key]} options={optionsFor(n, prop)} onChange={(v) => setProp(prop.key, v)} /></div>{/each}
+                {:else if tab.id === 'appearance'}
+                  {#each appearanceProps as prop (prop.key)}
+                    <Control desc={prop} value={appearance?.[prop.key]} onChange={(v) => setProp('appearance', { ...appearance, [prop.key]: v })} />
+                  {/each}
                 {:else}
-                  <div class="inspector-prop"><Control desc={actionProp} value={(n.props ?? {}).actions} artifacts={designer.artifactOptions} onChange={(v) => setProp('actions', v)} /></div>
+                  {#each events as event (event.key)}
+                    <div class="inspector-prop">
+                      <strong>{event.label}</strong>
+                      {#if event.help}<p class="m-muted m-small">{event.help}</p>{/if}
+                      <Control desc={event} value={eventActions(n.props ?? {}, event.key)} artifacts={designer.artifactOptions} onChange={(v) => setProp('events', { ...(n.props?.events as Record<string, unknown> | undefined), [event.key]: v })} />
+                    </div>
+                  {/each}
                 {/if}
               </div>
             {/snippet}

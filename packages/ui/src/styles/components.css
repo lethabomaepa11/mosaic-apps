@@ -42,10 +42,10 @@
 
 /* ---------- table ---------- */
 .m-table-wrap { max-width: 100%; overflow: auto; border: 1px solid var(--m-border); border-radius: var(--m-radius); background: var(--m-surface); box-shadow: var(--m-shadow-sm); }
-.m-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; font-variant-numeric: tabular-nums; }
+.m-table { width: 100%; border-collapse: collapse; font-size: var(--m-component-font-size, 0.875rem); font-variant-numeric: tabular-nums; }
 .m-table th {
-  text-align: left; font-size: 0.75rem; letter-spacing: 0.01em;
-  color: var(--m-fg-muted); font-weight: 500; height: 40px; padding: 0 var(--m-space-4);
+  text-align: left; font-size: var(--m-component-font-size, 0.75rem); letter-spacing: 0.01em;
+  color: var(--m-fg-muted); font-weight: var(--m-component-font-weight, 500); height: 40px; padding: 0 var(--m-space-4);
   background: var(--m-surface-2); border-bottom: 1px solid var(--m-border);
   position: sticky; top: 0; z-index: 1; white-space: nowrap;
 }

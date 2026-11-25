@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { getComponent, isContainerType, draggable, dropzone, dragState, targetIndexFor, type DragPayload } from '$ui';
+  import { appearanceStyle, getComponent, isContainerType, draggable, dropzone, dragState, targetIndexFor, type DragPayload } from '$ui';
   import type { FormNode } from '@mosaic-apps/core';
   import { designer } from '#lib/designer.svelte';
   import { Icon } from '$ui';
@@ -53,7 +53,6 @@
   aria-label={`${def?.label ?? node.type}${selected ? ', selected' : ''}`}
   onpointerdown={onSelect}
   oncontextmenu={onContextMenu}
-  data-mosaic-dnd="ignore"
   use:draggable={{
     payload: { kind: 'node', sourceId: node.id, type: node.type } as DragPayload,
     label: node.type,
@@ -70,20 +69,20 @@
 
   {#if def && isContainerType(node.type)}
     {@const Comp = def.component}
-    <div class="design-render">
+    <div class="design-render" style={appearanceStyle(node.props?.appearance)}>
       <Comp {...(node.props ?? {})}>
         <div class="design-children" use:dropzone={{ id: node.id, onDrop }}>
           {#if (node.children ?? []).length === 0}
-            <div class="design-empty">Drop components here</div>
+            <div class="design-empty" data-mosaic-dnd="ignore">Drop components here</div>
           {:else}
             {#each node.children ?? [] as child, i (child.id)}
               {#if targetIndexFor(node.id) === i}
-                <div class="design-drop-hint"></div>
+                <div class="design-drop-hint" data-mosaic-dnd="ignore"></div>
               {/if}
               <CanvasNode node={child} depth={depth + 1} />
             {/each}
             {#if targetIndexFor(node.id) === (node.children ?? []).length}
-              <div class="design-drop-hint"></div>
+              <div class="design-drop-hint" data-mosaic-dnd="ignore"></div>
             {/if}
           {/if}
         </div>
@@ -91,22 +90,22 @@
     </div>
   {:else if def}
     {@const Comp = def.component}
-    <div class="design-render">
+    <div class="design-render" style={appearanceStyle(node.props?.appearance)}>
       <Comp {...(node.props ?? {})} value={node.props?.value ?? ''} />
     </div>
   {:else if isRoot}
     <div class="design-children" use:dropzone={{ id: node.id, onDrop }}>
       {#if (node.children ?? []).length === 0}
-        <div class="design-empty">Drop components here</div>
+        <div class="design-empty" data-mosaic-dnd="ignore">Drop components here</div>
       {:else}
         {#each node.children ?? [] as child, i (child.id)}
           {#if targetIndexFor(node.id) === i}
-            <div class="design-drop-hint"></div>
+            <div class="design-drop-hint" data-mosaic-dnd="ignore"></div>
           {/if}
           <CanvasNode node={child} depth={depth + 1} />
         {/each}
         {#if targetIndexFor(node.id) === (node.children ?? []).length}
-          <div class="design-drop-hint"></div>
+          <div class="design-drop-hint" data-mosaic-dnd="ignore"></div>
         {/if}
       {/if}
     </div>

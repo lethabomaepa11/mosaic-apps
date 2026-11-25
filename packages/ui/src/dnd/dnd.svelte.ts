@@ -28,6 +28,7 @@ export interface DragState {
 
 export interface ZoneSpec {
   id: string;
+  hitPadding?: number;
   /** element containing droppable children (defaults to the zone element itself) */
   container?: HTMLElement | (() => HTMLElement | null);
   canAccept?: (payload: DragPayload) => boolean;
@@ -72,18 +73,21 @@ export function computeIndex(el: HTMLElement, x: number, y: number): number {
 }
 
 export function hitTest(x: number, y: number): { zone: RegisteredZone; index: number } | null {
+  let nearby: { zone: RegisteredZone; el: HTMLElement } | undefined;
   for (let i = zones.length - 1; i >= 0; i--) {
     const zone = zones[i]!;
-    if (zone.canAccept && dragState.payload && !zone.canAccept(dragState.payload)) continue;
     const el = zone.getContainer() ?? zone.el;
     if (!el || !el.isConnected) continue;
     const rect = el.getBoundingClientRect();
-    const pad = 32;
-    if (x >= rect.left - pad && x <= rect.right + pad && y >= rect.top - pad && y <= rect.bottom + pad) {
+    const pad = zone.hitPadding ?? 32;
+    if (x < rect.left - pad || x > rect.right + pad || y < rect.top - pad || y > rect.bottom + pad) continue;
+    if (zone.canAccept && dragState.payload && !zone.canAccept(dragState.payload)) continue;
+    if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
       return { zone, index: computeIndex(el, x, y) };
     }
+    nearby ??= { zone, el };
   }
-  return null;
+  return nearby ? { zone: nearby.zone, index: computeIndex(nearby.el, x, y) } : null;
 }
 
 export function cleanup(): void {

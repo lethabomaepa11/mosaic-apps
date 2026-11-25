@@ -1,12 +1,12 @@
 /* Mosaic form controls */
 
 .m-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-.m-field__label { font-size: 0.8125rem; font-weight: 500; line-height: 1.3; color: var(--m-fg); display: flex; gap: 5px; align-items: center; }
+.m-field__label { font-size: var(--m-component-font-size, 0.8125rem); font-weight: var(--m-component-font-weight, 500); line-height: 1.3; color: var(--m-fg); display: flex; gap: 5px; align-items: center; }
 .m-field__req { color: var(--m-danger); }
 .m-field__help { font-size: 0.75rem; color: var(--m-fg-muted); }
 .m-field__error { font-size: 0.75rem; color: var(--m-danger); font-weight: 500; }
 .m-input, .m-select, .m-textarea {
-  font: inherit; font-size: 0.875rem; color: var(--m-fg);
+  font: inherit; font-size: var(--m-component-font-size, 0.875rem); color: var(--m-fg);
   background: var(--m-surface); border: 1px solid var(--m-border-strong);
   border-radius: var(--m-radius-sm); padding: 8px 12px; width: 100%;
   box-shadow: var(--m-shadow-sm);

@@ -112,11 +112,53 @@ try {
     const dialog = page.getByRole('dialog', { name: 'Form JSON' });
     await dialog.locator('.monaco-editor .view-lines').getByText('"name"', { exact: false }).first().waitFor();
     await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+    const smokePage = await page.request.post('http://127.0.0.1:3100/api/pages', { data: {
+      name: 'Studio interaction smoke', route: '/studio-interaction-smoke',
+      schema: { id: 'root', type: 'page', children: [
+        { id: 'test-button', type: 'button', props: { label: 'Test action', events: {
+          onclick: [{ type: 'message', title: 'Button action ran' }],
+        } } },
+        { id: 'test-input', type: 'textField', props: { label: 'Test value', events: {
+          onchange: [{ type: 'message', title: 'New value {{event}}' }],
+        } } },
+        { id: 'test-table', type: 'dataTable', props: {
+          columns: [{ key: 'name', label: 'Name' }], rows: [{ id: 'r1', name: 'Test record' }],
+          events: { onrowclick: [{ type: 'message', title: 'Selected {{event.id}}' }] },
+        } },
+      ] },
+    } });
+    assert.ok(smokePage.ok(), await smokePage.text());
+    const { data: artifact } = await smokePage.json();
+    await page.goto(`http://127.0.0.1:3100/studio/pages/${artifact.id}`, { waitUntil: 'domcontentloaded' });
+    await page.locator('.palette-item').getByText('Data table', { exact: true }).hover();
+    await page.locator('.component-preview').getByText('First record', { exact: true }).waitFor();
+    const layers = page.locator('.layer-row');
+    await layers.last().waitFor();
+    const source = await layers.first().locator('.layer-grip').boundingBox();
+    const target = await layers.last().boundingBox();
+    assert.ok(source && target);
+    await page.mouse.move(source.x + source.width / 2, source.y + source.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(target.x + target.width / 2, target.y + target.height * 0.8, { steps: 8 });
+    await page.mouse.up();
+    await layers.last().getByRole('button', { name: 'button', exact: true }).waitFor();
+    await page.getByRole('tab', { name: 'Appearance' }).click();
+    await page.getByLabel('Padding (px)', { exact: true }).fill('24');
+    const rendered = page.locator('.design-render').filter({ has: page.getByRole('button', { name: 'Test action', exact: true }) });
+    assert.equal(await rendered.evaluate((element) => element.style.padding), '24px');
+    await page.getByRole('button', { name: 'Preview', exact: true }).click();
+    const preview = page.locator('.page-preview__surface');
+    await preview.getByRole('button', { name: 'Test action', exact: true }).click();
+    await page.getByText('Button action ran', { exact: true }).waitFor();
+    await preview.getByLabel('Test value', { exact: true }).fill('updated');
+    await page.getByText('New value updated', { exact: true }).waitFor();
+    await preview.getByText('Test record', { exact: true }).click();
+    await page.getByText('Selected r1', { exact: true }).waitFor();
     assert.deepEqual(errors, [], 'Installed Studio has browser runtime exceptions.');
     await page.goto('http://127.0.0.1:3100/', { waitUntil: 'domcontentloaded' });
     await page.getByRole('heading').first().waitFor();
     assert.deepEqual(errors, [], 'Installed web application has browser runtime exceptions.');
-    console.log('[mosaic] installed consumer browser passed: login, Studio hydration, Form JSON Monaco modal, web rendering.');
+    console.log('[mosaic] installed consumer browser passed: login, Studio hydration, Monaco, palette preview, Layers drag, component appearance and events, and web rendering.');
     const service = spawn(process.execPath, ['build/index.js'], { cwd: join(app, 'apps', 'web'), env: { ...process.env, PORT: '3200', HOST: '127.0.0.1' }, detached: process.platform !== 'win32', windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
     services.push(service);
     for (const stream of [service.stdout, service.stderr]) stream.on('data', (chunk) => { logs = (logs + chunk.toString()).slice(-60_000); });

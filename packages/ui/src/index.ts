@@ -16,6 +16,7 @@ export { default as EntityForm } from './render/EntityForm.svelte';
 export { default as PageRenderer } from './render/PageRenderer.svelte';
 export { default as NodeRenderer } from './render/NodeRenderer.svelte';
 export { default as NodeChildren } from './render/NodeChildren.svelte';
+export { appearanceProps, appearanceStyle, componentEvents, eventActions } from './render/component-options.js';
 
 // registry
 export {

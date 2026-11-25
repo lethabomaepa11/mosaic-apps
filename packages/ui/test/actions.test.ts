@@ -39,3 +39,17 @@ test('starting an action again cancels its previous request', async () => {
   assert.equal(aborted, 1);
   assert.equal((state.component.getPath('actions.load') as { status: string }).status, 'succeeded');
 });
+
+test('row and input event values remain available throughout each action chain', async () => {
+  const state = createMosaicState();
+  const runner = createActionRunner({ state });
+  await runner.execute('row', [
+    { type: 'state.set', target: { scope: 'page', path: 'first' }, value: 'an earlier result' },
+    { type: 'state.set', target: { scope: 'page', path: 'selectedId' }, value: '{{event.id}}' },
+  ], { id: 'row_1' });
+  await runner.execute('change', [
+    { type: 'state.set', target: { scope: 'page', path: 'input' }, value: '{{event}}' },
+  ], false);
+  assert.equal(state.page.getPath('selectedId'), 'row_1');
+  assert.equal(state.page.getPath('input'), false);
+});

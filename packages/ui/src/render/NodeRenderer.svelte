@@ -1,6 +1,7 @@
 <script lang="ts">
   import { getComponent, isContainerType } from '../registry/index';
-  import type { ComponentAction, FormNode, ScriptCondition, TransitionConfig } from '@mosaic-apps/core';
+  import type { FormNode, ScriptCondition, TransitionConfig } from '@mosaic-apps/core';
+  import { appearanceStyle, eventActions, type ComponentEvent } from './component-options';
   import NodeChildren from './NodeChildren.svelte';
   import { fade } from 'svelte/transition';
   import { getContext, onDestroy, setContext } from 'svelte';
@@ -42,7 +43,10 @@
   let conditionRun = 0;
   const unsubscribers = [componentState.application, componentState.page, componentState.form, componentState.component]
     .map((store) => store.subscribe(() => (stateRevision += 1)));
-  onDestroy(() => { actionRunner.cancel(node.id); unsubscribers.forEach((unsubscribe) => unsubscribe()); });
+  onDestroy(() => {
+    for (const key of ['onclick', 'onchange', 'onrowclick'] as const) actionRunner.cancel(eventKey(key));
+    unsubscribers.forEach((unsubscribe) => unsubscribe());
+  });
   $effect(() => {
     actionContext.client = client;
     actionContext.data = data;
@@ -56,7 +60,8 @@
   const binding = $derived(typeof nodeProps.binding === 'string' ? nodeProps.binding : undefined);
   const value = $derived(binding && data ? data[binding] : nodeProps.value);
   const error = $derived(binding && errors ? errors[binding] : undefined);
-  const actions = $derived(Array.isArray(nodeProps.actions) ? nodeProps.actions as ComponentAction[] : []);
+  const clickActions = $derived(eventActions(nodeProps, 'onclick'));
+  const rowActions = $derived(eventActions(nodeProps, 'onrowclick'));
 
   function scriptCondition(value: unknown): ScriptCondition | undefined {
     if (!value || typeof value !== 'object') return undefined;
@@ -92,23 +97,36 @@
   // strip framework-level props before spreading into the component
   const rest = $derived(
     Object.fromEntries(
-      Object.entries(nodeProps).filter(([k]) => k !== 'binding' && k !== 'visibleIf' && k !== 'disabledIf' && k !== 'colSpan' && k !== 'actions'),
+      Object.entries(nodeProps).filter(([k]) => !['binding', 'visibleIf', 'disabledIf', 'colSpan', 'actions', 'events', 'appearance'].includes(k)),
     ),
   );
 
   function oninput(v: unknown) {
     if (binding) onField?.(binding, v);
     else if (typeof nodeProps.oninput === 'function') (nodeProps.oninput as (v: unknown) => void)(v);
+    void runActions('onchange', v);
   }
 
-  async function runActions(event: MouseEvent) {
-    if (!actions.length || actionRunning) return;
+  function eventKey(key: ComponentEvent) {
+    return key === 'onclick' ? node.id : `${node.id}:${key}`;
+  }
+
+  async function runActions(key: ComponentEvent, payload?: unknown) {
+    const actions = eventActions(nodeProps, key);
+    if (!actions.length) return;
+    try {
+      await actionRunner.execute(eventKey(key), actions, payload);
+    } catch (actionError) {
+      toast.error('Action failed', actionError instanceof Error ? actionError.message : String(actionError));
+    }
+  }
+
+  async function onclick(event: MouseEvent) {
+    if (actionRunning) return;
     event.preventDefault();
     actionRunning = true;
     try {
-      await actionRunner.execute(node.id, actions);
-    } catch (actionError) {
-      toast.error('Action failed', actionError instanceof Error ? actionError.message : String(actionError));
+      await runActions('onclick');
     } finally {
       actionRunning = false;
     }
@@ -116,7 +134,7 @@
 </script>
 
 {#if (!visible || visible(node)) && scriptVisible}
-  <div class={`m-node-enter m-transition-${transition?.kind ?? 'fade'}`} style={`--m-enter-duration:${duration}ms;--m-enter-delay:${delay}ms;grid-column:span ${Math.max(1, Math.min(4, Number(nodeProps.colSpan ?? 1)))}`} in:fade={{ duration, delay }}>
+  <div class={`m-node-enter m-transition-${transition?.kind ?? 'fade'}`} style={`--m-enter-duration:${duration}ms;--m-enter-delay:${delay}ms;grid-column:span ${Math.max(1, Math.min(4, Number(nodeProps.colSpan ?? 1)))};${appearanceStyle(nodeProps.appearance)}`} in:fade={{ duration, delay }}>
   {#if def}
     {@const Comp = def.component}
     {#snippet renderChildren()}
@@ -130,7 +148,8 @@
       {error}
       disabled={actionRunning || scriptDisabled || nodeProps.disabled === true || disabled?.(node) === true}
       oninput={oninput}
-      onclick={actions.length ? runActions : undefined}
+      {...(clickActions.length ? { onclick } : {})}
+      {...(rowActions.length ? { onrowclick: (row: unknown) => runActions('onrowclick', row) } : {})}
       children={isContainerType(node.type) ? renderChildren : undefined}
     />
   {:else}

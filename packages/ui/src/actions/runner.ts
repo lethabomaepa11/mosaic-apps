@@ -25,7 +25,7 @@ function readPath(value: unknown, path: string): unknown {
   return current;
 }
 
-export function actionScope(context: ActionContext, result?: unknown): ScriptStateSnapshot & Record<string, unknown> {
+export function actionScope(context: ActionContext, result?: unknown, event?: unknown): ScriptStateSnapshot & Record<string, unknown> {
   return {
     application: context.state.application.snapshot(),
     page: context.state.page.snapshot(),
@@ -33,6 +33,7 @@ export function actionScope(context: ActionContext, result?: unknown): ScriptSta
     component: context.state.component.snapshot(),
     data: context.data ? JSON.parse(JSON.stringify(context.data)) as Record<string, unknown> : context.state.form.snapshot(),
     result,
+    event,
   };
 }
 
@@ -71,13 +72,13 @@ export class ActionRunner {
     this.controllers.get(key)?.abort();
   }
 
-  async execute(key: string, actions: ComponentAction[]): Promise<unknown> {
+  async execute(key: string, actions: ComponentAction[], event?: unknown): Promise<unknown> {
     this.cancel(key);
     const controller = new AbortController();
     this.controllers.set(key, controller);
     this.setStatus(key, { status: 'running', startedAt: new Date().toISOString() });
     try {
-      const result = await this.runActions(actions, controller);
+      const result = await this.runActions(actions, controller, event);
       if (this.controllers.get(key) === controller) this.setStatus(key, { status: 'succeeded', finishedAt: new Date().toISOString() });
       return result;
     } catch (error) {
@@ -93,21 +94,21 @@ export class ActionRunner {
     }
   }
 
-  private async runActions(actions: ComponentAction[], controller: AbortController, initialResult?: unknown): Promise<unknown> {
+  private async runActions(actions: ComponentAction[], controller: AbortController, event: unknown, initialResult?: unknown): Promise<unknown> {
     let result = initialResult;
     for (const action of actions) {
       if (controller.signal.aborted) throw new DOMException('Action cancelled', 'AbortError');
-      const scope = actionScope(this.context, result);
+      const scope = actionScope(this.context, result, event);
       if (action.when && !evaluateBoolean(action.when, scope, false)) continue;
       if (action.type === 'script') {
         const generated = await runActionScript({
           source: action.source,
           language: action.language,
           timeoutMs: action.timeoutMs,
-          state: actionScope(this.context),
+          state: scope,
           signal: controller.signal,
         });
-        result = await this.runActions(generated, controller, result);
+        result = await this.runActions(generated, controller, event, result);
       } else if (action.type === 'message') {
         const title = String(resolveValue(action.title, scope) ?? '');
         const description = String(resolveValue(action.description, scope) ?? '');

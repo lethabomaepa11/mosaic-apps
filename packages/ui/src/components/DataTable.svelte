@@ -3,7 +3,7 @@
 
   export interface Props<T extends Record<string, unknown>> {
     columns: { key: string; label: string; width?: string; align?: 'left' | 'right' | 'center'; render?: (row: T) => string; sortable?: boolean }[];
-    rows: T[];
+    rows?: T[];
     sortBy?: string;
     sortDir?: 'asc' | 'desc';
     onsort?: (key: string) => void;
@@ -28,7 +28,7 @@
     sortable?: boolean;
   }
 
-  let { columns, rows, sortBy, sortDir, onsort, onrowclick, emptyText = 'No records', actions, cell, loading }: Props<T> = $props();
+  let { columns, rows = [], sortBy, sortDir, onsort, onrowclick, emptyText = 'No records', actions, cell, loading }: Props<T> = $props();
 
   function cellValue(row: T, col: Column): string {
     const v = row[col.key];
@@ -77,7 +77,14 @@
         <tr><td colspan={columns.length + 1} class="m-table__empty">{emptyText}</td></tr>
       {:else}
         {#each rows as row, i (i)}
-          <tr class:clickable={!!onrowclick} onclick={(event) => onRowClick(event, row)}>
+          <!-- svelte-ignore a11y_no_noninteractive_tabindex a11y_no_noninteractive_element_interactions -->
+          <tr class:clickable={!!onrowclick} tabindex={onrowclick ? 0 : undefined}
+            onclick={(event) => onRowClick(event, row)}
+            onkeydown={(event) => {
+              if (!onrowclick || event.target !== event.currentTarget || (event.key !== 'Enter' && event.key !== ' ')) return;
+              event.preventDefault();
+              onrowclick(row);
+            }}>
             {#each columns as col (col.key)}
               <td style:text-align={col.align ?? 'left'} title={typeof row[col.key] === 'boolean' ? undefined : cellValue(row, col) || undefined}>
                 {#if typeof row[col.key] === 'boolean'}
@@ -99,4 +106,5 @@
 
 <style>
   .clickable { cursor: pointer; }
+  .clickable:focus-visible { outline: 2px solid var(--m-primary); outline-offset: -2px; }
 </style>

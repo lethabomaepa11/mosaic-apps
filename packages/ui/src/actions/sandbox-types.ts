@@ -6,6 +6,7 @@ export interface ScriptStateSnapshot {
   form: Record<string, unknown>;
   component: Record<string, unknown>;
   data: Record<string, unknown>;
+  event?: unknown;
 }
 
 export interface SandboxRequest {

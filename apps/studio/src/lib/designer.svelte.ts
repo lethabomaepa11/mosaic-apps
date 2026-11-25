@@ -3,6 +3,7 @@
 import {
   ensureRoot,
   duplicateNode,
+  findParent,
   insertNode,
   moveNode,
   removeNode,
@@ -76,10 +77,10 @@ class DesignerStore {
     this.externalDirty = false;
   }
 
-  private snapshot(): void {
+  private snapshot(previous?: string): void {
     const cur = this.current;
     if (!cur) return;
-    this.past.push(JSON.stringify(cur));
+    this.past.push(previous ?? JSON.stringify(cur));
     if (this.past.length > 60) this.past.shift();
     this.future = [];
   }
@@ -125,9 +126,17 @@ class DesignerStore {
   }
 
   move(id: string, parentId: string, index: number): void {
-    if (!this.root) return;
-    this.snapshot();
-    moveNode(this.root, id, parentId, index);
+    if (!this.root || !this.current) return;
+    const parent = findParent(this.root, id);
+    const from = parent?.children?.findIndex((child) => child.id === id) ?? -1;
+    if (parent?.id === parentId && from >= 0) {
+      if (from < index) index--;
+      if (from === index) return;
+    }
+    const previous = JSON.stringify(this.current);
+    if (!moveNode(this.root, id, parentId, index)) return;
+    this.snapshot(previous);
+    this.selectedId = id;
   }
 
   remove(id: string): void {

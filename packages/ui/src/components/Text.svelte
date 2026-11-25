@@ -13,7 +13,7 @@
 
 <style>
   .m-text { margin: 0 0 0.75rem; max-width: 72ch; line-height: 1.65; white-space: pre-line; color: var(--m-fg); }
-  .m-text--sm { font-size: 0.875rem; }
-  .m-text--md { font-size: 1rem; }
-  .m-text--lg { font-size: 1.125rem; }
+  .m-text--sm { font-size: var(--m-component-font-size, 0.875rem); }
+  .m-text--md { font-size: var(--m-component-font-size, 1rem); }
+  .m-text--lg { font-size: var(--m-component-font-size, 1.125rem); }
 </style>

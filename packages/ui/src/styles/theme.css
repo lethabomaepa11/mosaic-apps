@@ -256,15 +256,15 @@
 .m-h3,
 .m-h4 {
   margin: 0 0 var(--m-space-3);
-  font-weight: 600;
+  font-weight: var(--m-component-font-weight, 600);
   line-height: 1.25;
   letter-spacing: -0.011em;
   color: var(--m-fg);
 }
-.m-h1 { font-size: 1.75rem; letter-spacing: -0.022em; }
-.m-h2 { font-size: 1.25rem; letter-spacing: -0.017em; }
-.m-h3 { font-size: 1rem; }
-.m-h4 { font-size: 0.875rem; }
+.m-h1 { font-size: var(--m-component-font-size, 1.75rem); letter-spacing: -0.022em; }
+.m-h2 { font-size: var(--m-component-font-size, 1.25rem); letter-spacing: -0.017em; }
+.m-h3 { font-size: var(--m-component-font-size, 1rem); }
+.m-h4 { font-size: var(--m-component-font-size, 0.875rem); }
 .m-muted { color: var(--m-fg-muted); }
 .m-small { font-size: 0.8125rem; line-height: 1.45; }
 .m-mono { font-family: var(--m-mono); }
@@ -275,8 +275,8 @@
   justify-content: center;
   gap: 7px;
   font: inherit;
-  font-weight: 500;
-  font-size: 0.875rem;
+  font-weight: var(--m-component-font-weight, 500);
+  font-size: var(--m-component-font-size, 0.875rem);
   line-height: 1;
   height: var(--m-control-h);
   padding: 0 14px;
@@ -300,8 +300,8 @@
 .m-btn--ghost:hover:not(:disabled) { background: var(--m-surface-2); color: var(--m-fg); }
 .m-btn--danger { background: var(--m-danger); color: var(--m-on-danger); box-shadow: var(--m-shadow-sm); }
 .m-btn--danger:hover:not(:disabled) { filter: brightness(0.94); }
-.m-btn--sm { height: var(--m-control-h-sm); padding: 0 10px; font-size: 0.8125rem; }
-.m-btn--lg { height: var(--m-control-h-lg); padding: 0 20px; font-size: 0.9375rem; }
+.m-btn--sm { height: var(--m-control-h-sm); padding: 0 10px; font-size: var(--m-component-font-size, 0.8125rem); }
+.m-btn--lg { height: var(--m-control-h-lg); padding: 0 20px; font-size: var(--m-component-font-size, 0.9375rem); }
 .m-btn--icon { padding: 0; width: 32px; height: 32px; }
 .m-btn--block { width: 100%; }
 .m-btn-group { display: inline-flex; gap: var(--m-space-2); flex-wrap: wrap; }
