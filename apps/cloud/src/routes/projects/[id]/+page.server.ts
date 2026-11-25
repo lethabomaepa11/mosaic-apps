@@ -3,6 +3,7 @@ import type { Actions, PageServerLoad } from './$types';
 import { getCloudDb, id, readCloud, transientCloudDbError } from '#lib/server/db';
 import { isDaisyTheme } from '#lib/themes';
 import type { ProjectBlueprint } from '#lib/server/groq';
+import type { Answer, BuildFeature } from '#lib/server/agents';
 import { enqueueJob, kickJobs, queueLatestDelivery } from '#lib/server/jobs';
 import { canManageConnections } from '#lib/server/connections';
 import { deleteProject } from '#lib/server/projects';
@@ -34,7 +35,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
   if (!locals.user) throw redirect(303, '/login');
   const project = await projectFor(params.id, locals.user.id);
   if (!project) throw error(404, 'Project not found');
-  const [environments, jobs, messages, releases] = await readCloud(async (db) => [
+  const [environments, jobs, messages, releases, generation] = await readCloud(async (db) => [
     await db.query<{ id: string; name: string; kind: string; status: string; url: string | null }>('SELECT id, name, kind, status, url FROM cloud_environments WHERE project_id = $1 ORDER BY kind DESC', [project.id]),
     await db.query<{ id: string; kind: string; status: string; progress: number; stage: string | null; error: string | null; created_at: string; started_at: string | null; lease_expires_at: string | null; run_after: string; log: Array<{ at: string; message: string; agent?: string }>; questions: Array<{ question: string; options: string[] }> | null }>("SELECT id, kind, status, progress, stage, error, created_at, started_at, lease_expires_at, run_after, log, metadata->'questions' AS questions FROM cloud_jobs WHERE project_id = $1 ORDER BY created_at DESC LIMIT 20", [project.id]),
     await db.query<{ id: string; role: string; content: string; created_at: string }>(
@@ -43,6 +44,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
        WHERE conversation.project_id = $1 ORDER BY message.created_at`, [project.id],
     ),
     await db.query<{ id: string; version: number; status: string; checksum: string; file_count: number; created_at: string }>('SELECT id, version, status, checksum, file_count, created_at FROM cloud_releases WHERE project_id = $1 ORDER BY version DESC LIMIT 10', [project.id]),
+    await db.query<{ spec: string | null; features: BuildFeature[] | null; completed: number | null }>("SELECT metadata->>'refinedSpec' AS spec, metadata->'featurePlan' AS features, (metadata->>'completedFeatures')::int AS completed FROM cloud_jobs WHERE project_id = $1 AND kind = 'generate' AND metadata ? 'generationMode' ORDER BY created_at DESC LIMIT 1", [project.id]),
   ] as const).catch((cause) => {
     if (transientCloudDbError(cause)) throw error(503, 'Cloud is reconnecting to its database. Reload the project shortly.');
     throw cause;
@@ -50,9 +52,9 @@ export const load: PageServerLoad = async ({ params, locals }) => {
   // Reopening the builder resumes work no runner picked up (e.g. after a function was recycled).
   // Only overdue/stalled jobs count: the page polls every 2s and must not start a runner per poll.
   const now = Date.now();
-  if (jobs.rows.some((job) => (job.status === 'queued' && now - new Date(job.run_after).getTime() > 30_000)
+  if (jobs.rows.some((job) => (project.status !== 'needs_input' && job.status === 'queued' && now - new Date(job.run_after).getTime() > 30_000)
     || (job.status === 'running' && now >= (job.lease_expires_at ? new Date(job.lease_expires_at).getTime() : new Date(job.started_at ?? job.created_at).getTime() + 10 * 60_000)))) kickJobs();
-  return { project, environments: environments.rows, jobs: jobs.rows, messages: messages.rows, releases: releases.rows };
+  return { project, environments: environments.rows, jobs: jobs.rows, messages: messages.rows, releases: releases.rows, generation: generation.rows[0] };
 };
 
 export const actions: Actions = {
@@ -105,7 +107,7 @@ export const actions: Actions = {
       // The built-in preview reads these settings live; the job carries them into source, Git and Vercel.
       const registrationChanged = registration !== undefined && registration !== project.allow_registration;
       const changed = registrationChanged || requestedTheme !== project.ui_theme || requestedUiSystem !== project.ui_system;
-      if (changed && project.blueprint) await enqueueJob(tx, { projectId: project.id, kind: 'generate', metadata: { reuseBlueprint: true, userId: user.id, allowRegistration: registrationChanged ? registration : undefined }, stage: 'Waiting to apply app settings' });
+      if (changed && (await tx.query('SELECT 1 FROM cloud_releases WHERE project_id = $1 LIMIT 1', [project.id])).rows.length) await enqueueJob(tx, { projectId: project.id, kind: 'generate', metadata: { reuseBlueprint: true, userId: user.id, allowRegistration: registrationChanged ? registration : undefined }, stage: 'Waiting to apply app settings' });
       return true;
     });
     if (!saved) return fail(409, { settingsMessage: 'This project is being removed.' });
@@ -128,14 +130,16 @@ export const actions: Actions = {
         conversation = await tx.query<{ id: string }>('INSERT INTO cloud_conversations (id, project_id) VALUES ($1, $2) RETURNING id', [id(), project.id]);
       }
       // Resume the build that asked for clarification.
-      const waiting = await tx.query<{ id: string; metadata: { questions?: Array<{ question: string }> } }>(
+      const waiting = await tx.query<{ id: string; metadata: { generationMode?: string; answers?: Answer[]; questions?: Array<{ question: string }> } }>(
         "SELECT id, metadata FROM cloud_jobs WHERE project_id = $1 AND kind = 'generate' AND status = 'waiting_input' ORDER BY created_at DESC LIMIT 1", [project.id],
       );
       await tx.query('INSERT INTO cloud_messages (id, conversation_id, role, content) VALUES ($1, $2, $3, $4)', [id(), conversation.rows[0]!.id, 'user', prompt]);
       const pending = waiting.rows[0];
       if (pending) {
-        const answers = [{ question: (pending.metadata.questions ?? []).map((item) => item.question).join(' / ') || 'Clarifications', answer: prompt }];
-        await tx.query("UPDATE cloud_jobs SET status = 'queued', run_after = now(), stage = 'Building with your answers', metadata = metadata || $2::jsonb WHERE id = $1", [pending.id, JSON.stringify({ answers, skipQuestions: true, userId: locals.user!.id })]);
+        const answer = { question: (pending.metadata.questions ?? []).map((item) => item.question).join(' / ') || 'Clarifications', answer: prompt };
+        const refining = Boolean(pending.metadata.generationMode);
+        const answers = refining ? [...(pending.metadata.answers ?? []), answer] : [answer];
+        await tx.query("UPDATE cloud_jobs SET status = 'queued', attempts = 0, run_after = now(), stage = $3, metadata = metadata || $2::jsonb WHERE id = $1", [pending.id, JSON.stringify({ answers, skipQuestions: !refining, userId: locals.user!.id }), refining ? 'Refining with your answers' : 'Building with your answers']);
         await tx.query("UPDATE cloud_jobs SET status = 'cancelled', finished_at = now(), stage = 'Superseded by your answer' WHERE project_id = $1 AND status = 'waiting_input' AND id <> $2", [project.id, pending.id]);
       } else {
         await enqueueJob(tx, { projectId: project.id, kind: 'generate', metadata: { prompt, revise: true, userId: locals.user!.id }, stage: 'Waiting to plan the change' });

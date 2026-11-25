@@ -8,14 +8,16 @@ import type { AppFramework } from '../framework';
 import { decryptProviderSecret, type Provider } from './providers';
 import { removeProjectData } from './project-data';
 
-export interface NewProject { prompt: string; name: string; appFramework: AppFramework; uiTheme: string; uiSystem: string; includeHome: boolean; includeLogin: boolean }
+export interface NewProject { prompt: string; name: string; appFramework: AppFramework; uiTheme: string; uiSystem: string; includeHome: boolean; includeLogin: boolean; generationMode: 'staged' | 'one-shot' }
 
 /** Reads and validates the prompt form; the name is optional and derived from the brief. */
 export function readProjectForm(data: FormData): NewProject | { error: string } {
-  const prompt = String(data.get('prompt') ?? '').trim().slice(0, 4000);
+  const prompt = String(data.get('prompt') ?? '').trim();
+  if (prompt.length > 24_000) return { error: 'Keep the project brief within 24,000 characters.' };
   // "A CRM for a solar installer with leads, …" → "CRM for a solar installer".
   const derived = prompt.split(/[,.;:!?]|\s(?:with|that|which|where|so|to help)\s/i)[0]!.replace(/^(build|create|make)?\s*(me\s+)?(an?|the)\s+/i, '').replace(/[^\p{L}\p{N}\s&'-]/gu, '').split(/\s+/).slice(0, 6).join(' ');
-  const name = (String(data.get('name') ?? '').trim() || derived.charAt(0).toUpperCase() + derived.slice(1)).slice(0, 60);
+  const heading = /^#\s+(.+?)(?:\s+[—–-]\s+.+)?\s*$/m.exec(prompt)?.[1];
+  const name = (String(data.get('name') ?? '').trim() || heading || derived.charAt(0).toUpperCase() + derived.slice(1)).slice(0, 60);
   if (name.length < 2 || prompt.length < 10) return { error: 'Describe the app in a little more detail.' };
   const theme = String(data.get('uiTheme') ?? 'corporate');
   const system = String(data.get('uiSystem') ?? 'daisyui');
@@ -25,6 +27,7 @@ export function readProjectForm(data: FormData): NewProject | { error: string } 
     prompt, name, appFramework, uiTheme: isDaisyTheme(theme) ? theme : 'corporate', uiSystem: appFramework === 'nextjs' ? 'mosaic' : ['daisyui', 'mosaic'].includes(system) ? system : 'daisyui',
     // Unchecked checkboxes are absent; a pending prompt saved from the public page keeps its choices.
     includeHome: data.get('includeHome') === 'on', includeLogin: data.get('includeLogin') === 'on',
+    generationMode: data.get('generationMode') === 'one-shot' ? 'one-shot' : 'staged',
   };
 }
 
@@ -63,7 +66,7 @@ export async function createProject(userId: string, input: NewProject, origin: s
        VALUES ($1, $2, $3, 'project.create', 'project', $4, $5::jsonb)`,
       [id(), organization.id, userId, projectId, JSON.stringify({ name: input.name, slug, appFramework: input.appFramework })],
     );
-    await enqueueJob(tx, { projectId, kind: 'generate', metadata: { prompt: input.prompt, userId }, stage: 'Waiting to plan' });
+    await enqueueJob(tx, { projectId, kind: 'generate', metadata: { prompt: input.prompt, userId, generationMode: input.generationMode }, stage: 'Waiting to plan' });
   });
   kickJobs();
   return projectId;
@@ -123,8 +126,14 @@ export async function deploymentCredentials(projectId: string, userId: string) {
 // A signed-out visitor's prompt waits in an HttpOnly cookie until they sign in, then becomes their project.
 const PENDING = 'mosaic_pending_project';
 
-export function savePendingProject(cookies: Cookies, input: NewProject): void {
-  cookies.set(PENDING, Buffer.from(JSON.stringify(input)).toString('base64url'), { path: '/', httpOnly: true, sameSite: 'lax', secure: hosted, maxAge: 60 * 60 });
+export async function savePendingProject(cookies: Cookies, input: NewProject): Promise<void> {
+  const db = await getCloudDb();
+  const pendingId = id();
+  await db.tx(async (tx) => {
+    await tx.query('DELETE FROM cloud_pending_projects WHERE expires_at <= now()');
+    await tx.query("INSERT INTO cloud_pending_projects (id, input, expires_at) VALUES ($1, $2, now() + interval '1 hour')", [pendingId, JSON.stringify(input)]);
+  });
+  cookies.set(PENDING, pendingId, { path: '/', httpOnly: true, sameSite: 'lax', secure: hosted, maxAge: 60 * 60 });
 }
 
 export async function continuePendingProject(cookies: Cookies, userId: string, origin: string): Promise<string | undefined> {
@@ -132,7 +141,10 @@ export async function continuePendingProject(cookies: Cookies, userId: string, o
   if (!raw) return undefined;
   cookies.delete(PENDING, { path: '/' });
   try {
-    const saved = JSON.parse(Buffer.from(raw, 'base64url').toString('utf8')) as Partial<NewProject>;
+    const saved = /^[\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12}$/i.test(raw)
+      ? (await (await getCloudDb()).query<{ input: NewProject }>('DELETE FROM cloud_pending_projects WHERE id = $1 AND expires_at > now() RETURNING input', [raw])).rows[0]?.input
+      : JSON.parse(Buffer.from(raw, 'base64url').toString('utf8')) as Partial<NewProject>;
+    if (!saved) return undefined;
     const form = new FormData();
     for (const [key, value] of Object.entries(saved)) form.set(key, typeof value === 'boolean' ? (value ? 'on' : '') : String(value ?? ''));
     const input = readProjectForm(form); // re-validate: the cookie is user-controlled input

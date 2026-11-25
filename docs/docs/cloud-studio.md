@@ -13,23 +13,29 @@ projects use the same Mosaic runtime and database-first artifacts.
 
 ## How it works
 
-1. Type a prompt on the home page. In **Options → Framework**, choose **SvelteKit**
+1. Enter a brief of up to 24,000 characters on the home page. In **Options → Framework**, choose **SvelteKit**
    or **Next.js**. Cloud keeps your prompt and choice through sign-in and uses that
    framework for later releases of the same project.
-2. The planner may ask one short round of questions when the answer changes the data
-   model. Answer, or choose **Decide for me**.
-3. A developer agent designs the app (entities, relationships, pages, roles, sample
-   data). A verifier runs real create, list and edit checks on a fresh Mosaic server, and
-   a reviewer checks that every workflow in your brief is possible. Each agent's thinking
-   appears in the chat while it works.
+2. **Feature by feature** is the default. A brief evaluator defines the users, access rules,
+   data, workflows and expected outcomes. If a decision affects how the app works, Cloud
+   asks in chat and refines the spec after you answer. Use **Decide for me** to delegate
+   open product decisions. Scope reductions for unsupported requirements need an explicit answer.
+3. A separate planner creates an ordered feature plan with acceptance checks. Open
+   **Blueprint** to see the specification and build order. Cloud builds each feature,
+   runs database create, list and edit checks, and reviews the result against its acceptance
+   criteria. The first passing feature appears in **Preview** while Cloud works through
+   later features. The final review uses the complete agreed spec. Cloud packages the
+   release and queues connected providers after all features pass. Choose **One shot**
+   when you want to build and preview the complete app in one pass after brief refinement.
 4. Open **App**, **Sign in**, or **Open Studio** in the preview toolbar. In Preview
    Studio, open a page or form and choose **Edit** to use the visual designer. Saves
    apply to the preview database. On installations with persistent previews, they
    survive instance restarts.
    When a SvelteKit deployment is ready, **Open live Studio** edits the deployed
    app. **Live app** opens the deployed site separately.
-5. Send changes in the chat. Theme and other settings changes apply to the preview at
-   once and are then rebuilt, committed, and redeployed in the background.
+5. Send feedback in the chat while reviewing a preview. Cloud queues it as a change
+   after the staged build. For released apps, settings changes apply to the preview
+   and are rebuilt, committed and redeployed in the background.
 6. Optionally connect your own GitHub (private repository, one commit per release),
    Neon (PostgreSQL), and Vercel (deployments) accounts in **Settings → Connections**.
    Cloud can deliver an existing build after you connect your accounts. Open
@@ -91,9 +97,11 @@ key. The build feed shows which model responded.
 
 ## Current limits
 
-Generated apps cover data-driven business screens: entities, relationships, CRUD,
-dashboards, roles and sample data. Custom Svelte code, external integrations, workflow
-automation, and usage billing are not generated yet; see the [road to v1](./roadmap.md).
+Generated apps cover data-driven business screens with entities, relationships, CRUD,
+dashboards, entity-level permissions and sample data. Requirements such as tenant
+isolation, per-record permissions, atomic approval and balance updates, invitation
+emails and password recovery need developer implementation in the generated repository.
+Database CRUD checks and AI review cover generated artifacts. See the [road to v1](./roadmap.md).
 
 ## Developer takeover
 

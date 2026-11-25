@@ -26,7 +26,7 @@ export const actions: Actions = {
     if ('error' in input) return fail(400, { message: input.error });
     if (!locals.user) {
       // Keep the prompt and continue right after sign-up/sign-in.
-      savePendingProject(cookies, input);
+      await savePendingProject(cookies, input);
       throw redirect(303, '/signup?continue=project');
     }
     let projectId: string;

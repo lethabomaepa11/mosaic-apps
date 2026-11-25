@@ -4,7 +4,7 @@ import { getCloudDb, id } from './db';
 import type { ProjectBlueprint } from './groq';
 import { AI_PROVIDERS, aiModel } from './ai';
 import { aiConfigFor } from './ai-settings';
-import type { Answer } from './agents';
+import { planFeatures, refineBrief, type Answer, type BuildFeature } from './agents';
 import { buildApp } from './build-app';
 import { discardPreview, publishToPreview } from './preview';
 import { drainPreviewCleanup } from './preview-schema';
@@ -56,6 +56,12 @@ export async function queueLatestDelivery(db: Db, projectId: string): Promise<st
 }
 
 /** Locks the workspace before claiming so two workers cannot run jobs in it at once. */
+const runnableProject = `(job.kind = 'delete' OR (
+    project.status NOT IN ('deleting', 'delete_failed')
+    AND NOT EXISTS (SELECT 1 FROM cloud_jobs waiting WHERE waiting.project_id = job.project_id
+      AND waiting.status = 'waiting_input' AND waiting.metadata ? 'generationMode')
+  ))`;
+
 export async function claimJob(db: Db): Promise<ClaimedJob | undefined> {
   const expired = await db.query<{ project_id: string; status: string }>(
     `UPDATE cloud_jobs SET status = CASE WHEN attempts >= $1 THEN 'failed' ELSE 'queued' END,
@@ -76,7 +82,7 @@ export async function claimJob(db: Db): Promise<ClaimedJob | undefined> {
        JOIN LATERAL (
          SELECT MIN(job.created_at) AS oldest FROM cloud_jobs job JOIN cloud_projects project ON project.id = job.project_id
          WHERE project.organization_id = workspace.id AND job.status = 'queued' AND job.run_after <= now()
-           AND (job.kind = 'delete' OR project.status NOT IN ('deleting', 'delete_failed'))
+           AND ${runnableProject}
        ) due ON due.oldest IS NOT NULL
        WHERE NOT EXISTS (SELECT 1 FROM cloud_jobs job JOIN cloud_projects project ON project.id = job.project_id
          WHERE project.organization_id = workspace.id AND job.status = 'running')
@@ -88,7 +94,7 @@ export async function claimJob(db: Db): Promise<ClaimedJob | undefined> {
          lease_id = $2, lease_expires_at = now() + make_interval(secs => $3)
        WHERE id = (SELECT job.id FROM cloud_jobs job JOIN cloud_projects project ON project.id = job.project_id
          WHERE project.organization_id = $1 AND job.status = 'queued' AND job.run_after <= now()
-           AND (job.kind = 'delete' OR project.status NOT IN ('deleting', 'delete_failed'))
+           AND ${runnableProject}
            AND NOT EXISTS (SELECT 1 FROM cloud_jobs active JOIN cloud_projects owner ON owner.id = active.project_id
              WHERE owner.organization_id = $1 AND active.status = 'running')
          ORDER BY job.created_at FOR UPDATE OF job SKIP LOCKED LIMIT 1)
@@ -170,7 +176,7 @@ export async function runJobs(db: Db, budgetMs = 240_000, handlers: Record<strin
     if (job) { await runJob(db, job, handlers); ran++; continue; }
     const next = await db.query<{ wait: number | null }>(`SELECT EXTRACT(EPOCH FROM (MIN(job.run_after) - now())) * 1000 AS wait
       FROM cloud_jobs job JOIN cloud_projects project ON project.id = job.project_id
-      WHERE job.status = 'queued' AND (job.kind = 'delete' OR project.status NOT IN ('deleting', 'delete_failed'))
+      WHERE job.status = 'queued' AND ${runnableProject}
         AND NOT EXISTS (SELECT 1 FROM cloud_jobs active JOIN cloud_projects owner ON owner.id = active.project_id
         WHERE owner.organization_id = project.organization_id AND active.status = 'running')`);
     const wait = next.rows[0]?.wait;
@@ -230,15 +236,79 @@ async function addMessage(db: Db, projectId: string, content: string) {
   );
 }
 
-const generate: JobHandler = async ({ db, job, stage, think, pause, enqueue }) => {
+const generate: JobHandler = async ({ db, job, stage, think, pause, enqueue, requeue }) => {
   const project = await loadProject(db, job.project_id);
   await db.query("UPDATE cloud_projects SET status = 'generating', updated_at = now() WHERE id = $1", [project.id]);
   const options = `framework=${frameworkLabel(project.app_framework)}, homepage=${project.include_home ? 'yes' : 'no'}, sign-in=${project.include_login ? 'yes' : 'no'}, theme=${project.ui_theme}`;
-  const answers = (job.metadata.answers ?? []) as Answer[];
+  const metadata = job.metadata;
+  const answers = (metadata.answers ?? []) as Answer[];
+  const refinedSpec = metadata.refinedSpec as string | undefined;
+  if (metadata.generationMode && !refinedSpec) {
+    await stage('Evaluating your brief', 3);
+    const refined = await refineBrief({
+      brief: project.prompt, answers, options, config: await aiConfigFor(metadata.userId),
+      onWait: (seconds) => think('Brief evaluator', `Retrying brief evaluation in ${seconds}s after an AI rate limit…`),
+    });
+    if (refined.questions.length) {
+      await pause(refined.questions, `Before I plan the build, I need your input:\n${refined.questions.map((item) => `• ${item.question}`).join('\n')}`);
+      return;
+    }
+    await requeue(0, { ...metadata, refinedSpec: refined.spec, questions: [] });
+    return;
+  }
   let spec: AppSpec;
   let app: CompiledApp;
   const verifiedSpec = job.metadata.verifiedSpec as AppSpec | undefined;
-  if (verifiedSpec || (job.metadata.reuseBlueprint && project.app_spec)) {
+  if (job.metadata.generationMode === 'staged') {
+    if (!refinedSpec) throw new Error('The evaluated brief is missing.');
+    const featurePlan = metadata.featurePlan as BuildFeature[] | undefined;
+    const index: number = metadata.completedFeatures ?? 0;
+    if (featurePlan && index === featurePlan.length && project.app_spec) {
+      spec = project.app_spec;
+      app = compileSpec(spec);
+    } else {
+      const ai = await aiConfigFor(metadata.userId);
+      let respondingModel = aiModel(ai);
+      ai.onModel = (model) => { respondingModel = model; };
+      const planning = { brief: project.prompt, answers, options, config: ai };
+      if (!featurePlan) {
+        await stage('Planning features and acceptance checks', 7);
+        const features = await planFeatures({ ...planning, refinedSpec, onWait: (seconds) => think('Planner', `Retrying feature planning in ${seconds}s after an AI rate limit…`) });
+        await requeue(0, { ...metadata, featurePlan: features });
+        return;
+      }
+      const feature = featurePlan[index];
+      if (!feature || (index && !project.app_spec)) throw new Error('The feature checkpoint is incomplete.');
+      const label = `Feature ${index + 1} of ${featurePlan.length} · ${feature.name}`;
+      const progress = (percent: number) => 10 + Math.floor(78 * (index + percent / 100) / featurePlan.length);
+      await stage(label, progress(0));
+      let featureSpec = metadata.pendingFeatureSpec as AppSpec | undefined;
+      if (!featureSpec) {
+        const acceptance = feature.acceptance.map((check) => `- ${check}`).join('\n');
+        const featureBrief = `Current feature: ${feature.name}\n${feature.scope}\n\nAcceptance checks:\n${acceptance}`;
+        const brief = `Product context, including requirements and dependencies for later features:\n${refinedSpec}\n\n${featureBrief}`;
+        const reviewBrief = index + 1 === featurePlan.length
+          ? `${featureBrief}\n\nReview this feature and the complete agreed spec:\n${refinedSpec}`
+          : featureBrief;
+        const result = await buildApp({
+          ai, brief, answers: [], options, feature, reviewBrief, current: project.app_spec ?? undefined, change: feature.scope, askQuestions: false,
+        }, { think, progress: async (percent) => { await db.query('UPDATE cloud_jobs SET progress = $2 WHERE id = $1', [job.id, progress(percent)]); } });
+        if (result.status !== 'built' || !result.reviewApproved) throw new Error(`${feature.name} did not pass review. The last verified preview is still available if a feature was published.`);
+        featureSpec = result.spec;
+        await db.query("UPDATE cloud_jobs SET metadata = metadata || jsonb_build_object('pendingFeatureSpec', $2::jsonb) WHERE id = $1", [job.id, JSON.stringify(featureSpec)]);
+      }
+      await stage(`Publishing ${feature.name} to preview`, progress(90));
+      await publishToPreview(project, featureSpec, compileSpec(featureSpec), `${job.id}:${index}`);
+      const next = { ...metadata, completedFeatures: index + 1, pendingFeatureSpec: undefined };
+      await db.tx(async (tx) => {
+        await tx.query('UPDATE cloud_projects SET app_spec = $2::jsonb, blueprint = $3::jsonb, planner_model = $4, planned_at = now(), updated_at = now() WHERE id = $1', [project.id, JSON.stringify(featureSpec), JSON.stringify(blueprintFromSpec(featureSpec)), respondingModel]);
+        await addMessage(tx, project.id, `${label} is ready in Preview. It passed database CRUD checks and AI review against the acceptance criteria.`);
+        await tx.query('UPDATE cloud_jobs SET metadata = $2::jsonb WHERE id = $1', [job.id, JSON.stringify(next)]);
+      });
+      await requeue(0, next);
+      return;
+    }
+  } else if (verifiedSpec || (job.metadata.reuseBlueprint && project.app_spec)) {
     // Settings-only change (e.g. theme): rebuild, commit and redeploy the same verified spec.
     spec = verifiedSpec ?? project.app_spec!;
     if (!verifiedSpec && typeof job.metadata.allowRegistration === 'boolean') {
@@ -251,6 +321,10 @@ const generate: JobHandler = async ({ db, job, stage, think, pause, enqueue }) =
     app = compileSpec(spec);
     await stage(verifiedSpec ? 'Resuming verified build' : 'Applying design settings', 40);
   } else {
+    if (job.metadata.revise && (await db.query(`SELECT 1 FROM cloud_jobs WHERE project_id = $1 AND status = 'failed'
+      AND metadata->>'generationMode' = 'staged' AND NOT EXISTS (SELECT 1 FROM cloud_releases WHERE project_id = $1) LIMIT 1`, [project.id])).rows.length) {
+      throw new Error('Retry the staged build before applying this change.');
+    }
     const revising = Boolean(job.metadata.revise && project.app_spec);
     // Everything the user has said counts, not just the first prompt (answers, "just do it", extra detail).
     const said = await db.query<{ content: string }>(
@@ -258,7 +332,7 @@ const generate: JobHandler = async ({ db, job, stage, think, pause, enqueue }) =
        WHERE conversation.project_id = $1 AND message.role = 'user' ORDER BY message.created_at`, [project.id],
     );
     const notes = said.rows.map((row) => row.content).filter((content) => content !== project.prompt && content !== job.metadata.prompt);
-    const brief = notes.length ? `${project.prompt}\n\nMore from the user (follow these):\n${notes.map((note) => `- ${note}`).join('\n')}` : project.prompt;
+    const brief = refinedSpec ?? (notes.length ? `${project.prompt}\n\nMore from the user (follow these):\n${notes.map((note) => `- ${note}`).join('\n')}` : project.prompt);
     // Ask at most once per project; after that the agents decide and state their assumptions.
     const askedBefore = await db.query("SELECT 1 FROM cloud_jobs WHERE project_id = $1 AND metadata ? 'questions' AND id <> $2 LIMIT 1", [project.id, job.id]);
     const ai = await aiConfigFor(job.metadata.userId as string | undefined);
@@ -266,9 +340,9 @@ const generate: JobHandler = async ({ db, job, stage, think, pause, enqueue }) =
     ai.onModel = (model) => { respondingModel = model; };
     if (ai.provider !== 'mosaic') await think('Planner', `Using your own ${AI_PROVIDERS[ai.provider].label} key (${respondingModel})`);
     const result = await buildApp({
-      ai, brief, answers, options,
+      ai, brief, answers: refinedSpec ? [] : answers, options,
       current: revising ? project.app_spec! : undefined, change: revising ? String(job.metadata.prompt ?? '') : undefined,
-      askQuestions: !revising && !askedBefore.rows.length && !notes.length && !job.metadata.answers && !job.metadata.skipQuestions,
+      askQuestions: !refinedSpec && !revising && !askedBefore.rows.length && !notes.length && !job.metadata.answers && !job.metadata.skipQuestions,
     }, { think, progress: async (percent) => { await db.query('UPDATE cloud_jobs SET progress = $2 WHERE id = $1', [job.id, percent]); } });
     if (result.status === 'needs_input') {
       await pause(result.questions, `Before I build, a few quick questions:\n${result.questions.map((question) => `• ${question.question}`).join('\n')}`);
@@ -281,8 +355,10 @@ const generate: JobHandler = async ({ db, job, stage, think, pause, enqueue }) =
       await tx.query("UPDATE cloud_jobs SET metadata = metadata || jsonb_build_object('verifiedSpec', $2::jsonb) WHERE id = $1", [job.id, JSON.stringify(spec)]);
     });
   }
-  await think('Verifier', 'Publishing the live preview…');
-  await publishToPreview(project, spec, app, job.id);
+  if (job.metadata.generationMode !== 'staged') {
+    await think('Verifier', 'Publishing the live preview…');
+    await publishToPreview(project, spec, app, job.id);
+  }
   await stage('Packaging the release', 90);
   const release = await persistGeneratedRelease(db, { projectId: project.id, jobId: job.id, name: project.name, slug: project.slug, spec, app, framework: project.app_framework, theme: project.ui_theme });
   const connected = await db.query<{ provider: string }>(

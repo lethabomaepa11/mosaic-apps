@@ -9,7 +9,8 @@ delete process.env.VERCEL;
 
 const { getCloudDb, readCloud } = await import('../src/lib/server/db');
 const { claimJob, enqueueJob, queueLatestDelivery, runJob, runJobs } = await import('../src/lib/server/jobs');
-const { deleteProject, deploymentCredentials, readProjectForm } = await import('../src/lib/server/projects');
+const { deleteProject, deploymentCredentials, readProjectForm, savePendingProject } = await import('../src/lib/server/projects');
+const { previewRuntime } = await import('../src/lib/server/preview');
 const { saveConnection } = await import('../src/lib/server/connections');
 const { createMosaicServer } = await import('@mosaic-apps/server');
 const { encryptProviderSecret } = await import('../src/lib/server/providers');
@@ -19,12 +20,13 @@ const db = await getCloudDb();
 // Fake Groq: answers as the three agents would. Tests set `agentQuestions` to make the planner ask.
 let agentQuestions: Array<{ question: string; options: string[] }> = [];
 const groqCalls: string[] = [];
+let stagedReply: ((name: string, prompt: string) => object | undefined) | undefined;
 function groqReply(body: any): Response {
   const name = body.response_format.json_schema.name as string;
   groqCalls.push(name);
-  const content = name === 'mosaic_clarify' ? { thinking: ['Reading the brief'], questions: agentQuestions }
+  const content = stagedReply?.(name, body.messages.at(-1).content) ?? (name === 'mosaic_clarify' ? { thinking: ['Reading the brief'], questions: agentQuestions }
     : name === 'mosaic_review' ? { thinking: ['Every workflow is covered'], approved: true, issues: [] }
-    : { thinking: ['Modelling equipment, employees and loans'], spec: equipmentSpec };
+    : { thinking: ['Modelling equipment, employees and loans'], spec: equipmentSpec });
   return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(content) } }] }), { status: 200, headers: { 'content-type': 'application/json' } });
 }
 const baseFetch = globalThis.fetch;
@@ -395,7 +397,7 @@ test('GitHub delivery refuses to commit into a repository Mosaic did not create'
   assert.match(deliver.error ?? '', /already exists/);
 });
 
-test('the planner asks once; a chat reply resumes the same job and it never asks again', async () => {
+test('legacy builds resume a one-round clarification without asking again', async () => {
   const { projectId } = await createProject();
   agentQuestions = [{ question: 'Who signs in?', options: ['Admins only', 'Admins and staff'] }];
   const jobId = await enqueueJob(db, { projectId, kind: 'generate', metadata: { prompt: 'Track customers and invoices' } });
@@ -418,6 +420,127 @@ test('the planner asks once; a chat reply resumes the same job and it never asks
   await runJobs(db, 10_000);
   assert.ok(!groqCalls.includes('mosaic_clarify'));
   agentQuestions = [];
+});
+
+test('long briefs retain their title, acceptance criteria and mode through sign-in storage', async () => {
+  const form = new FormData();
+  const prompt = '# LeaveDesk — Employee Leave Management System\n\n' + 'Approval must update the stored balance.\n'.repeat(250) + 'Never permit self-approval.';
+  form.set('prompt', prompt);
+  const input = readProjectForm(form);
+  assert.ok(!('error' in input));
+  assert.equal(input.name, 'LeaveDesk');
+  assert.equal(input.prompt, prompt);
+  assert.equal(input.generationMode, 'staged');
+  let cookie = '';
+  const cookies = { set: (_name: string, value: string) => { cookie = value; } } as Parameters<typeof savePendingProject>[0];
+  await savePendingProject(cookies, input);
+  assert.match(cookie, /^[a-f0-9-]{36}$/);
+  assert.deepEqual((await db.query('DELETE FROM cloud_pending_projects WHERE id = $1 RETURNING input', [cookie])).rows[0]?.input, input);
+  form.set('prompt', 'x'.repeat(24_001));
+  assert.ok('error' in readProjectForm(form));
+});
+
+test('staged generation refines twice, previews individual features, and releases only after final review', async () => {
+  const { projectId } = await createProject();
+  const jobId = await enqueueJob(db, { projectId, kind: 'generate', metadata: { generationMode: 'staged' } });
+  const first = {
+    ...equipmentSpec, workflows: ['Manage equipment'],
+    entities: equipmentSpec.entities.filter((entity) => entity.name === 'equipment'),
+    pages: equipmentSpec.pages.filter((page) => page.slug === 'home' || page.slug === 'equipment'),
+    sampleData: equipmentSpec.sampleData.filter((sample) => sample.entity === 'equipment'),
+  };
+  const refinedSpec = 'Staff sign in, manage equipment, and track its loans to employees.';
+  const features = [
+    { name: 'Inventory', scope: 'Allow staff to manage equipment', acceptance: ['Create and list equipment'] },
+    { name: 'Loans', scope: 'Add a loan that links staff and equipment', acceptance: ['Link a loan to its borrower'] },
+  ];
+  const checkpoint = async () => (await db.query<{ status: string; metadata: any }>('SELECT status, metadata FROM cloud_jobs WHERE id = $1', [jobId])).rows[0]!;
+  const releaseCount = async () => (await db.query('SELECT id FROM cloud_releases WHERE project_id = $1', [projectId])).rows.length;
+  const step = async () => {
+    const job = await claimJob(db);
+    assert.equal(job?.id, jobId);
+    await runJob(db, job);
+  };
+  let rejectLoans = false;
+  stagedReply = (name, prompt) => {
+    if (name === 'mosaic_refine_brief') {
+      if (prompt.includes('Track returns')) {
+        assert.match(prompt, /Staff sign in/);
+        return { spec: refinedSpec, questions: [] };
+      }
+      return { spec: '', questions: [{ question: prompt.includes('Staff sign in') ? 'What happens after loaning?' : 'Who signs in?', options: [] }] };
+    }
+    if (name === 'mosaic_feature_plan') {
+      assert.ok(prompt.includes(refinedSpec));
+      return { features };
+    }
+    if (name === 'mosaic_app_spec' && prompt.includes('Current feature: Inventory')) return { thinking: [], spec: first };
+    if (name === 'mosaic_review' && prompt.includes('Current feature: Loans')) {
+      assert.ok(prompt.includes(refinedSpec));
+      if (rejectLoans) return { thinking: [], approved: false, issues: [] };
+    }
+  };
+  try {
+    const answers = [];
+    for (const [question, answer] of [['Who signs in?', 'Staff sign in'], ['What happens after loaning?', 'Track returns']]) {
+      await step();
+      const paused = await checkpoint();
+      assert.equal(paused.status, 'waiting_input');
+      assert.equal(paused.metadata.questions[0].question, question);
+      assert.equal(await releaseCount(), 0);
+      answers.push({ question, answer });
+      await db.query("UPDATE cloud_jobs SET status = 'queued', attempts = 0, run_after = now(), metadata = metadata || $2::jsonb WHERE id = $1", [jobId, JSON.stringify({ answers })]);
+    }
+    await step(); // Evaluate the answers.
+    assert.equal((await checkpoint()).metadata.refinedSpec, refinedSpec);
+    await step(); // Plan the features.
+    assert.deepEqual((await checkpoint()).metadata.featurePlan, features);
+    await step(); // Publish the first verified feature.
+    assert.equal((await checkpoint()).metadata.completedFeatures, 1);
+    assert.equal(await releaseCount(), 0);
+    const project = (await db.query<Parameters<typeof previewRuntime>[0]>('SELECT id, slug, app_spec FROM cloud_projects WHERE id = $1', [projectId])).rows[0]!;
+    const preview = await previewRuntime(project);
+    const created = await preview.call('POST', '/api/entities/equipment', { name: 'Preview equipment', status: 'available' });
+    assert.equal(created.status, 201, JSON.stringify(created.body));
+    assert.equal((await preview.call('GET', '/api/entities/loan')).status, 404);
+
+    rejectLoans = true;
+    await step();
+    assert.equal((await checkpoint()).status, 'failed');
+    assert.equal((await checkpoint()).metadata.completedFeatures, 1);
+    assert.equal(await releaseCount(), 0);
+    assert.equal((await preview.call('GET', '/api/entities/loan')).status, 404);
+    rejectLoans = false;
+    await db.query("UPDATE cloud_jobs SET status = 'queued', attempts = 0, run_after = now() WHERE id = $1", [jobId]);
+    await step(); // Retry and publish the second feature after a review of the full spec.
+    assert.equal((await checkpoint()).metadata.completedFeatures, 2);
+    assert.equal(await releaseCount(), 0);
+    assert.equal((await preview.call('GET', '/api/entities/loan')).status, 200);
+    assert.equal((await preview.call('GET', `/api/entities/equipment/${created.body.data.id}`)).status, 200);
+    await step(); // Package the release.
+    assert.equal((await checkpoint()).status, 'completed');
+    assert.equal(await releaseCount(), 1);
+  } finally {
+    stagedReply = undefined;
+  }
+});
+
+test('one shot evaluates a complete brief and builds without planning feature slices', async () => {
+  const { projectId } = await createProject();
+  const refined = 'Keep an equipment inventory and record who has each item on loan.';
+  const before = groqCalls.length;
+  stagedReply = (name, prompt) => {
+    if (name === 'mosaic_refine_brief') return { spec: refined, questions: [] };
+    if (name === 'mosaic_app_spec') assert.ok(prompt.includes(refined));
+  };
+  try {
+    await enqueueJob(db, { projectId, kind: 'generate', metadata: { generationMode: 'one-shot' } });
+    await runDue();
+    assert.deepEqual(groqCalls.slice(before), ['mosaic_refine_brief', 'mosaic_app_spec', 'mosaic_review']);
+    assert.deepEqual(await jobsOf(projectId), [{ kind: 'generate', status: 'completed', error: null }]);
+  } finally {
+    stagedReply = undefined;
+  }
 });
 
 test('a verified app still publishes real Mosaic artifacts when the reviewer is unavailable', async (t) => {

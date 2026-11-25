@@ -111,6 +111,9 @@ CREATE INDEX IF NOT EXISTS cloud_jobs_queue_idx ON cloud_jobs (status, run_after
 CREATE TABLE IF NOT EXISTS cloud_preview_cleanup (
   project_id uuid PRIMARY KEY, created_at timestamptz NOT NULL DEFAULT now()
 );
+CREATE TABLE IF NOT EXISTS cloud_pending_projects (
+  id uuid PRIMARY KEY, input jsonb NOT NULL, expires_at timestamptz NOT NULL
+);
 `;
 
 // Kept on globalThis so a dev hot-reload of this module reuses the open database: a second

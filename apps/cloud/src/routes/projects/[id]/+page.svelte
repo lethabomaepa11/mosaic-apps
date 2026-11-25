@@ -37,9 +37,11 @@
   let previewBase = $derived(`/preview/${data.project.slug}`);
   let previewView = $state<'app' | 'login' | 'studio'>('app');
   let iframeUrl = $derived(`${previewBase}${previewView === 'app' ? '' : `/${previewView}`}`);
-  let busy = $derived(data.jobs.some((job) => ['queued', 'running'].includes(job.status)));
-  let activeJob = $derived(data.jobs.find((job) => ['queued', 'running'].includes(job.status)) ?? (data.jobs[0]?.status === 'failed' ? data.jobs[0] : undefined));
-  let waitingJob = $derived(busy ? undefined : data.jobs.find((job) => job.status === 'waiting_input'));
+  let waitingJob = $derived(data.jobs.find((job) => job.status === 'waiting_input'));
+  let busy = $derived(!waitingJob && data.jobs.some((job) => ['queued', 'running'].includes(job.status)));
+  let activeJob = $derived(data.jobs.find((job) => job.status === 'running')
+    ?? (busy ? data.jobs.findLast((job) => job.status === 'queued') : data.jobs.find((job) => job.status === 'failed')));
+  let hasPreview = $derived(Boolean(data.releases.length || data.generation?.completed));
   const agentTone: Record<string, string> = { Planner: 'bg-info/15 text-info', Developer: 'bg-primary/15 text-primary', Verifier: 'bg-success/15 text-success', Reviewer: 'bg-warning/15 text-warning' };
   let composer = $state<HTMLTextAreaElement>();
   // Chips build one combined answer in the composer; "Decide for me" sends straight away.
@@ -86,13 +88,25 @@
     <div class="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 py-5" bind:this={thread}>
       {#each data.messages as message}
         {#if message.role === 'user'}
-          <div class="ml-10 rounded-2xl rounded-tr-md bg-primary px-4 py-2.5 text-sm leading-6 text-primary-content shadow-sm">{message.content}</div>
+          <div class="ml-10 max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-2xl rounded-tr-md bg-primary px-4 py-2.5 text-sm leading-6 text-primary-content shadow-sm">{message.content}</div>
         {:else}
           <div class="flex gap-2.5"><span class="mt-0.5 grid size-7 shrink-0 place-items-center rounded-full bg-gradient-to-br from-primary to-violet-500 text-primary-content"><Sparkles size={13} /></span><div class="min-w-0 rounded-2xl rounded-tl-md bg-base-200 px-4 py-2.5 text-sm leading-6">{message.content}</div></div>
         {/if}
       {/each}
 
-      {#if data.project.blueprint}
+      {#if data.generation?.features}
+        <div class="ml-9 rounded-xl border border-base-300 bg-base-100 p-3.5 text-sm">
+          <div class="mb-2 flex items-center justify-between gap-2"><span class="font-medium">Feature plan</span><button class="link link-hover text-xs text-primary" type="button" onclick={() => { tab = 'blueprint'; pane = 'app'; }}>View spec</button></div>
+          <ol class="space-y-1.5">
+            {#each data.generation.features as feature, index}
+              <li class="flex items-center gap-2">
+                {#if index < (data.generation.completed ?? 0)}<Check size={14} class="shrink-0 text-success" aria-label="In preview" />{:else}<span class="status-dot shrink-0"></span>{/if}
+                {feature.name}
+              </li>
+            {/each}
+          </ol>
+        </div>
+      {:else if data.project.blueprint}
         {@const plan = data.project.blueprint}
         <div class="ml-9 rounded-xl border border-base-300 bg-base-100 p-3.5 text-sm">
           <div class="mb-2 flex items-center justify-between"><span class="font-medium">Plan</span><button class="link link-hover text-xs text-primary" type="button" onclick={() => (tab = 'blueprint')}>Full blueprint</button></div>
@@ -103,7 +117,6 @@
       {/if}
 
       {#if waitingJob}
-        <!-- The agents asked once; any reply (or "Decide for me") resumes the same build. -->
         <div class="ml-9 rounded-xl border border-primary/30 bg-primary/5 p-3.5 text-sm">
           <p class="mb-2 font-medium">A few quick questions</p>
           <div class="space-y-3">
@@ -166,7 +179,7 @@
       </div>
       {#if tab === 'preview'}
         <div class="ml-auto flex min-w-0 flex-wrap items-center gap-1" aria-label="Preview controls">
-          {#if data.releases.length}
+          {#if hasPreview}
             <button class={`btn btn-sm ${previewView === 'app' ? 'btn-primary' : 'btn-outline'}`} type="button" aria-pressed={previewView === 'app'} onclick={() => (previewView = 'app')}>App</button>
             <button class={`btn btn-sm ${previewView === 'login' ? 'btn-primary' : 'btn-outline'}`} type="button" aria-pressed={previewView === 'login'} onclick={() => (previewView = 'login')}>Sign in</button>
             <button class={`btn btn-sm ${previewView === 'studio' ? 'btn-primary' : 'btn-outline'}`} type="button" aria-pressed={previewView === 'studio'} onclick={() => (previewView = 'studio')}>Open Studio</button>
@@ -174,7 +187,7 @@
           {#if liveUrl}<a class="btn btn-outline btn-sm" href={liveUrl} target="_blank" rel="noreferrer"><Globe size={14} /> Live app</a>{/if}
           <div class="join hidden sm:flex"><button class={`btn btn-ghost btn-sm join-item btn-square ${device === 'desktop' ? 'btn-active' : ''}`} type="button" aria-label="Desktop width" aria-pressed={device === 'desktop'} onclick={() => (device = 'desktop')}><Monitor size={15} /></button><button class={`btn btn-ghost btn-sm join-item btn-square ${device === 'mobile' ? 'btn-active' : ''}`} type="button" aria-label="Phone width" aria-pressed={device === 'mobile'} onclick={() => (device = 'mobile')}><Smartphone size={15} /></button></div>
           <button class="btn btn-ghost btn-sm btn-square" type="button" aria-label="Reload preview" onclick={() => reloads++}><RotateCw size={15} /></button>
-          {#if preview?.url}<a class="btn btn-ghost btn-sm btn-square" href={iframeUrl} target="_blank" rel="noreferrer" aria-label="Open preview in new tab"><ExternalLink size={15} /></a>{/if}
+          {#if preview?.url && hasPreview}<a class="btn btn-ghost btn-sm btn-square" href={iframeUrl} target="_blank" rel="noreferrer" aria-label="Open preview in new tab"><ExternalLink size={15} /></a>{/if}
         </div>
       {/if}
     </div>
@@ -183,21 +196,41 @@
       {#if tab === 'preview'}
         <div class={`mx-auto h-full p-3 transition-all ${device === 'mobile' ? 'max-w-[400px]' : ''}`}>
           <div class="relative h-full overflow-hidden rounded-xl border border-base-300 bg-white shadow-sm">
-            {#if preview?.url && data.releases.length}
-              {#key `${iframeUrl}#${data.releases[0]?.version ?? 0}#${data.project.ui_theme}#${reloads}`}<iframe class="absolute inset-0 h-full w-full" src={iframeUrl} title={`${data.project.name} preview`}></iframe>{/key}
+            {#if preview?.url && hasPreview}
+              {#key `${iframeUrl}#${data.generation?.completed ?? 0}#${data.releases[0]?.version ?? 0}#${data.project.ui_theme}#${reloads}`}<iframe class="absolute inset-0 h-full w-full" src={iframeUrl} title={`${data.project.name} preview`}></iframe>{/key}
             {:else}
               {#if activeJob?.status === 'failed'}
                 <div class="absolute inset-0 grid place-items-center p-8 text-center"><div class="max-w-sm"><div class="mx-auto mb-4 grid size-12 place-items-center rounded-2xl bg-error/10 text-error"><CircleAlert size={22} /></div><p class="mb-1 font-medium">The build stopped</p><p class="mb-4 text-sm muted">{activeJob.error}</p><form method="POST" action="?/retry" use:enhance><input type="hidden" name="jobId" value={activeJob.id} /><button class="btn btn-primary btn-sm" type="submit"><RotateCw size={14} /> Try again</button></form></div></div>
+              {:else if waitingJob}
+                <div class="absolute inset-0 grid place-items-center p-8 text-center"><p class="text-sm muted">Answer in Chat to continue planning your app.</p></div>
               {:else}
                 <div class="absolute inset-0 grid place-items-center p-8 text-center"><div><div class="mx-auto mb-4 grid size-12 place-items-center rounded-2xl bg-primary/10 text-primary"><LoaderCircle size={22} class="animate-spin" /></div><p class="mb-1 font-medium">Your app is taking shape</p><p class="mb-0 text-sm muted">{activeJob?.stage ?? 'Planning pages and data…'}</p></div></div>
               {/if}
             {/if}
-            {#if busy && data.releases.length}<div class="absolute bottom-3 right-3 flex items-center gap-2 rounded-full bg-neutral/85 px-3 py-1.5 text-xs text-neutral-content shadow-lg backdrop-blur"><LoaderCircle size={12} class="animate-spin" /> Updating…</div>{/if}
+            {#if busy && hasPreview}<div class="absolute bottom-3 right-3 flex items-center gap-2 rounded-full bg-neutral/85 px-3 py-1.5 text-xs text-neutral-content shadow-lg backdrop-blur"><LoaderCircle size={12} class="animate-spin" /> Updating…</div>{/if}
           </div>
         </div>
 
       {:else if tab === 'blueprint'}
         <div class="mx-auto max-w-4xl space-y-5 p-5 md:p-8">
+          {#if data.generation?.spec}
+            <section class="rounded-xl border border-base-300 bg-base-100 p-5">
+              <h2 class="mb-3 text-xl font-semibold">Refined specification</h2>
+              <div class="whitespace-pre-wrap break-words text-sm leading-6">{data.generation.spec}</div>
+            </section>
+            {#if data.generation.features}
+              <section class="rounded-xl border border-base-300 bg-base-100 p-5">
+                <h2 class="mb-3 text-xl font-semibold">Build order</h2>
+                <ol class="list-decimal space-y-4 pl-5 text-sm">
+                  {#each data.generation.features as feature}
+                    <li><h3 class="font-semibold">{feature.name}</h3><p class="muted">{feature.scope}</p>
+                      <ul class="my-1 list-disc pl-5">{#each feature.acceptance as check}<li>{check}</li>{/each}</ul>
+                    </li>
+                  {/each}
+                </ol>
+              </section>
+            {/if}
+          {/if}
           {#if data.project.blueprint}
             <div class="flex flex-wrap items-start justify-between gap-3"><div><p class="section-label">Blueprint</p><h2 class="text-xl font-semibold">What Mosaic is building</h2></div>{#if data.project.planner_model}<span class="chip">Planned by {data.project.planner_model}</span>{/if}</div>
             <p class="max-w-3xl leading-7 muted">{data.project.blueprint.summary}</p>

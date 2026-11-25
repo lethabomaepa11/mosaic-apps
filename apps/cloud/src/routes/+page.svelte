@@ -43,13 +43,18 @@
     use:enhance={() => { submitting = true; return async ({ update }) => { await update(); submitting = false; }; }}>
     <label class="sr-only" for="prompt">Describe your app</label>
     <textarea class="block min-h-32 w-full resize-none rounded-xl bg-transparent px-4 pt-4 text-base leading-7 outline-none placeholder:text-base-content/40"
-      id="prompt" name="prompt" bind:value={prompt} required minlength="10"
+      id="prompt" name="prompt" bind:value={prompt} required minlength="10" maxlength="24000"
       placeholder="A customer portal for a solar installer with leads, quotes, installation milestones and invoices…"
       onkeydown={(event) => { if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) event.currentTarget.form?.requestSubmit(); }}></textarea>
 
     <div class="flex flex-wrap items-center gap-2 border-t border-base-300 px-2 pt-2">
       <label class="sr-only" for="name">Project name</label>
       <input class="input input-sm input-ghost w-44 focus:bg-base-200" id="name" name="name" placeholder="Project name (optional)" maxlength="60" />
+      <label class="sr-only" for="generationMode">Build mode</label>
+      <select class="select select-sm select-bordered w-auto" id="generationMode" name="generationMode">
+        <option value="staged">Feature by feature</option>
+        <option value="one-shot">One shot</option>
+      </select>
       <details class="dropdown">
         <summary class="btn btn-ghost btn-sm gap-1.5 font-normal muted"><Settings2 size={15} /> Options</summary>
         <div class="dropdown-content z-20 mt-2 w-80 space-y-3 rounded-box border border-base-300 bg-base-100 p-4 shadow-lg">

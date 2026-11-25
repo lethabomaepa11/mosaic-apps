@@ -347,7 +347,11 @@ export function blueprintFromSpec(spec: AppSpec) {
 
 /** One-line summary per entity/page for the reviewer (keeps prompts small on the 8k-token budget). */
 export function describeSpec(spec: AppSpec): string {
-  const entities = spec.entities.map((entity) => `- ${entity.name} (${entity.label}): ${entity.fields.map((field) => `${field.name}:${field.type}${field.type === 'ref' ? `→${field.refEntity}` : ''}${field.type === 'enum' ? `[${field.options.join('|')}]` : ''}${field.required ? '*' : ''}`).join(', ')}; perms create=${entity.permissions.create.join('/') || '*'} delete=${entity.permissions.delete.join('/') || '*'}`).join('\n');
+  const entities = spec.entities.map((entity) => {
+    const fields = entity.fields.map((field) => `${field.name}:${field.type}${field.type === 'ref' ? `→${field.refEntity}` : ''}${field.type === 'enum' ? `[${field.options.join('|')}]` : ''}${field.required ? '*' : ''}${field.unique ? ' (unique)' : ''}`).join(', ');
+    const permissions = Object.entries(entity.permissions).map(([action, roles]) => `${action}=${roles.join('/') || '*'}`).join(' ');
+    return `- ${entity.name} (${entity.label}): ${fields}; permissions ${permissions}`;
+  }).join('\n');
   const pages = spec.pages.map((page) => `- ${page.route} ${page.kind}${page.entity ? `(${page.entity})` : ''} ${page.access}${page.inMenu ? ' menu' : ''}${page.sections?.length ? `: ${page.sections.map((section) => `${section.title} [${section.kind}${section.entity ? `/${section.entity}` : ''}]`).join(', ')}` : ''}`).join('\n');
   const samples = spec.sampleData.map((sample) => `${sample.entity}×${sample.records.length}`).join(', ');
   return `Roles: ${spec.roles.join(', ')}\nPublic registration: ${spec.allowRegistration === true}; new users have the viewer role\nEntities:\n${entities}\nPages (list pages give full create/edit/delete/detail):\n${pages}\nSample data: ${samples || 'none'}\nWorkflows: ${spec.workflows.join('; ')}`;
