@@ -1,39 +1,36 @@
 <script lang="ts">
+  import { page as current } from '$app/state';
+  import { PageRenderer, Icon, Toaster, createClient } from '@mosaic-apps/ui';
   let { data } = $props();
-  const label = (path: string) => path === '/' ? 'Home' : (path.split('/').filter((part) => part && !part.startsWith('[')).at(-1) ?? path).replaceAll('-', ' ').replace(/^./, (char) => char.toUpperCase());
-  let routes = $derived(data.project.blueprint?.routes ?? []);
-  // Nav shows top-level sections only: no params (:id / [id]), sub-pages, or auth actions.
-  let navRoutes = $derived(routes.filter((route) => !/[:[]/.test(route.path) && route.path.split('/').filter(Boolean).length <= 1 && !/^\/(login|logout|signin|signup|register)$/.test(route.path)));
-  let entities = $derived(data.project.blueprint?.entities ?? []);
+  // The preview's API is same-origin and member-only; Cloud forwards it to the project's Mosaic server.
+  const client = $derived(createClient({ baseUrl: `${data.app.base}/api` }));
 </script>
 
-<svelte:head><title>{data.project.name}</title></svelte:head>
-<div class="min-h-screen bg-base-200 text-base-content" data-theme={data.project.ui_theme}>
-  <header class="border-b border-base-300 bg-base-100">
-    <nav class="mx-auto flex h-14 max-w-6xl items-center gap-4 px-5">
-      <a class="flex min-w-0 shrink-0 items-center gap-2 font-semibold tracking-tight whitespace-nowrap max-sm:max-w-[45%]" href={`/preview/${data.project.slug}`}><span class="grid size-7 place-items-center rounded-lg bg-primary text-xs font-bold text-primary-content">{data.project.name.slice(0, 1).toUpperCase()}</span><span class="truncate">{data.project.name}</span></a>
-      <div class="ml-auto flex min-w-0 gap-1 overflow-x-auto">
-        {#each navRoutes as route}
-          {@const href = `/preview/${data.project.slug}${route.path === '/' ? '' : route.path}`}
-          <a class={`rounded-lg px-3 py-1.5 text-sm whitespace-nowrap transition ${route.path === data.path ? 'bg-base-200 font-medium' : 'opacity-70 hover:bg-base-200 hover:opacity-100'}`} {href}>{label(route.path)}</a>
-        {/each}
-      </div>
-    </nav>
-  </header>
-  <main class="mx-auto max-w-6xl px-5 py-12 md:py-16">
-    {#if data.route}
-      <div class="max-w-2xl">
-        <span class="inline-flex items-center gap-1.5 rounded-full border border-base-300 bg-base-100 px-2.5 py-1 text-xs opacity-80"><span class={`size-1.5 rounded-full ${data.route.access === 'public' ? 'bg-success' : 'bg-warning'}`}></span>{data.route.access === 'public' ? 'Public page' : data.route.access === 'authenticated' ? 'Signed-in users' : 'Role-based access'}</span>
-        <h1 class="mt-4 text-4xl font-bold tracking-tight md:text-5xl">{data.path === '/' ? data.project.name : label(data.path)}</h1>
-        <p class="mt-4 text-lg leading-8 opacity-70">{data.route.purpose}</p>
-      </div>
-      {#if data.path === '/' && entities.length}
-        <div class="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {#each entities as entity}<div class="rounded-xl border border-base-300 bg-base-100 p-5 shadow-sm"><div class="mb-1 font-semibold">{entity.name}</div><p class="mb-0 text-sm leading-6 opacity-70">{entity.purpose}</p></div>{/each}
-        </div>
-      {/if}
-    {:else}
-      <div class="rounded-xl border border-base-300 bg-base-100 p-6 opacity-80">Mosaic is planning and building this preview…</div>
-    {/if}
-  </main>
+<svelte:head><title>{data.page?.settings?.title ?? data.page?.name ?? data.app.name} · {data.app.name}</title></svelte:head>
+
+<div class="preview-app min-h-screen bg-base-200 text-base-content" data-theme={data.app.theme}>
+  <div class="flex min-h-screen">
+    <aside class="hidden w-60 shrink-0 flex-col gap-0.5 border-r border-base-300 bg-base-100 p-3 md:flex">
+      <a class="mb-3 flex items-center gap-2 px-2 py-1.5 font-semibold tracking-tight" href={data.app.base}><span class="grid size-7 place-items-center rounded-lg bg-primary text-xs font-bold text-primary-content">{data.app.name.slice(0, 1).toUpperCase()}</span><span class="truncate">{data.app.name}</span></a>
+      {#each data.nav as item (item.href)}
+        <a class={`flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition ${current.url.pathname === item.href || (item.route === '/' && current.url.pathname === data.app.base) ? 'bg-primary/10 font-medium text-primary' : 'opacity-75 hover:bg-base-200 hover:opacity-100'}`} href={item.href}><Icon name={item.icon} /> {item.label}</a>
+      {/each}
+      <div class="mt-auto rounded-lg bg-base-200 px-2.5 py-2 text-[11px] leading-4 opacity-70">Live preview · signed in as the app admin. Data here is sample data.</div>
+    </aside>
+    <div class="min-w-0 flex-1">
+      <nav class="flex gap-1 overflow-x-auto border-b border-base-300 bg-base-100 px-3 py-2 md:hidden">
+        {#each data.nav as item (item.href)}<a class={`whitespace-nowrap rounded-lg px-3 py-1.5 text-sm ${current.url.pathname === item.href ? 'bg-base-200 font-medium' : 'opacity-70'}`} href={item.href}>{item.label}</a>{/each}
+      </nav>
+      <main class="mx-auto max-w-6xl p-4 md:p-8">
+        {#if data.status === 'ready' && data.page}
+          {#key data.page.id}<PageRenderer page={data.page} {client} scope={{ params: {}, query: Object.fromEntries(current.url.searchParams) }} />{/key}
+        {:else if data.status === 'building'}
+          <div class="grid min-h-[60vh] place-items-center text-center"><div><span class="loading loading-spinner loading-md text-primary"></span><p class="mt-3 font-medium">Mosaic is building this app…</p><p class="text-sm opacity-60">The preview appears as soon as the first verified version is ready.</p></div></div>
+        {:else}
+          <div class="grid min-h-[60vh] place-items-center text-center"><div><p class="font-medium">No page at {data.path}</p><a class="link link-primary text-sm" href={data.app.base}>Go to the home page</a></div></div>
+        {/if}
+      </main>
+    </div>
+  </div>
 </div>
+<Toaster />

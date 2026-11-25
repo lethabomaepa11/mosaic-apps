@@ -24,13 +24,15 @@
       {#if data.user}
         <nav class="ml-4 hidden items-center gap-1 sm:flex" aria-label="Main">
           <a class="tab-link" href="/" aria-current={page.url.pathname === '/' ? 'page' : undefined}>Projects</a>
-          <a class="tab-link" href="/settings/connections" aria-current={page.url.pathname.startsWith('/settings') ? 'page' : undefined}>Connections</a>
+          <a class="tab-link" href="/settings/connections" aria-current={page.url.pathname.startsWith('/settings') ? 'page' : undefined}>Settings</a>
         </nav>
         <div class="ml-auto flex items-center gap-2">
           <a class="btn btn-ghost btn-sm btn-square sm:hidden" href="/settings/connections" aria-label="Connections"><Plug size={16} /></a>
           <span class="grid size-8 place-items-center rounded-full bg-base-200 text-xs font-semibold" title={data.user.email}>{initials}</span>
           <form method="POST" action="/logout" use:enhance><button class="btn btn-ghost btn-sm btn-square" aria-label="Sign out" title="Sign out"><LogOut size={16} /></button></form>
         </div>
+      {:else if !['/login', '/signup'].includes(page.url.pathname)}
+        <div class="ml-auto flex items-center gap-1.5"><a class="btn btn-ghost btn-sm" href="/login">Sign in</a><a class="btn btn-primary btn-sm" href="/signup">Get started</a></div>
       {/if}
     </div>
   </header>

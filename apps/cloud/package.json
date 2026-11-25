@@ -10,8 +10,11 @@
     "test": "node --import tsx --test test/*.test.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.14.0",
     "@lucide/svelte": "^1.79.0",
+    "@mosaic-apps/core": "0.3.0",
     "@mosaic-apps/server": "0.3.0",
+    "@mosaic-apps/ui": "0.3.0",
     "@sveltejs/adapter-vercel": "^7.0.0",
     "@sveltejs/kit": "^3.0.1",
     "@vercel/functions": "^3.1.0",

@@ -4,23 +4,38 @@ import { gunzipSync } from 'node:zlib';
 import { generateProjectFiles } from '../src/lib/server/generation';
 import { tarGzip } from '../src/lib/server/archive';
 import { decryptProviderSecret, encryptProviderSecret } from '../src/lib/server/providers';
+import { compileSpec } from '../src/lib/server/spec';
+import { equipmentSpec } from './fixtures/equipment-spec';
 
-const blueprint = {
-  summary: 'A customer relationship application.',
-  routes: [
-    { path: '/', purpose: 'Public homepage', access: 'public' as const },
-    { path: '/customers', purpose: 'Manage customers', access: 'authenticated' as const },
-  ],
-  entities: [{ name: 'Customer', purpose: 'Customer records', fields: ['name:string', 'email:string'] }],
-  roles: ['admin'], workflows: ['Create customer'], implementationNotes: [],
-};
+const project = () => generateProjectFiles({ name: 'Equipment Loans', slug: 'equipment-loans', spec: equipmentSpec, app: compileSpec(equipmentSpec) });
 
-test('generation creates a complete source repository and migration', () => {
-  const files = generateProjectFiles({ name: 'Northstar CRM', slug: 'northstar-crm', theme: 'corporate', blueprint });
-  const paths = files.map((file) => file.path);
-  for (const required of ['package.json', 'src/routes/+page.svelte', 'src/routes/customers/+page.svelte', 'migrations/001_initial.sql', 'AGENTS.md', '.agents/skills/mosaic-app/SKILL.md']) assert.ok(paths.includes(required), required);
-  assert.match(files.find((file) => file.path.includes('001_initial'))!.content, /CREATE TABLE IF NOT EXISTS customer/);
-  assert.equal(new Set(paths).size, paths.length);
+test('a release is the full mosaic create project: one app with the API and Studio built in', () => {
+  const files = project();
+  const paths = new Set(files.map((file) => file.path));
+  for (const required of ['package.json', '.gitignore', 'AGENTS.md', '.agents/skills/mosaic-app/SKILL.md', 'apps/web/package.json', 'apps/web/src/routes/api/[...path]/+server.ts', 'apps/web/src/routes/studio/+layout.svelte']) {
+    assert.ok(paths.has(required), required);
+  }
+  assert.ok(![...paths].some((path) => path.startsWith('apps/studio/')), 'Studio lives inside the web app');
+  assert.ok(![...paths].some((path) => path.endsWith('gitignore') && !path.endsWith('.gitignore')));
+  assert.equal(files.length, paths.size);
+});
+
+test('the generated entities replace the demo ones, and nothing is left unfilled', () => {
+  const files = project();
+  const entityFiles = files.filter((file) => file.path.startsWith('apps/web/src/lib/server/entities/')).map((file) => file.path.split('/').at(-1));
+  assert.deepEqual(entityFiles.sort(), ['employee.entity.json', 'equipment.entity.json', 'loan.entity.json']);
+  for (const file of files) assert.doesNotMatch(file.content, /__[A-Z_]+__/, `${file.path} still has a template placeholder`);
+  assert.match(files.find((file) => file.path === 'apps/web/package.json')!.content, /"@equipment-loans\/web"/);
+});
+
+test('the app imports its generated pages and forms on first boot', () => {
+  const files = project();
+  const mosaic = files.find((file) => file.path === 'apps/web/src/lib/server/mosaic.ts')!.content;
+  assert.match(mosaic, /createMosaicServerProvider\(\(\) => createMosaicServer\(\{/);
+  assert.match(mosaic, /\}\)\.then\(importGeneratedApp\)\);/);
+  const app = JSON.parse(files.find((file) => file.path === 'apps/web/src/lib/server/mosaic-app.json')!.content);
+  assert.deepEqual(app.pages.map((page: { route: string }) => page.route), ['/', '/dashboard', '/equipment', '/employees', '/loans']);
+  assert.ok(files.some((file) => file.path === 'apps/web/src/lib/server/import-generated.ts'));
 });
 
 test('release archive is a valid gzip-wrapped tar', () => {
@@ -31,20 +46,6 @@ test('release archive is a valid gzip-wrapped tar', () => {
   assert.equal(tar.subarray(257, 262).toString(), 'ustar');
 });
 
-test('provider credentials are encrypted and recoverable server-side', () => {
-  const encrypted = encryptProviderSecret('provider-secret-value');
-  assert.notEqual(encrypted.ciphertext, 'provider-secret-value');
-  assert.equal(decryptProviderSecret(encrypted), 'provider-secret-value');
-});
-
-test('model text cannot inject Svelte expressions or tags', () => {
-  const files = generateProjectFiles({ name: 'A {x} <b>', slug: 'a', theme: 'corporate', blueprint: { ...blueprint, routes: [{ path: '/', purpose: 'Use {secret} & <script>', access: 'public' as const }] } });
-  for (const path of ['src/routes/+page.svelte', 'src/routes/+layout.svelte']) {
-    const markup = files.find((file) => file.path === path)!.content.replace(/<script>.*?<\/script>/s, '').replace(/\{@render children\(\)\}/, '');
-    assert.doesNotMatch(markup, /\{(?!@)|<b>|<script>/, path);
-  }
-});
-
 test('release archive stores long paths in the ustar prefix', () => {
   const path = `${'nested/'.repeat(20)}file.svelte`;
   const tar = gunzipSync(tarGzip([{ path, content: 'x' }]));
@@ -52,7 +53,8 @@ test('release archive stores long paths in the ustar prefix', () => {
   assert.equal(`${field(345, 500)}/${field(0, 100)}`, path);
 });
 
-test('planner route params (:id) become SvelteKit [id] directories', () => {
-  const files = generateProjectFiles({ name: 'A', slug: 'a', theme: 'corporate', blueprint: { ...blueprint, routes: [{ path: '/equipment/:id/edit', purpose: 'Edit', access: 'authenticated' as const }] } });
-  assert.ok(files.some((file) => file.path === 'src/routes/equipment/[id]/edit/+page.svelte'));
+test('provider credentials are encrypted and recoverable server-side', () => {
+  const encrypted = encryptProviderSecret('provider-secret-value');
+  assert.notEqual(encrypted.ciphertext, 'provider-secret-value');
+  assert.equal(decryptProviderSecret(encrypted), 'provider-secret-value');
 });

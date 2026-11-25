@@ -19,9 +19,20 @@
   let preview = $derived(data.environments.find((environment) => environment.kind === 'production' && environment.status === 'ready' && environment.url) ?? data.environments.find((environment) => environment.kind === 'preview'));
   let busy = $derived(data.jobs.some((job) => ['queued', 'running'].includes(job.status)));
   let activeJob = $derived(data.jobs.find((job) => ['queued', 'running'].includes(job.status)) ?? (data.jobs[0]?.status === 'failed' ? data.jobs[0] : undefined));
+  let waitingJob = $derived(busy ? undefined : data.jobs.find((job) => job.status === 'waiting_input'));
+  const agentTone: Record<string, string> = { Planner: 'bg-info/15 text-info', Developer: 'bg-primary/15 text-primary', Verifier: 'bg-success/15 text-success', Reviewer: 'bg-warning/15 text-warning' };
+  let composer = $state<HTMLTextAreaElement>();
+  // Chips build one combined answer in the composer; "Decide for me" sends straight away.
+  const addAnswer = (question: string, option: string) => {
+    if (!composer) return;
+    const line = `${question.replace(/\?$/, '')}: ${option}`;
+    composer.value = composer.value.trim() ? `${composer.value.trim()}\n${line}` : line;
+    composer.focus();
+  };
+  const sendNow = (text: string) => { if (!composer) return; composer.value = text; composer.form?.requestSubmit(); };
   let production = $derived(data.environments.find((environment) => environment.kind === 'production'));
   // The generated app serves its API same-origin: /api on the built-in preview, /api/health on the deployed app.
-  let apiUrl = $derived(preview?.url ? `${preview.url}${preview.kind === 'production' ? '/api/health' : '/api'}` : null);
+  let apiUrl = $derived(preview?.url ? `${preview.url}/api/health` : null);
   let copied = $state('');
   const copy = async (value: string) => { await navigator.clipboard.writeText(value).catch(() => {}); copied = value; setTimeout(() => (copied = ''), 1500); };
   const tone = (status: string) => ['ready', 'completed', 'connected'].includes(status) ? 'is-ready' : status === 'failed' ? 'is-failed' : ['queued', 'running', 'generating', 'delivering', 'building'].includes(status) ? 'is-busy' : '';
@@ -65,6 +76,22 @@
         </div>
       {/if}
 
+      {#if waitingJob}
+        <!-- The agents asked once; any reply (or "Decide for me") resumes the same build. -->
+        <div class="ml-9 rounded-xl border border-primary/30 bg-primary/5 p-3.5 text-sm">
+          <p class="mb-2 font-medium">A few quick questions</p>
+          <div class="space-y-3">
+            {#each waitingJob.questions ?? [] as item}
+              <div><p class="mb-1.5">{item.question}</p><div class="flex flex-wrap gap-1.5">{#each item.options as option}<button class="chip !py-1 text-xs" type="button" onclick={() => addAnswer(item.question, option)}>{option}</button>{/each}</div></div>
+            {/each}
+          </div>
+          <div class="mt-3 flex flex-wrap items-center gap-2 border-t border-primary/15 pt-3">
+            <button class="btn btn-primary btn-xs" type="button" onclick={() => sendNow('Decide everything sensibly yourself and build it.')}>Decide for me</button>
+            <span class="text-xs muted">or pick answers above / type your own below</span>
+          </div>
+        </div>
+      {/if}
+
       {#if activeJob}
         <div class={`rounded-xl border p-3.5 text-sm ${activeJob.status === 'failed' ? 'border-error/30 bg-error/5' : 'border-base-300 bg-base-100'}`}>
           <div class="flex items-center gap-2 font-medium">
@@ -74,10 +101,14 @@
           </div>
           {#if activeJob.status !== 'failed'}<progress class="progress progress-primary mt-2.5 h-1.5 w-full" value={activeJob.progress} max="100"></progress>{/if}
           {#if activeJob.log.length}
-            <ol class="mt-3 space-y-1.5">
-              {#each activeJob.log.slice(-5) as entry, index}
-                {@const last = index === Math.min(activeJob.log.length, 5) - 1}
-                <li class="flex items-start gap-2 text-xs"><span class="mt-0.5">{#if last}{#if activeJob.status === 'failed'}<CircleAlert size={12} class="text-error" />{:else}<LoaderCircle size={12} class="animate-spin muted" />{/if}{:else}<Check size={12} class="text-success" />{/if}</span><span class={last ? '' : 'muted'}>{entry.message}</span></li>
+            <!-- Live thinking: what each agent is working on right now. -->
+            <ol class="mt-3 space-y-2">
+              {#each activeJob.log.slice(-8) as entry, index}
+                {@const last = index === Math.min(activeJob.log.length, 8) - 1}
+                <li class="flex items-start gap-2 text-xs">
+                  <span class="mt-0.5 shrink-0">{#if last && activeJob.status !== 'completed'}{#if activeJob.status === 'failed'}<CircleAlert size={12} class="text-error" />{:else}<LoaderCircle size={12} class="animate-spin muted" />{/if}{:else}<Check size={12} class="text-success" />{/if}</span>
+                  <span class="min-w-0">{#if entry.agent}<span class={`mr-1.5 inline-block rounded px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide ${agentTone[entry.agent] ?? 'bg-base-200'}`}>{entry.agent}</span>{/if}<span class={last ? '' : 'muted'}>{entry.message}</span></span>
+                </li>
               {/each}
             </ol>
           {:else}<p class="mb-0 mt-2 text-xs muted">{activeJob.stage ?? 'Waiting to start…'}</p>{/if}
@@ -93,8 +124,8 @@
       {#if form?.message}<div class="alert alert-error mb-2 py-2 text-sm" role="alert">{form.message}</div>{/if}
       <div class="rounded-xl border border-base-300 bg-base-100 p-1.5 shadow-sm transition focus-within:border-primary/50 focus-within:ring-4 focus-within:ring-primary/10">
         <label class="sr-only" for="prompt">What should Mosaic change?</label>
-        <textarea class="block max-h-48 min-h-16 w-full resize-none bg-transparent px-2.5 py-1.5 text-sm leading-6 outline-none placeholder:text-base-content/40" id="prompt" name="prompt" required minlength="3"
-          placeholder={busy ? 'Mosaic is working. Queue your next change…' : 'Ask for a change: add an approvals dashboard…'}
+        <textarea class="block max-h-48 min-h-16 w-full resize-none bg-transparent px-2.5 py-1.5 text-sm leading-6 outline-none placeholder:text-base-content/40" id="prompt" name="prompt" required minlength="3" bind:this={composer}
+          placeholder={waitingJob ? 'Answer the questions, or tell me to decide…' : busy ? 'Mosaic is working. Queue your next change…' : 'Ask for a change: add an approvals dashboard…'}
           onkeydown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }}></textarea>
         <div class="flex items-center justify-between px-1"><span class="text-[11px] muted">Enter to send · Shift+Enter for a new line</span><button class="btn btn-primary btn-sm btn-circle" type="submit" disabled={sending} aria-label="Send change">{#if sending}<LoaderCircle size={15} class="animate-spin" />{:else}<ArrowUp size={15} />{/if}</button></div>
       </div>

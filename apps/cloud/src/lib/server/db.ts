@@ -93,6 +93,14 @@ ALTER TABLE cloud_projects ADD COLUMN IF NOT EXISTS blueprint jsonb;
 ALTER TABLE cloud_projects ADD COLUMN IF NOT EXISTS planner_model text;
 ALTER TABLE cloud_projects ADD COLUMN IF NOT EXISTS planned_at timestamptz;
 ALTER TABLE cloud_projects ADD COLUMN IF NOT EXISTS neon_project_id text;
+ALTER TABLE cloud_projects ADD COLUMN IF NOT EXISTS app_spec jsonb;
+ALTER TABLE cloud_projects ADD COLUMN IF NOT EXISTS deploy_secret jsonb;
+ALTER TABLE cloud_users ADD COLUMN IF NOT EXISTS github_id text;
+CREATE TABLE IF NOT EXISTS cloud_user_ai_settings (
+  user_id uuid PRIMARY KEY REFERENCES cloud_users(id) ON DELETE CASCADE, provider text NOT NULL, model text,
+  secret_ciphertext text, secret_iv text, secret_tag text, updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS cloud_users_github_idx ON cloud_users (github_id) WHERE github_id IS NOT NULL;
 ALTER TABLE cloud_projects ADD COLUMN IF NOT EXISTS database_secret jsonb;
 ALTER TABLE cloud_jobs ADD COLUMN IF NOT EXISTS attempts integer NOT NULL DEFAULT 0;
 ALTER TABLE cloud_jobs ADD COLUMN IF NOT EXISTS run_after timestamptz NOT NULL DEFAULT now();
@@ -102,7 +110,7 @@ CREATE INDEX IF NOT EXISTS cloud_jobs_queue_idx ON cloud_jobs (status, run_after
 
 // Kept on globalThis so a dev hot-reload of this module reuses the open database: a second
 // embedded PGlite instance on the same data directory corrupts it.
-const cache = globalThis as typeof globalThis & { __mosaicCloudDb?: Promise<Db> };
+const cache = globalThis as typeof globalThis & { __mosaicCloudDb?: Promise<Db>; __mosaicCloudDdl?: Promise<void> };
 
 function databaseUrl(): string {
   const value = env.CLOUD_DATABASE_URL ?? env.DATABASE_URL ?? 'pglite://./data/cloud';
@@ -112,14 +120,22 @@ function databaseUrl(): string {
   return value;
 }
 
-async function initialize(): Promise<Db> {
-  const db = await createDb(databaseUrl());
+async function applyDdl(db: Db): Promise<void> {
   for (const statement of CONTROL_DDL.split(/;\s*\n/).map((value) => value.trim()).filter(Boolean)) {
     await db.query(statement);
   }
+}
+
+async function initialize(): Promise<Db> {
+  const db = await createDb(databaseUrl());
+  await applyDdl(db);
   await bootstrap(db);
   return db;
 }
+
+// Each evaluation of this module (a dev hot reload included) re-applies the idempotent DDL
+// to the shared database, so new columns exist without restarting the server.
+const ddlForThisModule = { done: false };
 
 async function bootstrap(db: Db): Promise<void> {
   const email = (env.CLOUD_ADMIN_EMAIL ?? (hosted ? '' : 'admin@mosaic.local')).trim().toLowerCase();
@@ -140,12 +156,21 @@ async function bootstrap(db: Db): Promise<void> {
   });
 }
 
-export function getCloudDb(): Promise<Db> {
-  cache.__mosaicCloudDb ??= initialize().catch((cause) => {
-    cache.__mosaicCloudDb = undefined;
-    throw cause;
-  });
-  return cache.__mosaicCloudDb;
+export async function getCloudDb(): Promise<Db> {
+  if (!cache.__mosaicCloudDb) {
+    ddlForThisModule.done = true;
+    cache.__mosaicCloudDb = initialize().catch((cause) => {
+      cache.__mosaicCloudDb = undefined;
+      throw cause;
+    });
+  } else if (!ddlForThisModule.done) {
+    ddlForThisModule.done = true;
+    const db = cache.__mosaicCloudDb;
+    cache.__mosaicCloudDdl = db.then(applyDdl);
+  }
+  const db = await cache.__mosaicCloudDb;
+  await cache.__mosaicCloudDdl;
+  return db;
 }
 
 export function id(): string { return randomUUID(); }

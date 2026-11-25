@@ -63,7 +63,9 @@ export async function provisionNeon(input: { token: string; name: string }) {
 // shortcut: replays the idempotent initial migration each release; switch to versioned migrations once generated schemas evolve.
 export async function applyMigration(connectionUri: string, sql: string) {
   const db = await createDb(connectionUri);
-  try { await db.query(sql); } finally { await db.close(); }
+  // Drivers run queries as prepared statements, which allow one command each.
+  const statements = sql.split(/;\s*(?:\n|$)/).map((statement) => statement.replace(/^\s*--.*$/gm, '').trim()).filter(Boolean);
+  try { for (const statement of statements) await db.query(statement); } finally { await db.close(); }
 }
 
 const VERCEL = 'https://api.vercel.com';
@@ -71,7 +73,7 @@ const VERCEL = 'https://api.vercel.com';
 const vercelUrl = (path: string, teamId?: string | null) => { const url = new URL(path, VERCEL); if (teamId) url.searchParams.set('teamId', teamId); return url.toString(); };
 
 export async function createVercelProject(input: { token: string; name: string; teamId?: string | null }): Promise<string> {
-  const created = await api('Vercel', vercelUrl('/v11/projects', input.teamId), input.token, { method: 'POST', body: { name: input.name, framework: 'sveltekit' } });
+  const created = await api('Vercel', vercelUrl('/v11/projects', input.teamId), input.token, { method: 'POST', body: { name: input.name, framework: 'sveltekit', rootDirectory: 'apps/web', installCommand: 'cd ../.. && npm install', buildCommand: 'npm run build' } });
   if (created.status === 409) throw new ProviderError(`A Vercel project named ${input.name} already exists. Rename or remove it, then retry.`);
   return String(created.body.id);
 }
@@ -83,7 +85,7 @@ export async function deployToVercel(input: { token: string; projectId: string; 
   }
   const deployment = await api('Vercel', vercelUrl('/v13/deployments', input.teamId), input.token, {
     method: 'POST',
-    body: { name: input.name, project: projectId, target: 'production', files: input.files.map((file) => ({ file: file.path, data: file.content })), projectSettings: { framework: 'sveltekit' } },
+    body: { name: input.name, project: projectId, target: 'production', files: input.files.map((file) => ({ file: file.path, data: file.content })), projectSettings: { framework: 'sveltekit', rootDirectory: 'apps/web', installCommand: 'cd ../.. && npm install', buildCommand: 'npm run build' } },
   });
   if (deployment.status >= 400) throw new ProviderError(`Vercel rejected the deployment (${deployment.status}).`);
   return { projectId, deploymentId: String(deployment.body.id) };

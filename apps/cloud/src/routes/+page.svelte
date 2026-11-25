@@ -27,7 +27,7 @@
 
 <section class="hero-glow -mx-4 -mt-8 px-4 pb-4 pt-10 md:-mt-12 md:pt-16">
   <div class="mx-auto max-w-3xl text-center">
-    <span class="chip mb-5"><Sparkles size={14} class="text-primary" /> {data.organization?.name ?? 'Your workspace'}</span>
+    <span class="chip mb-5"><Sparkles size={14} class="text-primary" /> {data.organization?.name ?? 'AI app builder on Mosaic'}</span>
     <h1 class="page-title mb-4">What do you want to build?</h1>
     <p class="mx-auto mb-8 max-w-xl text-base leading-7 muted">Describe it in plain words. Mosaic plans the pages and data, writes a real SvelteKit app, and shows it live while it builds.</p>
   </div>
@@ -67,6 +67,7 @@
     {#each ideas as idea}<button class="chip" type="button" onclick={() => { prompt = idea.text; document.getElementById('prompt')?.focus(); }}>{idea.label}</button>{/each}
   </div>
 
+  {#if data.organization}
   <div class="mx-auto mt-6 flex max-w-3xl flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs muted">
     {#each ['github', 'vercel', 'neon'] as provider}
       {@const connection = data.connections.find((item) => item.provider === provider)}
@@ -75,8 +76,10 @@
     {/each}
     <a class="link link-hover text-primary" href="/settings/connections">{data.connections.length ? 'Manage connections' : 'Connect providers (optional)'}</a>
   </div>
+  {/if}
 </section>
 
+{#if data.organization}
 <section class="mt-14">
   <div class="mb-4 flex items-baseline justify-between">
     <h2 class="text-lg font-semibold">Your projects</h2>
@@ -97,3 +100,4 @@
     <div class="surface grid place-items-center gap-2 p-12 text-center"><Sparkles size={22} class="text-primary" /><p class="mb-0 font-medium">No projects yet</p><p class="mb-0 text-sm muted">Describe an app above, or start from one of the ideas.</p></div>
   {/if}
 </section>
+{/if}

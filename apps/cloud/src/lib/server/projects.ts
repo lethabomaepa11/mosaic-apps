@@ -1,0 +1,85 @@
+import type { Cookies } from '@sveltejs/kit';
+import { getCloudDb, hosted, id, slugify } from './db';
+import { enqueueJob, kickJobs } from './jobs';
+import { isDaisyTheme } from '../themes';
+
+export interface NewProject { prompt: string; name: string; uiTheme: string; uiSystem: string; includeHome: boolean; includeLogin: boolean }
+
+/** Reads and validates the prompt form; the name is optional and derived from the brief. */
+export function readProjectForm(data: FormData): NewProject | { error: string } {
+  const prompt = String(data.get('prompt') ?? '').trim().slice(0, 4000);
+  // "A CRM for a solar installer with leads, …" → "CRM for a solar installer".
+  const derived = prompt.split(/[,.;:!?]|\s(?:with|that|which|where|so|to help)\s/i)[0]!.replace(/^(build|create|make)?\s*(me\s+)?(an?|the)\s+/i, '').replace(/[^\p{L}\p{N}\s&'-]/gu, '').split(/\s+/).slice(0, 6).join(' ');
+  const name = (String(data.get('name') ?? '').trim() || derived.charAt(0).toUpperCase() + derived.slice(1)).slice(0, 60);
+  if (name.length < 2 || prompt.length < 10) return { error: 'Describe the app in a little more detail.' };
+  const theme = String(data.get('uiTheme') ?? 'corporate');
+  const system = String(data.get('uiSystem') ?? 'daisyui');
+  return {
+    prompt, name, uiTheme: isDaisyTheme(theme) ? theme : 'corporate', uiSystem: ['daisyui', 'mosaic'].includes(system) ? system : 'daisyui',
+    // Unchecked checkboxes are absent; a pending prompt saved from the public page keeps its choices.
+    includeHome: data.get('includeHome') === 'on', includeLogin: data.get('includeLogin') === 'on',
+  };
+}
+
+export async function organizationFor(userId: string) {
+  const db = await getCloudDb();
+  const result = await db.query<{ id: string; name: string; slug: string; role: string }>(
+    `SELECT organization.id, organization.name, organization.slug, membership.role FROM cloud_organizations organization
+     JOIN cloud_memberships membership ON membership.organization_id = organization.id
+     WHERE membership.user_id = $1 ORDER BY organization.created_at LIMIT 1`, [userId],
+  );
+  return result.rows[0];
+}
+
+export async function createProject(userId: string, input: NewProject, origin: string): Promise<string> {
+  const organization = await organizationFor(userId);
+  if (!organization) throw new Error('No organization membership is available.');
+  const db = await getCloudDb();
+  const projectId = id();
+  const conversationId = id();
+  const slug = `${slugify(input.name)}-${projectId.slice(0, 6)}`;
+  await db.tx(async (tx) => {
+    await tx.query(
+      `INSERT INTO cloud_projects (id, organization_id, name, slug, prompt, status, include_home, include_login, app_framework, ui_system, ui_theme)
+       VALUES ($1, $2, $3, $4, $5, 'queued', $6, $7, 'sveltekit', $8, $9)`,
+      [projectId, organization.id, input.name, slug, input.prompt, input.includeHome, input.includeLogin, input.uiSystem, input.uiTheme],
+    );
+    await tx.query(
+      `INSERT INTO cloud_environments (id, project_id, name, kind, status, url) VALUES
+       ($1, $2, 'Preview', 'preview', 'ready', $4), ($3, $2, 'Production', 'production', 'not_configured', NULL)`,
+      [id(), projectId, id(), `${origin}/preview/${slug}`],
+    );
+    await tx.query('INSERT INTO cloud_conversations (id, project_id) VALUES ($1, $2)', [conversationId, projectId]);
+    await tx.query('INSERT INTO cloud_messages (id, conversation_id, role, content) VALUES ($1, $2, $3, $4)', [id(), conversationId, 'user', input.prompt]);
+    await tx.query(
+      `INSERT INTO cloud_audit_log (id, organization_id, user_id, action, target_type, target_id, metadata)
+       VALUES ($1, $2, $3, 'project.create', 'project', $4, $5::jsonb)`,
+      [id(), organization.id, userId, projectId, JSON.stringify({ name: input.name, slug })],
+    );
+    await enqueueJob(tx, { projectId, kind: 'generate', metadata: { prompt: input.prompt, userId }, stage: 'Waiting to plan' });
+  });
+  kickJobs();
+  return projectId;
+}
+
+// A signed-out visitor's prompt waits in an HttpOnly cookie until they sign in, then becomes their project.
+const PENDING = 'mosaic_pending_project';
+
+export function savePendingProject(cookies: Cookies, input: NewProject): void {
+  cookies.set(PENDING, Buffer.from(JSON.stringify(input)).toString('base64url'), { path: '/', httpOnly: true, sameSite: 'lax', secure: hosted, maxAge: 60 * 60 });
+}
+
+export async function continuePendingProject(cookies: Cookies, userId: string, origin: string): Promise<string | undefined> {
+  const raw = cookies.get(PENDING);
+  if (!raw) return undefined;
+  cookies.delete(PENDING, { path: '/' });
+  try {
+    const saved = JSON.parse(Buffer.from(raw, 'base64url').toString('utf8')) as Partial<NewProject>;
+    const form = new FormData();
+    for (const [key, value] of Object.entries(saved)) form.set(key, typeof value === 'boolean' ? (value ? 'on' : '') : String(value ?? ''));
+    const input = readProjectForm(form); // re-validate: the cookie is user-controlled input
+    return 'error' in input ? undefined : await createProject(userId, input, origin);
+  } catch {
+    return undefined;
+  }
+}

@@ -32,7 +32,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
   const db = await getCloudDb();
   const [environments, jobs, messages, releases] = await Promise.all([
     db.query<{ id: string; name: string; kind: string; status: string; url: string | null }>('SELECT id, name, kind, status, url FROM cloud_environments WHERE project_id = $1 ORDER BY kind DESC', [project.id]),
-    db.query<{ id: string; kind: string; status: string; progress: number; stage: string | null; error: string | null; created_at: string; started_at: string | null; run_after: string; log: Array<{ at: string; message: string }> }>('SELECT id, kind, status, progress, stage, error, created_at, started_at, run_after, log FROM cloud_jobs WHERE project_id = $1 ORDER BY created_at DESC LIMIT 20', [project.id]),
+    db.query<{ id: string; kind: string; status: string; progress: number; stage: string | null; error: string | null; created_at: string; started_at: string | null; run_after: string; log: Array<{ at: string; message: string; agent?: string }>; questions: Array<{ question: string; options: string[] }> | null }>("SELECT id, kind, status, progress, stage, error, created_at, started_at, run_after, log, metadata->'questions' AS questions FROM cloud_jobs WHERE project_id = $1 ORDER BY created_at DESC LIMIT 20", [project.id]),
     db.query<{ id: string; role: string; content: string; created_at: string }>(
       `SELECT message.id, message.role, message.content, message.created_at
        FROM cloud_messages message JOIN cloud_conversations conversation ON conversation.id = message.conversation_id
@@ -72,7 +72,7 @@ export const actions: Actions = {
       );
       // The built-in preview reads these settings live; the job carries them into source, Git and Vercel.
       const changed = requestedTheme !== project.ui_theme || requestedUiSystem !== project.ui_system;
-      if (changed && project.blueprint) await enqueueJob(tx, { projectId: project.id, kind: 'generate', metadata: { reuseBlueprint: true }, stage: 'Waiting to apply design settings' });
+      if (changed && project.blueprint) await enqueueJob(tx, { projectId: project.id, kind: 'generate', metadata: { reuseBlueprint: true, userId: user.id }, stage: 'Waiting to apply design settings' });
     });
     kickJobs();
     return { settingsSaved: true, uiSystem: requestedUiSystem, uiTheme: requestedTheme };
@@ -90,9 +90,20 @@ export const actions: Actions = {
       await db.query('INSERT INTO cloud_conversations (id, project_id) VALUES ($1, $2)', [id(), project.id]);
       conversation = await db.query<{ id: string }>('SELECT id FROM cloud_conversations WHERE project_id = $1 ORDER BY created_at LIMIT 1', [project.id]);
     }
+    // A message sent while the agents wait on questions IS the answer: resume that job, never start another.
+    const waiting = await db.query<{ id: string; metadata: { questions?: Array<{ question: string }> } }>(
+      "SELECT id, metadata FROM cloud_jobs WHERE project_id = $1 AND kind = 'generate' AND status = 'waiting_input' ORDER BY created_at DESC LIMIT 1", [project.id],
+    );
     await db.tx(async (tx) => {
       await tx.query('INSERT INTO cloud_messages (id, conversation_id, role, content) VALUES ($1, $2, $3, $4)', [id(), conversation.rows[0]!.id, 'user', prompt]);
-      await enqueueJob(tx, { projectId: project.id, kind: 'generate', metadata: { prompt, revise: true }, stage: 'Waiting to plan the change' });
+      const pending = waiting.rows[0];
+      if (pending) {
+        const answers = [{ question: (pending.metadata.questions ?? []).map((item) => item.question).join(' / ') || 'Clarifications', answer: prompt }];
+        await tx.query("UPDATE cloud_jobs SET status = 'queued', run_after = now(), stage = 'Building with your answers', metadata = metadata || $2::jsonb WHERE id = $1", [pending.id, JSON.stringify({ answers, skipQuestions: true, userId: locals.user!.id })]);
+        await tx.query("UPDATE cloud_jobs SET status = 'cancelled', finished_at = now(), stage = 'Superseded by your answer' WHERE project_id = $1 AND status = 'waiting_input' AND id <> $2", [project.id, pending.id]);
+      } else {
+        await enqueueJob(tx, { projectId: project.id, kind: 'generate', metadata: { prompt, revise: true, userId: locals.user!.id }, stage: 'Waiting to plan the change' });
+      }
       await tx.query("UPDATE cloud_projects SET status = 'queued', updated_at = now() WHERE id = $1", [project.id]);
       await tx.query(
         `INSERT INTO cloud_audit_log (id, organization_id, user_id, action, target_type, target_id)

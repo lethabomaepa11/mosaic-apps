@@ -4,13 +4,29 @@ import test from 'node:test';
 
 process.env.CLOUD_DATABASE_URL = 'pglite://memory';
 process.env.CLOUD_ADMIN_EMAIL = '';
-delete process.env.GROQ_API_KEY;
+process.env.GROQ_API_KEY = 'test-key';
 delete process.env.VERCEL;
 
 const { getCloudDb } = await import('../src/lib/server/db');
-const { claimJob, enqueueJob, runJobs } = await import('../src/lib/server/jobs');
+const { claimJob, enqueueJob, runJob, runJobs } = await import('../src/lib/server/jobs');
 const { encryptProviderSecret } = await import('../src/lib/server/providers');
+const { equipmentSpec } = await import('./fixtures/equipment-spec');
 const db = await getCloudDb();
+
+// Fake Groq: answers as the three agents would. Tests set `agentQuestions` to make the planner ask.
+let agentQuestions: Array<{ question: string; options: string[] }> = [];
+const groqCalls: string[] = [];
+function groqReply(body: any): Response {
+  const name = body.response_format.json_schema.name as string;
+  groqCalls.push(name);
+  const content = name === 'mosaic_clarify' ? { thinking: ['Reading the brief'], questions: agentQuestions }
+    : name === 'mosaic_review' ? { thinking: ['Every workflow is covered'], approved: true, issues: [] }
+    : { thinking: ['Modelling equipment, employees and loans'], spec: equipmentSpec };
+  return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(content) } }] }), { status: 200, headers: { 'content-type': 'application/json' } });
+}
+const baseFetch = globalThis.fetch;
+let providerFetch: typeof fetch = baseFetch;
+globalThis.fetch = (async (input: string | URL, init: RequestInit = {}) => String(input).includes('api.groq.com') ? groqReply(JSON.parse(String(init.body))) : providerFetch(input, init)) as typeof fetch;
 
 async function createProject() {
   const organizationId = randomUUID(), projectId = randomUUID();
@@ -27,6 +43,11 @@ async function connect(organizationId: string, provider: string, metadata: Recor
     "INSERT INTO cloud_provider_connections (id, organization_id, provider, label, status, secret_ciphertext, secret_iv, secret_tag, metadata) VALUES ($1, $2, $3, $3, 'connected', $4, $5, $6, $7::jsonb)",
     [randomUUID(), organizationId, provider, secret.ciphertext, secret.iv, secret.tag, JSON.stringify(metadata)],
   );
+}
+
+// Runs every job that is due now, however long each takes (no wall-clock budgets to flake on a busy machine).
+async function runDue(): Promise<void> {
+  for (let job = await claimJob(db); job; job = await claimJob(db)) await runJob(db, job);
 }
 
 const jobsOf = async (projectId: string) => (await db.query<{ kind: string; status: string; error: string | null }>('SELECT kind, status, error FROM cloud_jobs WHERE project_id = $1 ORDER BY created_at', [projectId])).rows;
@@ -65,8 +86,7 @@ test('delivery provisions Neon, commits to GitHub, deploys to Vercel, and tracks
   for (const provider of ['neon', 'github', 'vercel']) await connect(organizationId, provider, provider === 'github' ? { login: 'octo' } : {});
   const calls: Array<{ method: string; url: string; body: any; auth: string | null }> = [];
   let deploymentState = 'BUILDING';
-  const realFetch = globalThis.fetch;
-  globalThis.fetch = (async (input: string | URL, init: RequestInit = {}) => {
+  providerFetch = (async (input: string | URL, init: RequestInit = {}) => {
     const url = String(input), method = init.method ?? 'GET';
     calls.push({ method, url, body: init.body ? JSON.parse(String(init.body)) : undefined, auth: new Headers(init.headers).get('authorization') });
     const reply = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -85,15 +105,15 @@ test('delivery provisions Neon, commits to GitHub, deploys to Vercel, and tracks
   }) as typeof fetch;
   try {
     await enqueueJob(db, { projectId, kind: 'generate', metadata: { prompt: 'Track customers' } });
-    await runJobs(db, 2_000);
+    await runDue();
     // Deployment polling is delayed; make it due now instead of waiting.
     await db.query("UPDATE cloud_jobs SET run_after = now() WHERE project_id = $1 AND status = 'queued'", [projectId]);
-    await runJobs(db, 1_000);
+    await runDue();
     deploymentState = 'READY';
     await db.query("UPDATE cloud_jobs SET run_after = now() WHERE project_id = $1 AND status = 'queued'", [projectId]);
-    await runJobs(db, 1_000);
+    await runDue();
   } finally {
-    globalThis.fetch = realFetch;
+    providerFetch = baseFetch;
   }
   assert.deepEqual((await jobsOf(projectId)).map((job) => `${job.kind}:${job.status}:${job.error ?? ''}`), ['generate:completed:', 'deliver:completed:', 'vercel-status:completed:']);
   const project = (await db.query<any>('SELECT status, github_repository, vercel_project_id, neon_project_id, database_secret FROM cloud_projects WHERE id = $1', [projectId])).rows[0];
@@ -109,21 +129,61 @@ test('delivery provisions Neon, commits to GitHub, deploys to Vercel, and tracks
   assert.deepEqual(calls.find((call) => call.url.endsWith('/git/commits'))!.body.parents, ['parent-sha']);
   assert.equal(calls.find((call) => call.url.includes('/env'))!.body.key, 'DATABASE_URL');
   assert.equal(calls.filter((call) => call.url.endsWith('/v13/deployments/dpl_1')).length, 2);
-  assert.ok(calls.every((call) => call.auth === `Bearer ${call.url.includes('github') ? 'github' : call.url.includes('neon') ? 'neon' : 'vercel'}-token`));
+  const providerCalls = calls.filter((call) => !call.url.startsWith('https://northstar.vercel.app'));
+  assert.ok(providerCalls.every((call) => call.auth === `Bearer ${call.url.includes('github') ? 'github' : call.url.includes('neon') ? 'neon' : 'vercel'}-token`));
+  // After the deploy is ready, Cloud signs in to the live app to publish pages/data model through its API.
+  assert.ok(calls.some((call) => call.url === 'https://northstar.vercel.app/api/auth/login'));
 });
 
 test('GitHub delivery refuses to commit into a repository Mosaic did not create', async () => {
   const { organizationId, projectId } = await createProject();
   await connect(organizationId, 'github', { login: 'octo' });
-  const realFetch = globalThis.fetch;
-  globalThis.fetch = (async () => new Response(JSON.stringify({ message: 'name already exists' }), { status: 422 })) as typeof fetch;
+  providerFetch = (async () => new Response(JSON.stringify({ message: 'name already exists' }), { status: 422 })) as typeof fetch;
   try {
     await enqueueJob(db, { projectId, kind: 'generate', metadata: { prompt: 'Track customers' } });
-    await runJobs(db, 2_000);
+    await runDue();
   } finally {
-    globalThis.fetch = realFetch;
+    providerFetch = baseFetch;
   }
   const deliver = (await jobsOf(projectId)).find((job) => job.kind === 'deliver')!;
   assert.equal(deliver.status, 'failed');
   assert.match(deliver.error ?? '', /already exists/);
+});
+
+test('the planner asks once; a chat reply resumes the same job and it never asks again', async () => {
+  const { projectId } = await createProject();
+  agentQuestions = [{ question: 'Who signs in?', options: ['Admins only', 'Admins and staff'] }];
+  const jobId = await enqueueJob(db, { projectId, kind: 'generate', metadata: { prompt: 'Track customers and invoices' } });
+  await runJobs(db, 5_000);
+  const paused = (await db.query<{ status: string; metadata: any }>('SELECT status, metadata FROM cloud_jobs WHERE id = $1', [jobId])).rows[0]!;
+  assert.equal(paused.status, 'waiting_input');
+  assert.equal(paused.metadata.questions[0].question, 'Who signs in?');
+  assert.equal((await db.query<{ status: string }>('SELECT status FROM cloud_projects WHERE id = $1', [projectId])).rows[0]!.status, 'needs_input');
+
+  // What the iterate action does with the user's reply.
+  await db.query("UPDATE cloud_jobs SET status = 'queued', run_after = now(), metadata = metadata || $2::jsonb WHERE id = $1", [jobId, JSON.stringify({ answers: [{ question: 'Who signs in?', answer: 'just do anything' }], skipQuestions: true })]);
+  groqCalls.length = 0;
+  await runJobs(db, 10_000);
+  assert.equal((await db.query<{ status: string }>('SELECT status FROM cloud_jobs WHERE id = $1', [jobId])).rows[0]!.status, 'completed');
+  assert.ok(!groqCalls.includes('mosaic_clarify'), 'no second round of questions after an answer');
+
+  // A later change on the same project is built without asking, even if the planner would.
+  await enqueueJob(db, { projectId, kind: 'generate', metadata: { prompt: 'Add invoices', revise: true } });
+  groqCalls.length = 0;
+  await runJobs(db, 10_000);
+  assert.ok(!groqCalls.includes('mosaic_clarify'));
+  agentQuestions = [];
+});
+
+test('a generated app is the verified spec with real Mosaic artifacts in the release', async () => {
+  const { projectId } = await createProject();
+  await enqueueJob(db, { projectId, kind: 'generate', metadata: { prompt: 'Track equipment loans' } });
+  await runJobs(db, 10_000);
+  const project = (await db.query<{ app_spec: any; status: string }>('SELECT app_spec, status FROM cloud_projects WHERE id = $1', [projectId])).rows[0]!;
+  assert.equal(project.status, 'ready');
+  assert.deepEqual(project.app_spec.entities.map((entity: any) => entity.name), ['employee', 'equipment', 'loan']);
+  const paths = (await db.query<{ path: string }>('SELECT file.path FROM cloud_release_files file JOIN cloud_releases release ON release.id = file.release_id WHERE release.project_id = $1', [projectId])).rows.map((row) => row.path);
+  for (const path of ['mosaic/spec.json', 'apps/web/src/lib/server/entities/loan.entity.json', 'apps/web/src/lib/server/mosaic-app.json', 'apps/web/src/routes/studio/+layout.svelte']) assert.ok(paths.includes(path), path);
+  const log = (await db.query<{ log: Array<{ agent?: string }> }>('SELECT log FROM cloud_jobs WHERE project_id = $1', [projectId])).rows[0]!.log;
+  for (const agent of ['Developer', 'Verifier', 'Reviewer']) assert.ok(log.some((entry) => entry.agent === agent), `${agent} shows its thinking`);
 });

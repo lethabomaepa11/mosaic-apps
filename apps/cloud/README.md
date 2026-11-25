@@ -1,29 +1,61 @@
 # Mosaic Cloud
 
-Mosaic Cloud is the hosted control plane for creating and operating Mosaic apps.
-This first vertical slice provides self-serve account creation, sign-in, organizations, projects, default page
-choices, framework/UI-system/theme preferences, conversations, environments, durable jobs, provider-connection records,
-and an audit log.
+Mosaic Cloud turns one prompt into a working Mosaic app, shows it live while it builds,
+and delivers it to the user's own GitHub, Neon and Vercel accounts.
 
-Project creation uses Groq structured output to turn the brief into a typed
-application blueprint (routes, physical business entities, roles, and workflows)
-before the generation job is queued. `GROQ_API_KEY` stays server-side; local
-development uses a deterministic fallback when it is absent.
+## How a build works
 
-The Cloud shell stays on a consistent Corporate theme. Each project brief exposes
-the curated DaisyUI themes Corporate, Business, Light, Dark, Nord, Winter, Silk,
-and Lo-fi. The project theme is stored in PostgreSQL so the generator can apply the
-same design tokens to the whole generated app.
+1. **Prompt.** Anyone can type a prompt on `/`. Signed-out visitors keep their prompt
+   (HttpOnly cookie) through sign-up, sign-in or "Continue with GitHub", and the project
+   starts as soon as they are in.
+2. **Durable job.** Creating a project or sending a chat message only queues a job in
+   `cloud_jobs` and returns. The runner (`src/lib/server/jobs.ts`) works after the
+   response via `waitUntil`; reopening the builder resumes stalled jobs, and failed jobs
+   can be retried. Nothing reloads the page; the builder polls job state.
+3. **Agents** (`src/lib/server/agents.ts`, `build-app.ts`), all primed with a condensed
+   Mosaic knowledge pack (`mosaic-knowledge.ts`, from `docs/` and the template skill):
+   - **Planner** asks at most one round of clarifying questions, only when the answer
+     would change the data model. Any reply (or "Decide for me") resumes the same job.
+   - **Developer** writes an *app spec* (entities, fields, relations, pages, roles,
+     sample data) and fixes it against problems.
+   - **Verifier** auto-repairs mechanical mistakes, validates the spec, compiles it to
+     real Mosaic entities/forms/pages (`spec.ts`), boots a throwaway Mosaic server and
+     runs create/list/read/update on every entity with relations (`mosaic-runtime.ts`).
+   - **Reviewer** judges MVP completeness against the brief; its issues go back to the
+     developer, and every change is re-verified. A broken app is never shipped.
+   Each step's thinking streams into the chat, labelled by agent.
+4. **Live preview.** The verified app is published to a real Mosaic server inside Cloud
+   with its own database (`preview.ts`; local PGlite under `data/previews`, in-memory on
+   serverless). `/preview/<slug>` renders its published pages with `PageRenderer`
+   through a member-only same-origin API proxy; the preview admin token never reaches
+   the browser.
+5. **Release.** Each build stores a versioned release: the full `mosaic create` project
+   (`templates/fullstack`, bundled at build time by `template.ts`): one SvelteKit app
+   with the API at `/api` and Studio at `/studio`, the generated entities as entity JSON,
+   and an importer that publishes the generated forms/pages on the app's first boot.
+   Download it as `.tar.gz` or let delivery push it.
+6. **Delivery** to the *user's own* accounts (`delivery.ts`): Neon provisions the
+   database, GitHub gets a private repo and one commit per release, Vercel gets a project
+   (root `apps/web`) with per-project secrets, deploys, is polled until ready, and then
+   Cloud publishes the latest pages and data model through the live app's API.
 
-Creating a project or sending a change only queues a durable job in `cloud_jobs`
-and returns immediately. The runner (`src/lib/server/jobs.ts`) runs after the
-response via `waitUntil`, plans with Groq, writes a versioned source release, and,
-for each connected provider, provisions Neon and applies the migration, commits
-the release to GitHub, and deploys it to Vercel while polling the deployment.
-Reopening the builder resumes queued or stalled jobs; failed jobs can be retried.
-Provider tokens and the Neon connection string are AES-GCM encrypted at rest.
-Usage and billing are subsequent milestones tracked in
-`contributor-docs/platform-plan.md`.
+## AI models
+
+The default is Groq `openai/gpt-oss-120b` with the operator's `GROQ_API_KEY`. On the free
+tier that is about 8,000 tokens per minute and 1,000 requests per day shared by every
+user, so a build takes roughly 3 to 6 minutes and may wait on the rate limit (the chat says
+so). Users can bring their own key in **Settings → AI**: ChatGPT (OpenAI API), Claude
+(Anthropic API, official SDK, default `claude-opus-5-5` with server-side refusal
+fallback) or DeepSeek. Keys are validated, AES-GCM encrypted and only used for that
+user's builds. ChatGPT Plus and Claude Pro subscriptions do not include API access.
+
+## Connections
+
+Users connect GitHub and Vercel with OAuth (when the OAuth App / Integration are
+configured) or by pasting a token; Neon uses an API key (Neon OAuth is partner-only).
+GitHub sign-in to Cloud reuses the GitHub OAuth App: register its callback URL as the site
+origin so both `/auth/github/callback` and `/settings/connections/github/callback` are
+accepted.
 
 ## Local development
 
@@ -34,13 +66,14 @@ npm install
 npm run dev -w @mosaic-apps/cloud
 ```
 
-Open `http://127.0.0.1:3010`. With no environment file, local development uses
-PGlite in `apps/cloud/data/cloud` and creates `admin@mosaic.local` / `admin1234`.
-Copy `.env.example` to `.env` to use durable PostgreSQL and explicit credentials.
+Open `http://127.0.0.1:3010`. With no environment file, local development uses PGlite in
+`apps/cloud/data/cloud` and creates `admin@mosaic.local` / `admin1234`. Put local secrets
+(at least `GROQ_API_KEY`) in `apps/cloud/.env`; it is gitignored and loaded in dev only.
 
 ## Verification
 
 ```bash
+npm test -w @mosaic-apps/cloud
 npm run check -w @mosaic-apps/cloud
 npm run build -w @mosaic-apps/cloud
 ```
@@ -50,12 +83,9 @@ connection string.
 
 ## Vercel
 
-Create a separate Vercel project rooted at `apps/cloud`, set the install command to
-`cd ../.. && npm install`, and keep the build command as `npm run build`. Configure
-all values in `.env.example`; PGlite is deliberately rejected on Vercel because a
-serverless filesystem is not durable. The SvelteKit Vercel adapter produces the
-Build Output API bundle in `apps/cloud/.vercel/output`.
-
-The initial admin variables are only used if no matching user exists. Rotate or
-remove the bootstrap password after the first production sign-in. Never commit a
-real provider credential or database URL.
+Create a Vercel project rooted at `apps/cloud`, set the install command to
+`cd ../.. && npm install`, and keep the build command as `npm run build`. Configure the
+values in `.env.example`. Built servers refuse local defaults: they need
+`CLOUD_DATABASE_URL` (PostgreSQL), `CLOUD_SESSION_SECRET`, `CLOUD_PROVIDER_SECRET_KEY`
+and `GROQ_API_KEY`. Never change `CLOUD_PROVIDER_SECRET_KEY` once set (stored
+credentials would no longer decrypt). Never commit a real credential or database URL.

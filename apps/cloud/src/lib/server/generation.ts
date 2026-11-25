@@ -1,77 +1,92 @@
 import { createHash } from 'node:crypto';
 import type { Db } from '@mosaic-apps/server';
-import type { ProjectBlueprint } from './groq';
 import { id } from './db';
+import type { AppSpec, CompiledApp } from './spec';
+import { renderTemplate } from './template';
 
 export interface GeneratedFile { path: string; content: string; mode?: string }
 
-function safeName(value: string): string {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'record';
-}
+const SERVER = 'apps/web/src/lib/server';
 
-function routeDirectory(path: string): string {
-  // Planners write params as `:id`; SvelteKit needs `[id]` directories.
-  const clean = path.split('?')[0]!.replace(/^\/+|\/+$/g, '').replace(/:(\w+)/g, '[$1]');
-  return clean ? `src/routes/${clean.replace(/[^a-zA-Z0-9_\-/[\]]/g, '-')}` : 'src/routes';
-}
+/**
+ * Runs once when the generated app's Mosaic server starts: registers the generated entities,
+ * applies safe migrations and publishes missing forms/pages through the app's own API. A
+ * fresh clone (`npm run dev`) or a fresh deployment therefore comes up as the built app,
+ * while anything already edited in Studio is left alone.
+ */
+const IMPORTER = `import type { MosaicServer } from '@mosaic-apps/server';
+import generated from './mosaic-app.json';
 
-// Model-written text lands in Svelte markup, where `{` starts an expression and `<` a tag.
-export function svelteText(value: string): string {
-  return value.replace(/[&<>{}]/g, (char) => `&#${char.charCodeAt(0)};`);
-}
+type Call = (method: string, path: string, body?: unknown) => Promise<{ status: number; body: any }>;
 
-function pageSource(name: string, purpose: string, access: string): string {
-  return `<svelte:head><title>${svelteText(name)}</title></svelte:head>
-
-<section class="mx-auto max-w-5xl space-y-6 py-12">
-  <div class="badge badge-outline">${svelteText(access)}</div>
-  <h1 class="text-4xl font-bold tracking-tight">${svelteText(name)}</h1>
-  <p class="max-w-2xl text-lg opacity-70">${svelteText(purpose)}</p>
-</section>
-`;
-}
-
-function migration(blueprint: ProjectBlueprint): string {
-  if (!blueprint.entities.length) return '-- No persistent business entities were inferred.\n';
-  return blueprint.entities.map((entity) => {
-    const fields = entity.fields.map((field) => `  ${safeName(field.split(/[:\s]/)[0] ?? field)} text`).join(',\n');
-    return `CREATE TABLE IF NOT EXISTS ${safeName(entity.name)} (\n  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),\n${fields ? `${fields},\n` : ''}  created_at timestamptz NOT NULL DEFAULT now(),\n  updated_at timestamptz NOT NULL DEFAULT now()\n);`;
-  }).join('\n\n') + '\n';
-}
-
-export function generateProjectFiles(input: { name: string; slug: string; theme: string; blueprint: ProjectBlueprint }): GeneratedFile[] {
-  const files: GeneratedFile[] = [
-    { path: 'package.json', content: JSON.stringify({ name: input.slug, private: true, version: '0.1.0', type: 'module', scripts: { dev: 'vite dev', build: 'vite build', preview: 'vite preview', check: 'svelte-kit sync && svelte-check --tsconfig ./tsconfig.json' }, dependencies: { '@lucide/svelte': '^1.55.0', '@sveltejs/adapter-vercel': '^7.0.0', '@sveltejs/kit': '^3.0.1', 'svelte': '^5.57.2' }, devDependencies: { '@sveltejs/vite-plugin-svelte': '^7.0.0', '@tailwindcss/vite': '^4.3.5', 'daisyui': '^5.8.2', 'svelte-check': '^4.4.5', 'tailwindcss': '^4.3.5', 'typescript': '^6.0.3', 'vite': '^8.3.0' }, engines: { node: '>=22' } }, null, 2) + '\n' },
-    { path: 'vite.config.ts', content: "import adapter from '@sveltejs/adapter-vercel';\nimport { sveltekit } from '@sveltejs/kit/vite';\nimport tailwindcss from '@tailwindcss/vite';\nimport { defineConfig } from 'vite';\nexport default defineConfig({ plugins: [tailwindcss(), sveltekit({ adapter: adapter({ runtime: 'nodejs22.x' }) })] });\n" },
-    { path: 'tsconfig.json', content: JSON.stringify({ extends: '$app/tsconfig', compilerOptions: { allowJs: true, checkJs: true, esModuleInterop: true, skipLibCheck: true, strict: true, moduleResolution: 'bundler' } }, null, 2) + '\n' },
-    { path: '.gitignore', content: 'node_modules/\n.svelte-kit/\nbuild/\n.vercel/\n.env\n.env.*\n!.env.example\n' },
-    { path: '.env.example', content: 'DATABASE_URL=postgresql://user:password@host/database?sslmode=require\nMOSAIC_JWT_SECRET=replace-with-a-long-random-secret\n' },
-    { path: 'src/app.html', content: '<!doctype html><html lang="en" data-theme="' + input.theme + '"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />%sveltekit.head%</head><body data-sveltekit-preload-data="hover"><div style="display: contents">%sveltekit.body%</div></body></html>\n' },
-    { path: 'src/app.css', content: `@import "tailwindcss";\n@plugin "daisyui" { themes: ${input.theme} --default, light, dark; }\n@layer base { body { margin: 0; min-height: 100vh; font-family: Inter, ui-sans-serif, system-ui, sans-serif; } }\n` },
-    { path: 'src/routes/+layout.svelte', content: `<script>import '../app.css'; let { children } = $props();</script>\n<header class="border-b border-base-300 bg-base-100"><nav class="navbar mx-auto max-w-6xl"><a class="btn btn-ghost text-lg" href="/">${svelteText(input.name)}</a></nav></header>\n<main class="min-h-[calc(100vh-4rem)] bg-base-200 px-5">{@render children()}</main>\n` },
-    { path: 'src/routes/api/health/+server.ts', content: "import { json } from '@sveltejs/kit';\nexport const GET = () => json({ ok: true, service: '" + input.slug + "' });\n" },
-    { path: 'migrations/001_initial.sql', content: migration(input.blueprint) },
-    { path: 'mosaic/blueprint.json', content: JSON.stringify(input.blueprint, null, 2) + '\n' },
-    { path: 'AGENTS.md', content: `# ${input.name} agent guide\n\nThis is a generated SvelteKit application. Keep routes in \`src/routes\`, business migrations in \`migrations\`, and the architecture contract in \`mosaic/blueprint.json\`. Run \`npm run check\` and \`npm run build\` before committing.\n` },
-    { path: '.agents/skills/mosaic-app/SKILL.md', content: `# Mosaic app\n\nRead \`mosaic/blueprint.json\` before changing routes or data. Preserve normal SvelteKit conventions, physical PostgreSQL tables, the global DaisyUI theme, and the same-origin API. Validate with \`npm run check\` and \`npm run build\`.\n` },
-    { path: 'README.md', content: `# ${input.name}\n\nGenerated by Mosaic Cloud from an editable application blueprint.\n\n## Develop\n\n\`\`\`bash\nnpm install\nnpm run dev\n\`\`\`\n\n## Verify\n\n\`\`\`bash\nnpm run check\nnpm run build\n\`\`\`\n` },
-  ];
-  for (const route of input.blueprint.routes) {
-    files.push({ path: `${routeDirectory(route.path)}/+page.svelte`, content: pageSource(route.path === '/' ? input.name : route.path.split('/').filter(Boolean).at(-1) ?? input.name, route.purpose, route.access) });
-    files.push({ path: `mosaic/pages/${safeName(route.path === '/' ? 'home' : route.path)}.json`, content: JSON.stringify(route, null, 2) + '\n' });
+export async function importGeneratedApp(server: MosaicServer): Promise<MosaicServer> {
+  if (process.env.MOSAIC_IMPORT_GENERATED === 'false') return server;
+  const request = (token: string): Call => async (method, path, body) => {
+    const response = await server.app.request(path, { method, headers: { authorization: \`Bearer \${token}\`, ...(body === undefined ? {} : { 'content-type': 'application/json' }) }, body: body === undefined ? undefined : JSON.stringify(body) });
+    return { status: response.status, body: await response.json().catch(() => ({})) };
+  };
+  const login = await request('')('POST', '/api/auth/login', { email: process.env.ADMIN_EMAIL ?? 'admin@mosaic.local', password: process.env.ADMIN_PASSWORD ?? 'admin1234' });
+  if (login.status !== 200) { console.warn('[mosaic] generated app import skipped: admin sign-in failed'); return server; }
+  const call = request(login.body.data.token);
+  try {
+    for (const entity of generated.entities) {
+      if ((await call('GET', \`/api/entities/\${entity.name}/meta\`)).status === 404) await call('PUT', \`/api/entities/\${entity.name}\`, { entity, origin: 'import', message: 'Generated by Mosaic Cloud' });
+    }
+    await call('POST', '/api/migrations/apply', { allowDestructive: false });
+    for (const [kind, items] of [['forms', generated.forms], ['pages', generated.pages]] as const) {
+      for (const item of items as Array<Record<string, any>>) {
+        if ((await call('GET', \`/api/\${kind}/\${item.slug}\`)).status !== 404) continue;
+        const created = await call('POST', \`/api/\${kind}\`, { name: item.name, slug: item.slug, description: item.description, schema: item.root, settings: item.settings, ...(kind === 'forms' ? { entity: item.entity, dataSource: item.dataSource } : { route: item.route }) });
+        if (created.status === 201) await call('POST', \`/api/\${kind}/\${created.body.data.id}/publish\`);
+      }
+    }
+  } catch (cause) {
+    console.error('[mosaic] generated app import failed', cause);
   }
-  return [...new Map(files.map((file) => [file.path, file])).values()].sort((a, b) => a.path.localeCompare(b.path));
+  return server;
+}
+`;
+
+/** Wraps the template's server provider so the importer runs after the server starts. */
+function withImporter(mosaicTs: string): string {
+  const open = 'export const mosaicServer = createMosaicServerProvider({';
+  const close = '});\n\nexport const mosaicApi';
+  if (!mosaicTs.includes(open) || !mosaicTs.includes(close)) throw new Error('The project template changed: cannot attach the generated-app importer to mosaic.ts.');
+  return mosaicTs
+    .replace("import { createMosaicApiHandlers, createMosaicServerProvider } from '@mosaic-apps/sveltekit';", "import { createMosaicApiHandlers, createMosaicServerProvider } from '@mosaic-apps/sveltekit';\nimport { createMosaicServer } from '@mosaic-apps/server';\nimport { importGeneratedApp } from './import-generated';")
+    .replace(open, 'export const mosaicServer = createMosaicServerProvider(() => createMosaicServer({')
+    .replace(close, '}).then(importGeneratedApp));\n\nexport const mosaicApi');
 }
 
-export async function persistGeneratedRelease(db: Db, input: { projectId: string; name: string; slug: string; theme: string; blueprint: ProjectBlueprint }) {
+/** The full `mosaic create` project for this app: one SvelteKit app, API at /api, Studio at /studio. */
+export function generateProjectFiles(input: { name: string; slug: string; spec: AppSpec; app: CompiledApp }): GeneratedFile[] {
+  const files = renderTemplate({
+    __PROJECT_NAME__: input.name, __PROJECT_SLUG__: input.slug, __DB_URL__: 'pglite://./data',
+    __AUTH__: 'true', __PWA__: 'false', __DEMO__: 'false', __WEB_PORT__: '3000', __API_PORT__: '3001', __DB_PORT__: '5432',
+  }).filter((file) => !file.path.startsWith(`${SERVER}/entities/`)); // the template's demo entities
+  const json = (value: unknown) => JSON.stringify(value, null, 2) + '\n';
+  const out = new Map(files.map((file) => [file.path, file as GeneratedFile]));
+  const mosaicTs = out.get(`${SERVER}/mosaic.ts`);
+  if (!mosaicTs) throw new Error('The project template has no apps/web/src/lib/server/mosaic.ts.');
+  out.set(mosaicTs.path, { path: mosaicTs.path, content: withImporter(mosaicTs.content) });
+  out.set(`${SERVER}/import-generated.ts`, { path: `${SERVER}/import-generated.ts`, content: IMPORTER });
+  out.set(`${SERVER}/mosaic-app.json`, { path: `${SERVER}/mosaic-app.json`, content: json({ entities: input.app.entities, forms: input.app.forms, pages: input.app.pages }) });
+  // Code-owned entity files: synced at boot in local development and reviewable in Git.
+  for (const entity of input.app.entities) out.set(`${SERVER}/entities/${entity.name}.entity.json`, { path: `${SERVER}/entities/${entity.name}.entity.json`, content: json(entity) });
+  out.set('mosaic/spec.json', { path: 'mosaic/spec.json', content: json(input.spec) });
+  return [...out.values()].sort((a, b) => a.path.localeCompare(b.path));
+}
+
+export async function persistGeneratedRelease(db: Db, input: { projectId: string; name: string; slug: string; spec: AppSpec; app: CompiledApp }) {
   const files = generateProjectFiles(input);
   const checksum = createHash('sha256').update(files.map((file) => `${file.path}\0${file.content}`).join('\0')).digest('hex');
   const releaseId = id();
-  await db.tx(async (tx) => {
+  const version = await db.tx(async (tx) => {
     const versions = await tx.query<{ version: number }>('SELECT COALESCE(MAX(version), 0) + 1 AS version FROM cloud_releases WHERE project_id = $1', [input.projectId]);
-    const version = Number(versions.rows[0]?.version ?? 1);
-    await tx.query('INSERT INTO cloud_releases (id, project_id, version, status, checksum, file_count) VALUES ($1, $2, $3, $4, $5, $6)', [releaseId, input.projectId, version, 'ready', checksum, files.length]);
+    const next = Number(versions.rows[0]?.version ?? 1);
+    await tx.query('INSERT INTO cloud_releases (id, project_id, version, status, checksum, file_count) VALUES ($1, $2, $3, $4, $5, $6)', [releaseId, input.projectId, next, 'ready', checksum, files.length]);
     for (const file of files) await tx.query('INSERT INTO cloud_release_files (release_id, path, content, mode) VALUES ($1, $2, $3, $4)', [releaseId, file.path, file.content, file.mode ?? '100644']);
+    return next;
   });
-  return { id: releaseId, checksum, fileCount: files.length };
+  return { id: releaseId, version, checksum, fileCount: files.length };
 }

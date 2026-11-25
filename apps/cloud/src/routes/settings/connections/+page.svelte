@@ -14,7 +14,7 @@
 <svelte:head><title>Connections · Mosaic Cloud</title><meta name="description" content="Connect your GitHub, Vercel and Neon accounts to Mosaic Cloud." /></svelte:head>
 
 <section class="mx-auto max-w-3xl space-y-6">
-  <header><p class="section-label">{data.organization.name}</p><h1 class="mb-2 text-2xl font-semibold tracking-tight">Connections</h1><p class="mb-0 max-w-2xl leading-7 muted">Connect your own accounts and Mosaic creates each project's repository, deployment and database there. You own everything. Credentials are encrypted and never sent back to the browser.</p></header>
+  <header><nav class="mb-5 flex gap-1" aria-label="Settings"><a class="tab-link" href="/settings/connections" aria-current="page">Connections</a><a class="tab-link" href="/settings/ai">AI</a></nav><p class="section-label">{data.organization.name}</p><h1 class="mb-2 text-2xl font-semibold tracking-tight">Connections</h1><p class="mb-0 max-w-2xl leading-7 muted">Connect your own accounts and Mosaic creates each project's repository, deployment and database there. You own everything. Credentials are encrypted and never sent back to the browser.</p></header>
   {#if notice}<div class={`alert text-sm ${notice.success ? 'alert-success' : 'alert-error'}`} role="status">{notice.message}</div>{/if}
   <div class="space-y-3">
     {#each providers as provider}

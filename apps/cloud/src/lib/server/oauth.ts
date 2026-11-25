@@ -35,8 +35,8 @@ export function authorizeUrl(provider: OAuthProvider, config: OAuthConfig, origi
 }
 
 /** Exchanges the callback code for an access token (plus the Vercel team the user chose, if any). */
-export async function exchangeCode(provider: OAuthProvider, config: OAuthConfig, origin: string, code: string): Promise<{ token: string; teamId: string | null }> {
-  const redirect_uri = callbackUrl(origin, provider);
+export async function exchangeCode(provider: OAuthProvider, config: OAuthConfig, origin: string, code: string, redirectUri?: string): Promise<{ token: string; teamId: string | null }> {
+  const redirect_uri = redirectUri ?? callbackUrl(origin, provider);
   const response = provider === 'github'
     ? await fetch('https://github.com/login/oauth/access_token', {
         method: 'POST', headers: { accept: 'application/json', 'content-type': 'application/json' },

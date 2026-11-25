@@ -1,14 +1,16 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { registerAccount, setSession } from '#lib/server/auth';
+import { continuePendingProject } from '#lib/server/projects';
+import { githubLoginEnabled } from '#lib/server/github-login';
 
 export const load: PageServerLoad = ({ locals }) => {
   if (locals.user) throw redirect(303, '/');
-  return {};
+  return { githubLogin: githubLoginEnabled() };
 };
 
 export const actions: Actions = {
-  default: async ({ request, cookies }) => {
+  default: async ({ request, cookies, url }) => {
     const data = await request.formData();
     const name = String(data.get('name') ?? '').trim();
     const email = String(data.get('email') ?? '').trim().toLowerCase();
@@ -19,6 +21,8 @@ export const actions: Actions = {
     const user = await registerAccount(name, email, password);
     if (!user) return fail(409, { name, email, message: 'An account with this email already exists.' });
     setSession(cookies, user);
-    throw redirect(303, '/');
+    // A prompt typed before signing in becomes the user's first project right away.
+    const projectId = await continuePendingProject(cookies, user.id, url.origin);
+    throw redirect(303, projectId ? `/projects/${projectId}` : '/');
   },
 };
