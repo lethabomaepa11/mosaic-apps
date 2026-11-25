@@ -1,16 +1,17 @@
 import { createMosaicServer } from '@mosaic-apps/server';
 
-let initialization;
+// Next can bundle API handlers and React routes separately inside one process.
+const instance = Symbol.for('mosaic-nextjs.server');
 
 export function mosaicServer() {
-  return initialization ??= start().catch((cause) => {
-    initialization = undefined;
+  return globalThis[instance] ??= start().catch((cause) => {
+    delete globalThis[instance];
     throw cause;
   });
 }
 
 async function start() {
-  const { DATABASE_URL, MOSAIC_JWT_SECRET, ADMIN_EMAIL, ADMIN_PASSWORD, NODE_ENV, VERCEL } = process.env;
+  const { DATABASE_URL, MOSAIC_JWT_SECRET, ADMIN_EMAIL, ADMIN_PASSWORD, NODE_ENV, VERCEL, AUTH, SEED_DEMO } = process.env;
   if (NODE_ENV === 'production' && (!DATABASE_URL || !MOSAIC_JWT_SECRET || MOSAIC_JWT_SECRET.length < 32)) {
     throw new Error('Set DATABASE_URL and a MOSAIC_JWT_SECRET of at least 32 characters.');
   }
@@ -22,8 +23,8 @@ async function start() {
   }
   return createMosaicServer({
     databaseUrl: DATABASE_URL ?? 'pglite://./.mosaic-data',
-    auth: { jwtSecret: MOSAIC_JWT_SECRET },
+    auth: { enabled: AUTH !== 'off', jwtSecret: MOSAIC_JWT_SECRET },
     cors: false,
-    seed: ADMIN_EMAIL && ADMIN_PASSWORD ? { admin: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD }, demo: false } : false,
+    seed: ADMIN_EMAIL && ADMIN_PASSWORD ? { admin: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD }, demo: SEED_DEMO === 'true' } : false,
   });
 }

@@ -22,6 +22,7 @@ Then compose UIs visually in the Studio and publish them as routes in your web a
 | `apps/studio` | the visual designer (forms, pages, entities, migrations) |
 | `apps/cloud` | the hosted SaaS control plane and vibe-coding workspace |
 | `templates/fullstack` | the project `mosaic create` scaffolds from |
+| `examples/nextjs` | Next.js App Router scaffold and production smoke test |
 | `docs/` | Docusaurus site (`npm run docs:start`) |
 | `infra/` | `docker compose` Postgres (`npm run db:up`) |
 | `scripts/` | e2e runner + `link-cli.mjs` |

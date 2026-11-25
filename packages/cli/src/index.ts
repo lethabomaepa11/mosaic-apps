@@ -15,7 +15,7 @@ mosaic — the metadata-driven full-stack platform
 Usage: mosaic <command> [options]
 
 Commands:
-  create <name>          Scaffold a SvelteKit app with a same-origin Hono API
+  create <name>          Scaffold an app with a same-origin Hono API
   migrate                Plan + apply pending migrations (dry-run preview)
   seed [--demo]          Seed roles, settings, admin user (and demo data)
   entity <Name>          Scaffold an entity class in the app's server directory
@@ -25,6 +25,7 @@ Commands:
   help                   Show this help
 
 create options:
+  --framework sveltekit|nextjs   App framework (default sveltekit)
   --db <url>             Postgres connection string
                           (default pglite://./data, persistent embedded PostgreSQL)
   --auth on|off          Enable authentication (default on)
@@ -72,6 +73,7 @@ async function main(): Promise<void> {
       const { values, positionals } = parseArgs({
         args: rest,
         options: {
+          framework: { type: 'string', default: 'sveltekit' },
           db: { type: 'string' },
           auth: { type: 'string', default: 'on' },
           demo: { type: 'boolean', default: true },
@@ -98,8 +100,10 @@ async function main(): Promise<void> {
         console.error('Usage: mosaic create <name> [options]');
         process.exit(1);
       }
+      const framework = values.framework;
+      if (framework !== 'sveltekit' && framework !== 'nextjs') throw new Error('Choose --framework sveltekit or nextjs.');
       await create({
-        name,
+        name, framework,
         db: values.db,
         auth: values.auth === 'on' || values.auth === undefined,
         demo: Boolean(values.demo) && !values['no-demo'],

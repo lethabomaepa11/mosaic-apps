@@ -2,3 +2,5 @@
 .env*
 .mosaic-data/
 node_modules/
+data/
+uploads/

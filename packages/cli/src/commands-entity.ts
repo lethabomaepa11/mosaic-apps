@@ -115,7 +115,7 @@ function pascalCase(input: string): string {
 }
 
 export async function entity(opts: { dir: string; name: string; fields?: string; softDelete: boolean }): Promise<void> {
-  await loadProjectConfig(opts.dir); // validates we're in a project
+  const config = await loadProjectConfig(opts.dir);
   const name = snakeCase(opts.name);
   const label = humanize(name);
   const def: EntityDef = {
@@ -136,12 +136,13 @@ export async function entity(opts: { dir: string; name: string; fields?: string;
   }
   const dir = entitiesDirOf(opts.dir);
   await mkdir(dir, { recursive: true });
-  const file = join(dir, `${name}.entity.ts`);
+  const next = config.framework === 'nextjs';
+  const file = join(dir, `${name}.entity.${next ? 'json' : 'ts'}`);
   if (existsSync(file)) {
     console.error(`${file} already exists — edit it instead.`);
     process.exit(1);
   }
-  await writeFile(file, generateEntityClass(def, pascalCase(name)) + '\n', 'utf8');
+  await writeFile(file, (next ? JSON.stringify(def, null, 2) : generateEntityClass(def, pascalCase(name))) + '\n', 'utf8');
   console.log(`✓ Created ${file}`);
   console.log('  Next: mosaic migrate  (or npm run migrate)');
 }
@@ -153,7 +154,7 @@ export async function info(opts: { dir: string }): Promise<void> {
   console.log(`  auth     : ${config.auth ? 'on' : 'off'}`);
   console.log(`  pwa      : ${config.pwa ? 'on' : 'off'}`);
   console.log(`  api port : ${config.api.port}`);
-  console.log(`  web port : ${config.web.port} (Studio at /studio)`);
+  console.log(`  web port : ${config.web.port}${config.framework === 'sveltekit' ? ' (Studio at /studio)' : ''}`);
   try {
     const res = await fetch(`http://localhost:${config.web.port}/api/health`);
     const json = (await res.json()) as { data?: { ok: boolean; version: string; db: boolean } };
@@ -168,6 +169,7 @@ export async function info(opts: { dir: string }): Promise<void> {
 /** Studio is served by the project's own app at /studio, so this starts the app. */
 export async function studio(opts: { dir: string }): Promise<void> {
   const config = await loadProjectConfig(opts.dir);
+  if (config.framework === 'nextjs') throw new Error('Use mosaic dev to start Next.js. Author pages and forms through its Mosaic API.');
   console.log(`
 ▦ Starting ${config.name} → Studio at http://localhost:${config.web.port}/studio
 `);

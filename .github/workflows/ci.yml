@@ -58,6 +58,16 @@ jobs:
       - name: Check package lifecycles
         run: npm run release:check
 
+      - name: Test production Next.js runtime
+        working-directory: examples/nextjs
+        run: |
+          docker exec ${{ job.services.postgres.id }} createdb -U mosaic mosaic_next_test
+          npm ci
+          npm run build
+          npm test
+        env:
+          TEST_NEXT_DATABASE_URL: postgres://mosaic:mosaic@127.0.0.1:5432/mosaic_next_test
+
   windows-cli:
     runs-on: windows-latest
     steps:

@@ -38,11 +38,11 @@ export function findRepoRoot(start: string): string | null {
   return null;
 }
 
-export function findTemplateDir(cliFileUrl: string): string | null {
+export function findTemplateDir(cliFileUrl: string, framework: 'sveltekit' | 'nextjs' = 'sveltekit'): string | null {
   const fromCli = dirname(fileURLToPath(cliFileUrl));
   const repo = findRepoRoot(fromCli);
-  if (repo) return join(repo, 'templates', 'fullstack');
-  const bundled = join(fromCli, '..', 'templates', 'fullstack');
+  if (repo) return framework === 'nextjs' ? join(repo, 'examples', 'nextjs') : join(repo, 'templates', 'fullstack');
+  const bundled = join(fromCli, '..', 'templates', framework === 'nextjs' ? 'nextjs' : 'fullstack');
   if (existsSync(join(bundled, 'package.json'))) return bundled;
   return null;
 }
@@ -54,6 +54,8 @@ export function findTemplateDir(cliFileUrl: string): string | null {
  * Earlier projects used either `apps/api/src/entities` or `apps/api/entities`.
  */
 export function entitiesDirsOf(dir: string): string[] {
+  const next = join(dir, 'entities');
+  if (existsSync(join(dir, 'next.config.mjs'))) return existsSync(next) ? [next] : [];
   const legacy = join(dir, 'apps', 'api', 'entities');
   const modern = join(dir, 'apps', 'api', 'src', 'entities');
   const current = join(dir, 'apps', 'web', 'src', 'lib', 'server', 'entities');
@@ -64,10 +66,11 @@ export function entitiesDirsOf(dir: string): string[] {
 /** The directory new entity files are written to. */
 export function entitiesDirOf(dir: string): string {
   const dirs = entitiesDirsOf(dir);
-  return dirs[dirs.length - 1]!;
+  return dirs[dirs.length - 1] ?? join(dir, 'entities');
 }
 
 export interface ProjectConfig {
+  framework: 'sveltekit' | 'nextjs';
   name: string;
   slug: string;
   databaseUrl: string;
@@ -98,6 +101,7 @@ export async function loadProjectConfig(dir: string): Promise<ProjectConfig> {
     databaseUrl = `pglite://${resolve(dir, databaseUrl.slice('pglite://'.length))}`;
   }
   return {
+    framework: raw.framework === 'nextjs' ? 'nextjs' : 'sveltekit',
     name: String(raw.name ?? 'Mosaic app'),
     slug: String(raw.slug ?? slugify(String(raw.name ?? 'app'))),
     databaseUrl,
@@ -122,7 +126,9 @@ export async function copyTemplate(
     const src = join(templateDir, relative);
     const entries = await readdir(src, { withFileTypes: true });
     for (const entry of entries) {
-      if (entry.name === 'node_modules' || entry.name === '.svelte-kit' || entry.name === 'dist' || entry.name === 'build' || entry.name === 'pgdata') continue;
+      if (['node_modules', '.svelte-kit', '.next', '.mosaic-data', '.vercel', '.git', 'dist', 'build', 'pgdata'].includes(entry.name)
+        || (!relative && ['data', 'uploads'].includes(entry.name))
+        || (entry.name.startsWith('.env') && entry.name !== '.env.example')) continue;
       const rel = relative ? join(relative, entry.name) : entry.name;
       // npm omits/renames .gitignore files in tarballs; keep it as a normal template asset.
       const dest = join(targetDir, relative, entry.name === 'gitignore' ? '.gitignore' : entry.name === 'gitattributes' ? '.gitattributes' : entry.name);

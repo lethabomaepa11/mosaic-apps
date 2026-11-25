@@ -79,6 +79,23 @@ test('published template is not mistaken for a source checkout', async (t) => {
   assert.equal(findRepoRoot(root), null);
 });
 
+test('Next.js scaffold keeps its lockfile, same-origin API, and deployment environment private', async (t) => {
+  const root = await fixture(t);
+  await create(options(root, { framework: 'nextjs', webPort: 3210 }));
+  const app = join(root, 'my-crm');
+  const manifest = JSON.parse(await readFile(join(app, 'package.json'), 'utf8'));
+  const lock = JSON.parse(await readFile(join(app, 'package-lock.json'), 'utf8'));
+  assert.equal(manifest.name, 'my-crm');
+  assert.equal(manifest.scripts.dev, 'next dev --port 3210');
+  assert.equal(lock.packages[''].name, manifest.name);
+  assert.equal((await loadProjectConfig(app)).web.port, 3210);
+  assert.ok(existsSync(join(app, 'app/api/[...path]/route.js')));
+  assert.ok(existsSync(join(app, 'app/[...path]/page.jsx')));
+  assert.ok(!existsSync(join(app, '.next')));
+  const ignored = spawnSync('git', ['check-ignore', '.env', 'data/db', 'uploads/image.png'], { cwd: app, encoding: 'utf8' });
+  assert.equal(ignored.status, 0);
+});
+
 test('link mode installs source UI dependencies in the generated app', async (t) => {
   const root = await fixture(t);
   const link = resolve(import.meta.dirname, '../../..');

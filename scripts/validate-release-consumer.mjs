@@ -37,6 +37,10 @@ const cliVersion = JSON.parse(await readFile(join(repository, 'packages/cli/pack
 const reportedVersion = spawnSync(process.execPath, [cli, '--version'], { cwd: directory, encoding: 'utf8', windowsHide: true });
 assert.equal(reportedVersion.status, 0, reportedVersion.stderr);
 assert.equal(reportedVersion.stdout.trim(), `mosaic ${cliVersion}`);
+run([cli, 'create', 'next-app', '--framework', 'nextjs', '--no-install', '--no-git'], directory);
+const nextApp = join(directory, 'next-app');
+await readFile(join(nextApp, 'app', 'api', '[...path]', 'route.js'));
+assert.match(await readFile(join(nextApp, '.gitignore'), 'utf8'), /^\.env\*/m);
 // Exercise normal published defaults, including Git/PWA, rather than hiding
 // scaffold failures behind --no-git/--npm-mode/--db overrides.
 run([cli, 'create', 'reference-app', '--no-install', '--web-port', '3100'], directory);
