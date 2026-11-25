@@ -54,6 +54,7 @@
   const sendNow = (text: string) => { if (!composer) return; composer.value = text; composer.form?.requestSubmit(); };
   let production = $derived(data.environments.find((environment) => environment.kind === 'production'));
   let liveUrl = $derived(production?.status === 'ready' ? production.url?.replace(/\/$/, '') : undefined);
+  let canRevealCredentials = $derived(Boolean(liveUrl && ['owner', 'admin'].includes(data.project.role)));
   let appUrl = $derived(liveUrl ?? preview?.url);
   let apiUrl = $derived(appUrl ? `${appUrl}/api/health` : undefined);
   let copied = $state('');
@@ -154,6 +155,13 @@
           {#if activeJob.status === 'failed'}
             <form method="POST" action="?/retry" use:enhance class="mt-3"><input type="hidden" name="jobId" value={activeJob.id} /><button class="btn btn-sm btn-outline" type="submit"><RotateCw size={14} /> Try again</button></form>
           {/if}
+        </div>
+      {/if}
+      {#if canRevealCredentials}
+        <div class="rounded-xl border border-success/25 bg-success/5 p-3.5 text-sm" aria-label="Deployment sign-in">
+          <p class="font-semibold">Your app is live</p>
+          <p class="mt-1 text-xs muted">Use your generated administrator account to sign in for the first time.</p>
+          <button class="btn btn-outline btn-xs mt-2" type="button" onclick={() => { tab = 'source'; pane = 'app'; }}>View admin sign-in</button>
         </div>
       {/if}
     </div>
@@ -280,12 +288,16 @@
           {#if !data.project.neon_project_id}<p class="text-sm muted">Vercel delivery requires a Neon connection to provision PostgreSQL.</p>{/if}
           {#if form?.deliveryMessage}<div class="alert alert-error text-sm" role="alert">{form.deliveryMessage}</div>{/if}
           {#if form?.deliveryQueued}<p class="text-sm muted" role="status">Delivery queued. Follow its progress in the activity feed.</p>{/if}
-          {#if production?.status === 'ready' && ['owner', 'admin'].includes(data.project.role)}
+          {#if canRevealCredentials}
             <div class="surface space-y-2 p-4">
-              <button class="btn btn-outline btn-sm" type="button" onclick={revealCredentials}>{credentials ? 'Hide initial app sign-in' : 'Reveal initial app sign-in'}</button>
+              <h3 class="text-sm font-semibold">Administrator sign-in</h3>
+              <div class="flex flex-wrap items-center gap-2">
+                <a class="btn btn-primary btn-sm" href={`${liveUrl}/login`} target="_blank" rel="noreferrer">Open sign-in page</a>
+                <button class="btn btn-outline btn-sm" type="button" onclick={revealCredentials}>{credentials ? 'Hide initial app sign-in' : 'Reveal initial app sign-in'}</button>
+              </div>
               {#if credentials}
-                <p class="mb-0 text-sm">Email <code>{credentials.email}</code></p>
-                <p class="mb-0 text-sm">Password <code>{credentials.password}</code></p>
+                <p class="mb-0 flex flex-wrap items-center gap-2 text-sm">Email <code>{credentials.email}</code> <button class="btn btn-ghost btn-xs" type="button" onclick={() => copy(credentials!.email)}>{copied === credentials.email ? 'Copied' : 'Copy email'}</button></p>
+                <p class="mb-0 flex flex-wrap items-center gap-2 text-sm">Password <code>{credentials.password}</code> <button class="btn btn-ghost btn-xs" type="button" onclick={() => copy(credentials!.password)}>{copied === credentials.password ? 'Copied' : 'Copy password'}</button></p>
               {/if}
               {#if credentialsError}<p class="mb-0 text-sm text-error" role="alert">{credentialsError}</p>{/if}
             </div>

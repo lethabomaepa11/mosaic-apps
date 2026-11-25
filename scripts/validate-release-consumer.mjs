@@ -147,9 +147,12 @@ try {
     await page.mouse.up();
     await layers.last().getByRole('button', { name: 'button', exact: true }).waitFor();
     await page.getByRole('tab', { name: 'Appearance' }).click();
-    await page.getByLabel('Padding (px)', { exact: true }).fill('24');
+    await page.getByLabel('Padding all sides (px)', { exact: true }).fill('24');
     const rendered = page.locator('.design-render').filter({ has: page.getByRole('button', { name: 'Test action', exact: true }) });
     assert.equal(await rendered.evaluate((element) => element.style.padding), '24px');
+    await page.getByLabel('Padding left (px)', { exact: true }).fill('12');
+    assert.equal(await rendered.evaluate((element) => element.style.paddingLeft), '12px');
+    assert.equal(await rendered.evaluate((element) => element.style.paddingTop), '24px');
     await page.getByRole('button', { name: 'Preview', exact: true }).click();
     const preview = page.locator('.page-preview__surface');
     await preview.getByRole('button', { name: 'Test action', exact: true }).click();

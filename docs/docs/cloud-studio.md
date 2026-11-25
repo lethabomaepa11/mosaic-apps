@@ -49,8 +49,10 @@ projects use the same Mosaic runtime and database-first artifacts.
    **Source & delivery → Deliver latest** to queue it.
 7. Cloud creates the GitHub repository, provisions a Neon database, and deploys to
    Vercel using the framework you selected. Open the production URL after delivery
-   completes. Workspace owners and admins can use **Source & delivery → Reveal
-   initial app sign-in** to see the deployed app's first admin credentials.
+   completes. Workspace owners and admins see **View admin sign-in** in the build feed.
+   Open it and select **Reveal initial app sign-in** to copy the deployed app's initial
+   email and password. Local downloads default to `admin@mosaic.local` and
+   `admin1234` unless you set `ADMIN_EMAIL` and `ADMIN_PASSWORD` before initial startup.
 
 Describe who signs in and what they should do. For a book club, ask for a reading
 schedule with upcoming meetings, an RSVP action, and a screen for choosing the next
