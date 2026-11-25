@@ -90,6 +90,14 @@ export async function deployToVercel(input: { token: string; projectId: string; 
   const projectId = input.projectId;
   const workspace = input.files.some((file) => file.path === 'apps/web/package.json');
   const framework = releaseFramework(input.files);
+  // Vercel can stage apps/web by itself when installing an uploaded release.
+  const legacyAdapter = input.files.find((file) => file.path === 'scripts/vercel-adapter.ts');
+  const config = input.files.find((file) => file.path === 'apps/web/vite.config.ts');
+  const localAdapter = 'apps/web/scripts/vercel-adapter.ts';
+  const files = config?.content.includes('../../scripts/vercel-adapter.ts') && legacyAdapter
+    ? input.files.map((file) => file === config ? { ...file, content: file.content.replace('../../scripts/vercel-adapter.ts', './scripts/vercel-adapter.ts') } : file)
+      .concat(input.files.some((file) => file.path === localAdapter) ? [] : [{ ...legacyAdapter, path: localAdapter }])
+    : input.files;
   const settings = {
     framework,
     rootDirectory: workspace ? 'apps/web' : null,
@@ -106,7 +114,7 @@ export async function deployToVercel(input: { token: string; projectId: string; 
   }
   const deployment = await api('Vercel', vercelUrl('/v13/deployments', input.teamId), input.token, {
     method: 'POST',
-    body: { name: input.name, project: projectId, target: 'production', files: input.files.map((file) => ({ file: file.path, data: file.content })) },
+    body: { name: input.name, project: projectId, target: 'production', files: files.map((file) => ({ file: file.path, data: file.content })) },
   });
   if (deployment.status >= 400 || !deployment.body.id) throw new ProviderError(`Vercel rejected the deployment (${deployment.status}).`);
   return { projectId, deploymentId: String(deployment.body.id) };

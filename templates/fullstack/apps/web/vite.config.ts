@@ -1,7 +1,7 @@
 import { sveltekit } from '@sveltejs/kit/vite';
 import adapter from '@sveltejs/adapter-node';
 import netlifyAdapter from '@sveltejs/adapter-netlify';
-import { vercelAdapter } from '../../scripts/vercel-adapter.ts';
+import { vercelAdapter } from './scripts/vercel-adapter.ts';
 import { defineConfig } from 'vite';
 import tailwindcss from '@tailwindcss/vite';
 import { fileURLToPath } from 'node:url';
