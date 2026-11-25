@@ -1,19 +1,21 @@
 ---
 sidebar_position: 3
-title: Hosted Studio
+title: Mosaic Cloud
 ---
 
-# Hosted Studio
+# Mosaic Cloud
+
+[Open Mosaic Cloud](https://cloud.mosaictalent.co.za)
 
 Mosaic Cloud is the hosted path for people who want to describe an app, edit it
-visually, and optionally connect GitHub and Vercel. It uses the same Mosaic runtime
-and database-first artifacts as local development; it is not a separate generated
-application architecture.
+visually, and deliver it through GitHub, Neon and Vercel. SvelteKit and Next.js
+projects use the same Mosaic runtime and database-first artifacts.
 
 ## How it works
 
-1. Type a prompt on the home page; you can do this before signing in. Your prompt is
-   kept while you sign up, sign in, or continue with GitHub, then the build starts.
+1. Type a prompt on the home page. In **Options → Framework**, choose **SvelteKit**
+   or **Next.js**. Cloud keeps your prompt and choice through sign-in and uses that
+   framework for later releases of the same project.
 2. The planner may ask one short round of questions when the answer changes the data
    model. Answer, or choose **Decide for me**.
 3. A developer agent designs the app (entities, relationships, pages, roles, sample
@@ -27,24 +29,32 @@ application architecture.
    once and are then rebuilt, committed, and redeployed in the background.
 6. Optionally connect your own GitHub (private repository, one commit per release),
    Neon (PostgreSQL), and Vercel (deployments) accounts in **Settings → Connections**.
-   With Vercel, the preview switches to your live deployment once it is ready, and
-   later page and data-model changes are published through the deployed app's API.
+   Cloud can deliver an existing build after you connect your accounts. Open
+   **Source & delivery → Deliver latest** to queue it.
+7. Cloud creates the GitHub repository, provisions a Neon database, and deploys to
+   Vercel using the framework you selected. Open the production URL after delivery
+   completes. Workspace owners and admins can use **Source & delivery → Reveal
+   initial app sign-in** to see the deployed app's first admin credentials.
 
-Every release is a normal Mosaic project, the same as `mosaic create`: one SvelteKit app
-with the API at `/api` and Studio at `/studio`. Download it from **Source & delivery** or
-clone it from GitHub, run `npm install` and `npm run dev`, and the generated pages and
-forms are imported on first start. A public data-backed deployment needs PostgreSQL,
-so Vercel deploys run once Neon is connected.
+**Source & delivery** also lets you download the app. Install dependencies and run
+`npm run dev` from the repository root. The generated pages and forms import on
+first start. Next.js downloads include a lockfile, so use `npm ci`. Both frameworks
+serve the Mosaic API at `/api`. SvelteKit includes Studio at `/studio`. Next.js uses
+React to render published pages and forms. The private Cloud preview uses Mosaic's
+shared renderer and sample database for both frameworks.
+
+If Vercel rejects an expired or revoked credential, open **Settings → Connections**
+and choose **Reconnect Vercel** or replace the access token in place. Cloud keeps
+your session, repository and deployment settings, then resumes the latest blocked
+delivery. Vercel's integration credential uses a fresh authorization when revoked.
 
 ## AI models and limits
 
-By default the agents run on Groq `gpt-oss-120b` using the operator's free tier: about
-8,000 tokens per minute and 1,000 requests per day, shared by everyone. A build usually
-takes 3 to 6 minutes and can wait on the rate limit; the chat says when it does. In
-**Settings → AI** you can use your own ChatGPT (OpenAI API), Claude (Anthropic API) or
-DeepSeek key; builds then use your provider's limits and billing. ChatGPT Plus and
-Claude Pro subscriptions do not include API access, so create an API key with the
-provider.
+The shared defaults route builds across Groq's GPT-OSS models. An operator can
+configure Gemini as a shared backup. In **Settings → AI**, you can also select
+Gemini, the OpenAI API, Anthropic or DeepSeek with your own key. If a Gemini model
+is temporarily unavailable, Cloud tries another Flash-Lite model using the same
+key. The build feed shows which model responded.
 
 ## Current limits
 
@@ -54,11 +64,9 @@ automation, and usage billing are not generated yet; see the [road to v1](./road
 
 ## Developer takeover
 
-Generated apps remain normal SvelteKit repositories. Developers can edit Svelte,
-server routes, registered components and endpoints, install npm packages, and use
-the bundled `AGENTS.md` and Mosaic agent skill. The page/form JSON is an internal
-artifact representation presented through visual and AI editing—not the expected
-user interface.
+Generated apps are conventional SvelteKit or Next.js repositories. Developers can
+edit application routes, components and endpoints directly. Author published
+artifacts through Studio in SvelteKit or the Mosaic API in either framework.
 
 Orval is optional for stable external OpenAPI services. It is useful for generating
 typed clients and query hooks, but Mosaic's dynamic same-origin artifact APIs do not

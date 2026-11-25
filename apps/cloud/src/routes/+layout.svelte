@@ -1,7 +1,7 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
   import { page } from '$app/state';
-  import { Plug, LogOut } from '@lucide/svelte';
+  import { BookOpen, Plug, LogOut } from '@lucide/svelte';
   import '../app.css';
   let { children, data } = $props();
   // The builder is a full-height workspace; every other page sits in the centred container.
@@ -20,6 +20,9 @@
       <a class="flex items-center gap-2.5 font-semibold tracking-tight" href="/" aria-label="Mosaic Cloud home">
         <span class="grid size-7 place-items-center rounded-lg bg-gradient-to-br from-primary to-violet-500 text-[13px] font-bold text-primary-content shadow-sm">M</span>
         <span class="hidden min-[430px]:inline">Mosaic Cloud</span>
+      </a>
+      <a class="btn btn-ghost btn-sm gap-1.5" href="https://docs-mosaic-apps.vercel.app/docs/cloud-studio" aria-label="Docs" title="Docs">
+        <BookOpen size={16} /><span class="hidden min-[380px]:inline">Docs</span>
       </a>
       {#if data.user}
         <nav class="ml-4 hidden items-center gap-1 sm:flex" aria-label="Main">

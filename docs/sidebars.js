@@ -3,6 +3,7 @@ const sidebars = {
   guide: [
     'intro',
     'quickstart',
+    'cloud-studio',
     'workflows',
     'architecture',
     'cli',

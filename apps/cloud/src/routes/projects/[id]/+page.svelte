@@ -17,6 +17,20 @@
   let deleteDialog = $state<HTMLDialogElement>();
   let deleteConfirmation = $state('');
   let deleting = $state(false);
+  let credentials = $state<{ email: string; password: string }>();
+  let credentialsError = $state('');
+
+  async function revealCredentials() {
+    if (credentials) { credentials = undefined; return; }
+    credentialsError = '';
+    try {
+      const response = await fetch(`/projects/${data.project.id}/credentials`, { method: 'POST' });
+      if (!response.ok) throw new Error('App credentials are unavailable.');
+      credentials = await response.json();
+    } catch {
+      credentialsError = 'Could not load the initial app sign-in.';
+    }
+  }
 
   // Prefer the real Vercel deployment once it is live; the built-in preview covers every other path.
   let preview = $derived(data.environments.find((environment) => environment.kind === 'production' && environment.status === 'ready' && environment.url) ?? data.environments.find((environment) => environment.kind === 'preview'));
@@ -220,6 +234,16 @@
           {#if !data.project.neon_project_id}<p class="text-sm muted">Vercel delivery requires a Neon connection to provision PostgreSQL.</p>{/if}
           {#if form?.deliveryMessage}<div class="alert alert-error text-sm" role="alert">{form.deliveryMessage}</div>{/if}
           {#if form?.deliveryQueued}<p class="text-sm muted" role="status">Delivery queued. Follow its progress in the activity feed.</p>{/if}
+          {#if production?.status === 'ready' && ['owner', 'admin'].includes(data.project.role)}
+            <div class="surface space-y-2 p-4">
+              <button class="btn btn-outline btn-sm" type="button" onclick={revealCredentials}>{credentials ? 'Hide initial app sign-in' : 'Reveal initial app sign-in'}</button>
+              {#if credentials}
+                <p class="mb-0 text-sm">Email <code>{credentials.email}</code></p>
+                <p class="mb-0 text-sm">Password <code>{credentials.password}</code></p>
+              {/if}
+              {#if credentialsError}<p class="mb-0 text-sm text-error" role="alert">{credentialsError}</p>{/if}
+            </div>
+          {/if}
           <div class="surface overflow-hidden">
             <h3 class="border-b border-base-300 px-4 py-3 text-sm font-semibold">Activity</h3>
             {#if data.jobs.length}
@@ -233,8 +257,10 @@
           <form method="POST" action="?/settings" use:enhance class="surface space-y-5 p-5">
             <div><h2 class="text-base font-semibold">Design settings</h2><p class="mb-0 mt-1 text-sm muted">Applied to the whole app on the next build. Pages never carry their own colours.</p></div>
             <div class="grid gap-4 sm:grid-cols-3">
-              <label class="block text-xs font-medium">Framework<select class="select select-sm select-bordered mt-1 w-full" name="appFramework"><option value="sveltekit">SvelteKit</option><option disabled>Next.js (planned)</option><option disabled>Astro (planned)</option></select></label>
+              <div class="block text-xs font-medium">Framework<p class="mt-2 text-sm">{data.project.app_framework === 'nextjs' ? 'Next.js' : 'SvelteKit'}</p></div>
+              {#if data.project.app_framework !== 'nextjs'}
               <label class="block text-xs font-medium">Components<select class="select select-sm select-bordered mt-1 w-full" name="uiSystem" value={form?.uiSystem ?? data.project.ui_system}><option value="daisyui">DaisyUI</option><option value="mosaic">Mosaic native</option></select></label>
+              {/if}
               <label class="block text-xs font-medium">Theme<select class="select select-sm select-bordered mt-1 w-full" name="uiTheme" value={form?.uiTheme ?? data.project.ui_theme}>{#each DAISY_THEME_CHOICES as theme}<option value={theme.value}>{theme.label}</option>{/each}</select></label>
             </div>
             <div class="flex flex-wrap gap-2 text-xs"><span class="chip">{data.project.include_home ? 'Homepage' : 'No homepage'}</span><span class="chip">{data.project.include_login ? 'Sign-in' : 'Public only'}</span><span class="chip font-mono">{data.project.slug}</span></div>

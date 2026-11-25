@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { createDb, hashPassword, type Db } from '@mosaic-apps/server';
+import { createDb, createPgDriver, hashPassword, type Db } from '@mosaic-apps/server';
 
 const env = process.env;
 
@@ -127,10 +127,32 @@ async function applyDdl(db: Db): Promise<void> {
 }
 
 async function initialize(): Promise<Db> {
-  const db = await createDb(databaseUrl());
-  await applyDdl(db);
-  await bootstrap(db);
-  return db;
+  const url = databaseUrl();
+  const db = hosted ? createPgDriver(url, { max: 2, connectionTimeoutMillis: 12_000, idleTimeoutMillis: 5_000 }) : await createDb(url);
+  try {
+    await applyDdl(db);
+    await bootstrap(db);
+    return db;
+  } catch (cause) {
+    await db.close().catch(() => {});
+    throw cause;
+  }
+}
+
+export function transientCloudDbError(cause: unknown): boolean {
+  if (!(cause instanceof Error)) return false;
+  const code = (cause as NodeJS.ErrnoException).code;
+  return ['ETIMEDOUT', 'ECONNRESET', 'ECONNREFUSED', '57P01', '53300', '08006'].includes(code ?? '')
+    || /timeout exceeded when trying to connect|connection terminated unexpectedly/i.test(cause.message);
+}
+
+/** Retrying a read is safe when a connection drops between serverless requests. */
+export async function readCloud<T>(query: (db: Db) => Promise<T>): Promise<T> {
+  try { return await query(await getCloudDb()); } catch (cause) {
+    if (!transientCloudDbError(cause)) throw cause;
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    return query(await getCloudDb());
+  }
 }
 
 // Each evaluation of this module (a dev hot reload included) re-applies the idempotent DDL
@@ -163,10 +185,14 @@ export async function getCloudDb(): Promise<Db> {
       cache.__mosaicCloudDb = undefined;
       throw cause;
     });
-  } else if (!ddlForThisModule.done) {
+  } else if (!hosted && !ddlForThisModule.done) {
     ddlForThisModule.done = true;
     const db = cache.__mosaicCloudDb;
-    cache.__mosaicCloudDdl = db.then(applyDdl);
+    cache.__mosaicCloudDdl = db.then(applyDdl).catch((cause) => {
+      ddlForThisModule.done = false;
+      cache.__mosaicCloudDdl = undefined;
+      throw cause;
+    });
   }
   const db = await cache.__mosaicCloudDb;
   await cache.__mosaicCloudDdl;

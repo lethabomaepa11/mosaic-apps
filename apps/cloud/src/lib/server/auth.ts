@@ -1,6 +1,6 @@
 import type { Cookies } from '@sveltejs/kit';
 import { hashPassword, signJwt, verifyJwt, verifyPassword } from '@mosaic-apps/server';
-import { getCloudDb, hosted, id, slugify } from './db';
+import { getCloudDb, hosted, id, readCloud, slugify } from './db';
 
 const env = process.env;
 
@@ -58,7 +58,6 @@ export async function sessionUser(cookies: Cookies) {
   if (!token) return null;
   const payload = verifyJwt(token, secret());
   if (!payload) return null;
-  const db = await getCloudDb();
-  const result = await db.query<{ id: string; email: string; name: string }>('SELECT id, email, name FROM cloud_users WHERE id = $1', [payload.sub]);
+  const result = await readCloud((db) => db.query<{ id: string; email: string; name: string }>('SELECT id, email, name FROM cloud_users WHERE id = $1', [payload.sub]));
   return result.rows[0] ?? null;
 }

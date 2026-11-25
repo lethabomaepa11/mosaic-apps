@@ -23,7 +23,7 @@
 
 <section class="mx-auto max-w-3xl space-y-6">
   <header>
-    <nav class="mb-5 flex gap-1" aria-label="Settings"><a class="tab-link" href="/settings/connections">Connections</a><a class="tab-link" href="/settings/ai" aria-current="page">AI</a></nav>
+    <nav class="mb-5 flex gap-2" aria-label="Settings sections"><a class="btn btn-outline btn-sm" href="/settings/connections">Connections</a><a class="btn btn-primary btn-sm" href="/settings/ai" aria-current="page">AI</a></nav>
     <h1 class="mb-2 text-2xl font-semibold tracking-tight">AI that builds your apps</h1>
     <p class="mb-0 leading-7 muted">Pick the model behind the planner, developer and reviewer agents. Your key is checked, encrypted, and only used server-side for your own builds.</p>
   </header>

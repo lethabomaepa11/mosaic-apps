@@ -1,6 +1,6 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
-import { getCloudDb, id } from '#lib/server/db';
+import { getCloudDb, id, readCloud, transientCloudDbError } from '#lib/server/db';
 import { isDaisyTheme } from '#lib/themes';
 import type { ProjectBlueprint } from '#lib/server/groq';
 import { enqueueJob, kickJobs, queueLatestDelivery } from '#lib/server/jobs';
@@ -8,8 +8,7 @@ import { canManageConnections } from '#lib/server/connections';
 import { deleteProject } from '#lib/server/projects';
 
 async function projectFor(projectId: string, userId: string) {
-  const db = await getCloudDb();
-  const result = await db.query<{
+  const result = await readCloud((db) => db.query<{
     id: string; organization_id: string; role: string; name: string; slug: string; prompt: string; status: string;
     include_home: boolean; include_login: boolean; app_framework: string; ui_system: string; ui_theme: string;
     blueprint: ProjectBlueprint | null; planner_model: string | null; planned_at: string | null;
@@ -23,7 +22,7 @@ async function projectFor(projectId: string, userId: string) {
      FROM cloud_projects project
      JOIN cloud_memberships membership ON membership.organization_id = project.organization_id
      WHERE project.id = $1 AND membership.user_id = $2`, [projectId, userId],
-  );
+  ));
   return result.rows[0];
 }
 
@@ -31,17 +30,19 @@ export const load: PageServerLoad = async ({ params, locals }) => {
   if (!locals.user) throw redirect(303, '/login');
   const project = await projectFor(params.id, locals.user.id);
   if (!project) throw error(404, 'Project not found');
-  const db = await getCloudDb();
-  const [environments, jobs, messages, releases] = await Promise.all([
-    db.query<{ id: string; name: string; kind: string; status: string; url: string | null }>('SELECT id, name, kind, status, url FROM cloud_environments WHERE project_id = $1 ORDER BY kind DESC', [project.id]),
-    db.query<{ id: string; kind: string; status: string; progress: number; stage: string | null; error: string | null; created_at: string; started_at: string | null; run_after: string; log: Array<{ at: string; message: string; agent?: string }>; questions: Array<{ question: string; options: string[] }> | null }>("SELECT id, kind, status, progress, stage, error, created_at, started_at, run_after, log, metadata->'questions' AS questions FROM cloud_jobs WHERE project_id = $1 ORDER BY created_at DESC LIMIT 20", [project.id]),
-    db.query<{ id: string; role: string; content: string; created_at: string }>(
+  const [environments, jobs, messages, releases] = await readCloud(async (db) => [
+    await db.query<{ id: string; name: string; kind: string; status: string; url: string | null }>('SELECT id, name, kind, status, url FROM cloud_environments WHERE project_id = $1 ORDER BY kind DESC', [project.id]),
+    await db.query<{ id: string; kind: string; status: string; progress: number; stage: string | null; error: string | null; created_at: string; started_at: string | null; run_after: string; log: Array<{ at: string; message: string; agent?: string }>; questions: Array<{ question: string; options: string[] }> | null }>("SELECT id, kind, status, progress, stage, error, created_at, started_at, run_after, log, metadata->'questions' AS questions FROM cloud_jobs WHERE project_id = $1 ORDER BY created_at DESC LIMIT 20", [project.id]),
+    await db.query<{ id: string; role: string; content: string; created_at: string }>(
       `SELECT message.id, message.role, message.content, message.created_at
        FROM cloud_messages message JOIN cloud_conversations conversation ON conversation.id = message.conversation_id
        WHERE conversation.project_id = $1 ORDER BY message.created_at`, [project.id],
     ),
-    db.query<{ id: string; version: number; status: string; checksum: string; file_count: number; created_at: string }>('SELECT id, version, status, checksum, file_count, created_at FROM cloud_releases WHERE project_id = $1 ORDER BY version DESC LIMIT 10', [project.id]),
-  ]);
+    await db.query<{ id: string; version: number; status: string; checksum: string; file_count: number; created_at: string }>('SELECT id, version, status, checksum, file_count, created_at FROM cloud_releases WHERE project_id = $1 ORDER BY version DESC LIMIT 10', [project.id]),
+  ] as const).catch((cause) => {
+    if (transientCloudDbError(cause)) throw error(503, 'Cloud is reconnecting to its database. Reload the project shortly.');
+    throw cause;
+  });
   // Reopening the builder resumes work no runner picked up (e.g. after a function was recycled).
   // Only overdue/stalled jobs count: the page polls every 2s and must not start a runner per poll.
   const now = Date.now();
@@ -74,20 +75,20 @@ export const actions: Actions = {
     if (!project) throw error(404, 'Project not found');
     const form = await request.formData();
     const requestedTheme = String(form.get('uiTheme') ?? 'corporate');
-    const requestedUiSystem = String(form.get('uiSystem') ?? 'daisyui');
+    const requestedUiSystem = project.app_framework === 'nextjs' ? 'mosaic' : String(form.get('uiSystem') ?? 'daisyui');
     if (!isDaisyTheme(requestedTheme) || !['daisyui', 'mosaic'].includes(requestedUiSystem)) {
       return fail(400, { settingsMessage: 'Choose a supported UI system and theme.' });
     }
     const db = await getCloudDb();
     await db.tx(async (tx) => {
       await tx.query(
-        'UPDATE cloud_projects SET app_framework = $2, ui_system = $3, ui_theme = $4, updated_at = now() WHERE id = $1',
-        [project.id, 'sveltekit', requestedUiSystem, requestedTheme],
+        'UPDATE cloud_projects SET ui_system = $2, ui_theme = $3, updated_at = now() WHERE id = $1',
+        [project.id, requestedUiSystem, requestedTheme],
       );
       await tx.query(
         `INSERT INTO cloud_audit_log (id, organization_id, user_id, action, target_type, target_id, metadata)
          VALUES ($1, $2, $3, 'project.settings.update', 'project', $4, $5::jsonb)`,
-        [id(), project.organization_id, user.id, project.id, JSON.stringify({ appFramework: 'sveltekit', uiSystem: requestedUiSystem, uiTheme: requestedTheme })],
+        [id(), project.organization_id, user.id, project.id, JSON.stringify({ appFramework: project.app_framework, uiSystem: requestedUiSystem, uiTheme: requestedTheme })],
       );
       // The built-in preview reads these settings live; the job carries them into source, Git and Vercel.
       const changed = requestedTheme !== project.ui_theme || requestedUiSystem !== project.ui_system;

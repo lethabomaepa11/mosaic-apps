@@ -1,7 +1,7 @@
 import { createHmac } from 'node:crypto';
 import { createMosaicServer, type MosaicServer } from '@mosaic-apps/server';
 import type { PageDef } from '@mosaic-apps/core';
-import { getCloudDb, hosted } from './db';
+import { hosted, readCloud } from './db';
 import { applyApp, inProcessCaller, loginToken, seedAndSmokeTest, type MosaicCall } from './mosaic-runtime';
 import { compileSpec, type AppSpec, type CompiledApp } from './spec';
 
@@ -12,7 +12,7 @@ import { compileSpec, type AppSpec, type CompiledApp } from './spec';
  * ./data/previews; on serverless hosts it is in-memory per instance.
  */
 interface PreviewRuntime { server: MosaicServer; call: MosaicCall; token: string }
-const MAX_RUNNING = 8;
+const MAX_RUNNING = hosted ? 2 : 8;
 const cache = globalThis as typeof globalThis & { __mosaicPreviews?: Map<string, Promise<PreviewRuntime>> };
 const running: Map<string, Promise<PreviewRuntime>> = (cache.__mosaicPreviews ??= new Map());
 
@@ -32,11 +32,17 @@ async function start(project: { id: string; slug: string; app_spec: AppSpec | nu
     auth: { jwtSecret: secretFor(project.id, 'jwt') }, cors: false,
     seed: { admin: { email: ADMIN_EMAIL, password: secretFor(project.id, 'admin') }, demo: false },
   });
-  const token = await loginToken(inProcessCaller(server, ''), ADMIN_EMAIL, secretFor(project.id, 'admin'));
-  const call = inProcessCaller(server, token);
-  const entities = await call('GET', '/api/entities');
-  if (project.app_spec && !(entities.body?.data ?? []).length) await publish(call, project.app_spec, compileSpec(project.app_spec));
-  return { server, call, token };
+  try {
+    const token = await loginToken(inProcessCaller(server, ''), ADMIN_EMAIL, secretFor(project.id, 'admin'));
+    const call = inProcessCaller(server, token);
+    const entities = await call('GET', '/api/entities');
+    if (entities.status !== 200) throw new Error('Preview could not load its entity definitions.');
+    if (project.app_spec && !(entities.body?.data ?? []).length) await publish(call, project.app_spec, compileSpec(project.app_spec));
+    return { server, call, token };
+  } catch (cause) {
+    await server.close().catch(() => {});
+    throw cause;
+  }
 }
 
 async function publish(call: MosaicCall, spec: AppSpec, app: CompiledApp): Promise<void> {
@@ -80,11 +86,10 @@ export async function previewPages(project: { id: string; slug: string; app_spec
 
 /** Previews are private to the project's workspace members (the iframe is same-origin, so the Cloud session applies). */
 export async function previewProject(slug: string, userId: string) {
-  const db = await getCloudDb();
-  const result = await db.query<{ id: string; slug: string; name: string; ui_theme: string; app_spec: AppSpec | null }>(
-    `SELECT project.id, project.slug, project.name, project.ui_theme, project.app_spec FROM cloud_projects project
+  const result = await readCloud((db) => db.query<{ id: string; slug: string; name: string; app_framework: string; ui_theme: string; app_spec: AppSpec | null }>(
+    `SELECT project.id, project.slug, project.name, project.app_framework, project.ui_theme, project.app_spec FROM cloud_projects project
      JOIN cloud_memberships membership ON membership.organization_id = project.organization_id
      WHERE project.slug = $1 AND membership.user_id = $2`, [slug, userId],
-  );
+  ));
   return result.rows[0];
 }

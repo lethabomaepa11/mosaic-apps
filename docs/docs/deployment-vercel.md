@@ -4,8 +4,9 @@ sidebar_position: 12
 
 # Deploy to Vercel
 
-A generated Mosaic app deploys as one SvelteKit project. The browser UI and Hono
-API share an origin; PostgreSQL is the only separately managed runtime service.
+A generated Mosaic app deploys as one SvelteKit or Next.js project with its Hono
+API on the same origin. In [Mosaic Cloud](./cloud-studio.md), connect GitHub,
+Neon and Vercel to automate these steps. The steps below describe manual delivery.
 
 ## 1. Provision PostgreSQL
 
@@ -13,10 +14,10 @@ Use Neon, Supabase, or any PostgreSQL-compatible provider. Prefer its pooled
 serverless connection string and require TLS. Keep the direct connection string for
 operator-run migrations if the provider recommends that split.
 
-From a trusted environment, configure `DATABASE_URL` and run:
+From a trusted environment, configure `DATABASE_URL` and preview entity migrations.
 
 ```bash
-npm run migrate
+npx @mosaic-apps/cli migrate --dry-run
 ```
 
 Review destructive statements before applying them. PGlite is for local
@@ -26,12 +27,12 @@ development and cannot provide durable Vercel storage.
 
 Import the generated GitHub repository and configure:
 
-| Setting | Value |
-| --- | --- |
-| Root Directory | `apps/web` |
-| Framework | SvelteKit |
-| Build command | `npm run build` |
-| Install command | `cd ../.. && npm install` |
+| Setting | SvelteKit | Next.js |
+| --- | --- | --- |
+| Root Directory | `apps/web` | Repository root |
+| Framework | SvelteKit | Next.js |
+| Build command | `npm run build` | `npm run build` |
+| Install command | `npm install` | `npm ci` |
 
 Set these environment variables for Preview and Production as appropriate:
 
@@ -46,8 +47,10 @@ SEED_DEMO=false
 AUTH=on
 ```
 
-Do not set `PUBLIC_API_URL`: `/api` is handled by the same SvelteKit deployment.
-Likewise, same-origin requests do not need CORS configuration.
+The Mosaic API is available as `/api` on the deployed app's origin.
+Set `MOSAIC_DEPLOY_TARGET=vercel` for SvelteKit's Vercel adapter. For a generated
+Next.js app, set `ADMIN_EMAIL` and `ADMIN_PASSWORD` to initialize its entities,
+pages and forms. Cloud generates and stores these credentials for managed delivery.
 
 ## 3. Verify
 
@@ -59,7 +62,8 @@ GET https://your-app.vercel.app/api/meta
 ```
 
 Then sign in at `/login`, open a published database route, and exercise a record
-read/write path. Confirm the deployment logs contain no seed or migration attempts.
+read/write path. Cloud verifies the Next.js API's database connection and publishes
+the release's artifacts before reporting production ready.
 
 ## Uploads and rollback
 

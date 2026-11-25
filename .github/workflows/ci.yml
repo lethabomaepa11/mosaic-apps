@@ -68,6 +68,13 @@ jobs:
         env:
           TEST_NEXT_DATABASE_URL: postgres://mosaic:mosaic@127.0.0.1:5432/mosaic_next_test
 
+      - name: Test Cloud-generated Next.js release
+        run: |
+          docker exec ${{ job.services.postgres.id }} createdb -U mosaic mosaic_cloud_next_test
+          npm run test:cloud-next
+        env:
+          TEST_CLOUD_NEXT_DATABASE_URL: postgres://mosaic:mosaic@127.0.0.1:5432/mosaic_cloud_next_test
+
   windows-cli:
     runs-on: windows-latest
     steps:

@@ -1,13 +1,20 @@
 import { error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { previewProject, previewRuntime } from '#lib/server/preview';
+import { transientCloudDbError } from '#lib/server/db';
 
 /** Same-origin API for the preview app: forwards to the project's in-process Mosaic server as its admin. */
 const forward: RequestHandler = async ({ params, request, url, locals }) => {
   if (!locals.user) throw error(401, 'Sign in to Mosaic Cloud to use this preview.');
-  const project = await previewProject(params.slug, locals.user.id);
+  const project = await previewProject(params.slug, locals.user.id).catch((cause) => {
+    if (transientCloudDbError(cause)) throw error(503, 'Cloud is reconnecting to its database.');
+    throw cause;
+  });
   if (!project) throw error(404, 'Preview not found');
-  const { server, token } = await previewRuntime(project);
+  const { server, token } = await previewRuntime(project).catch((cause) => {
+    console.error('Could not open the preview API', cause);
+    throw error(503, 'The preview API is temporarily unavailable.');
+  });
   const headers = new Headers({ authorization: `Bearer ${token}` });
   const contentType = request.headers.get('content-type');
   if (contentType) headers.set('content-type', contentType);

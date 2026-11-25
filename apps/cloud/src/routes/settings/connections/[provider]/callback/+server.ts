@@ -3,7 +3,8 @@ import { error, redirect } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { canManageConnections, organizationFor, saveConnection } from '#lib/server/connections';
 import { exchangeCode, OAUTH_STATE_COOKIE, oauthConfig, type OAuthProvider } from '#lib/server/oauth';
-import { validateProviderCredential } from '#lib/server/providers';
+import { validateProviderCredential, verifyVercelConnection } from '#lib/server/providers';
+import { kickJobs } from '#lib/server/jobs';
 
 const NAMES: Record<OAuthProvider, string> = { github: 'GitHub', vercel: 'Vercel' };
 const back = (query: Record<string, string>) => `/settings/connections?${new URLSearchParams(query)}`;
@@ -31,12 +32,12 @@ export const GET: RequestHandler = async ({ params, url, cookies, locals }) => {
   let saved: string;
   try {
     const { token, teamId } = await exchangeCode(provider, config, url.origin, code);
-    // Vercel integration tokens installed on a team may not read /v2/user; the team id is what deliveries need.
-    const identity = await validateProviderCredential(provider, token).catch((cause) => {
-      if (provider === 'vercel') return { label: teamId ? 'Vercel team' : 'Vercel account', metadata: {} };
-      throw cause;
-    });
-    await saveConnection({ organizationId: organization.id, userId: locals.user.id, provider, token, label: identity.label, metadata: { ...identity.metadata, teamId }, method: 'oauth' });
+    // Team integration tokens need project scope but may have no access to /v2/user.
+    if (provider === 'vercel') await verifyVercelConnection(token, teamId);
+    const identity = provider === 'github' ? await validateProviderCredential(provider, token)
+      : { label: teamId ? 'Vercel team' : 'Vercel account', metadata: {} };
+    const resumed = await saveConnection({ organizationId: organization.id, userId: locals.user.id, provider, token, label: identity.label, metadata: { ...identity.metadata, teamId }, method: 'oauth' });
+    if (resumed) kickJobs();
     saved = identity.label;
   } catch (cause) {
     console.error(`${provider} OAuth callback failed`, cause);

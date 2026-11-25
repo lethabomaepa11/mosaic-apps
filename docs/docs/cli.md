@@ -11,10 +11,12 @@ Use `-C, --dir <path>` to target another directory, or `--help` for help.
 
 ```bash
 npx @mosaic-apps/cli@latest create "Acme CRM"
+npx @mosaic-apps/cli@latest create "Acme CRM" --framework nextjs
 ```
 
 | Option | Purpose |
 | --- | --- |
+| `--framework sveltekit\|nextjs` | Select the framework. Defaults to SvelteKit. |
 | `--db URL` | PostgreSQL connection string; defaults to persistent embedded storage at `pglite://./data` |
 | `--auth on\|off` | Enable authentication; defaults to on |
 | `--demo` / `--no-demo` | Include or omit seeded example records, forms, and pages |
@@ -52,8 +54,8 @@ review; see [Migrations](./migrations.md).
 
 ## Start and inspect
 
-- `npx mosaic dev`: start the project's app, API, and Studio (`/studio`) on one server.
-- `npx mosaic studio`: same as `dev`, printing the Studio URL.
+- `npx mosaic dev` starts the app and its same-origin API.
+- `npx mosaic studio` starts the SvelteKit app and prints its Studio URL.
 - `npx mosaic info`: inspect configuration and check API health.
 - `npx mosaic seed --demo`: seed demonstration data for local exploration.
 

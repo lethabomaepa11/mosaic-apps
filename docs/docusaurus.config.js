@@ -52,6 +52,7 @@ const config = {
           { to: '/docs/components/catalog', label: 'Components', position: 'left' },
           { to: '/docs/auto-crud', label: 'API reference', position: 'left' },
           { to: '/blog', label: 'Blog', position: 'left' },
+          { href: 'https://cloud.mosaictalent.co.za', label: 'Cloud', position: 'right' },
           {
             href: 'https://github.com/lethabomaepa11/mosaic-apps',
             label: 'GitHub',
@@ -65,6 +66,7 @@ const config = {
             title: 'Docs',
             items: [
               { label: 'Quickstart', to: '/docs/intro' },
+              { label: 'Mosaic Cloud', to: '/docs/cloud-studio' },
               { label: 'CLI', to: '/docs/cli' },
               { label: 'Migrations', to: '/docs/migrations' },
             ],

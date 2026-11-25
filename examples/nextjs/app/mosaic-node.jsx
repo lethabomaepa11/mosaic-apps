@@ -1,19 +1,19 @@
-import { publishedForm, readMosaic } from '../lib/artifacts.js';
+import { publishedForm, readMosaic, recordFormProps } from '../lib/artifacts.js';
 import { RecordForm } from './record-form.jsx';
 
 function safeLink(value) {
   return typeof value === 'string' && (/^https?:\/\//i.test(value) || /^\/(?![\/\\])/.test(value) && !value.includes('\\')) ? value : undefined;
 }
 
-function Table({ rows = [], columns = [] }) {
+function Table({ rows = [], columns = [], editHref }) {
   if (!rows.length) return <p>No records</p>;
   return (
-    <table>
-      <thead><tr>{columns.map((col) => <th key={col.key} scope="col">{col.label ?? col.key}</th>)}</tr></thead>
+    <div className="table-scroll"><table>
+      <thead><tr>{columns.map((col) => <th key={col.key} scope="col">{col.label ?? col.key}</th>)}{editHref && <th scope="col">Actions</th>}</tr></thead>
       <tbody>{rows.map((row, index) => <tr key={row.id ?? index}>{columns.map((col) =>
         <td key={col.key}>{row[col.key] == null ? '' : String(row[col.key])}</td>,
-      )}</tr>)}</tbody>
-    </table>
+      )}{editHref && <td><a href={editHref(row)}>Edit</a></td>}</tr>)}</tbody>
+    </table></div>
   );
 }
 
@@ -39,17 +39,28 @@ export async function MosaicNode({ node }) {
     }
     case 'dataTable':
       return <Table rows={Array.isArray(props.rows) ? props.rows : []} columns={Array.isArray(props.columns) ? props.columns : []} />;
+    case 'statCard': {
+      if (!props.entity) return null;
+      const { data } = await readMosaic(`/entities/${encodeURIComponent(props.entity)}?pageSize=1`);
+      return data ? <p><strong>{props.label ?? props.entity}</strong> {data.total}</p> : null;
+    }
     case 'entityTable': {
       if (typeof props.entity !== 'string' || !props.entity) return null;
       const result = await readMosaic(`/entities/${encodeURIComponent(props.entity)}?pageSize=20`);
       if (!result.data) return <p>Records unavailable.</p>;
       const rows = Array.isArray(result.data) ? result.data : result.data.data ?? [];
-      const columns = props.columns?.length ? props.columns.map((col) => typeof col === 'string' ? { key: col } : col) : Object.keys(rows[0] ?? {}).map((key) => ({ key }));
-      return <section>{props.title && <h2>{props.title}</h2>}<Table rows={rows} columns={columns} /></section>;
+      const columns = Array.isArray(props.columns) && props.columns.length ? props.columns.map((col) => typeof col === 'string' ? { key: col } : col) : Object.keys(rows[0] ?? {}).map((key) => ({ key }));
+      const { data: forms } = await readMosaic('/forms?published=true');
+      const form = forms?.find((item) => (item.entity ?? item.dataSource?.entity) === props.entity);
+      const url = form && '/f/' + encodeURIComponent(form.slug);
+      return <section>{props.title && <h2>{props.title}</h2>}
+        {url && props.allowCreate && <a href={url}>New record</a>}
+        <Table rows={rows} columns={columns} editHref={url && props.allowEdit ? (row) => `${url}?record=${encodeURIComponent(row.id)}` : undefined} />
+      </section>;
     }
     case 'subform': {
       const form = await publishedForm(props.formId);
-      return form ? <RecordForm form={form} /> : null;
+      return form ? <RecordForm {...await recordFormProps(form)} /> : null;
     }
     default:
       return <section>{props.title && <h2>{props.title}</h2>}{node.children?.map((child) => <MosaicNode key={child.id} node={child} />)}</section>;

@@ -73,9 +73,14 @@ export async function applyApp(call: MosaicCall, app: CompiledApp, options: { al
   for (const [kind, artifacts] of [['forms', app.forms], ['pages', app.pages]] as const) {
     for (const artifact of artifacts as Array<Record<string, any>>) {
       const payload = { name: artifact.name, slug: artifact.slug, description: artifact.description, schema: artifact.root, settings: artifact.settings, ...(kind === 'forms' ? { entity: artifact.entity, dataSource: artifact.dataSource } : { route: artifact.route }) };
-      const existing = await call('GET', `/api/${kind}/${artifact.slug}`);
+      let existing = await call('GET', `/api/${kind}/${artifact.slug}`);
+      if (existing.status === 404 && kind === 'pages' && artifact.route === '/') {
+        const pages = await call('GET', '/api/pages?published=true');
+        const home = pages.body?.data?.find((page: { route: string }) => page.route === '/');
+        if (home) existing = { status: 200, body: { data: home } };
+      }
       const saved = existing.status === 200
-        ? await call('PUT', `/api/${kind}/${artifact.slug}/save-and-publish`, payload)
+        ? await call('PUT', `/api/${kind}/${existing.body.data.id}/save-and-publish`, { ...payload, expectedVersion: existing.body.data.version, origin: 'ai' })
         : await call('POST', `/api/${kind}`, payload).then(async (created) => created.status === 201 ? call('POST', `/api/${kind}/${created.body.data.id}/publish`) : created);
       if (saved.status !== 200 && saved.status !== 201) errors.push(`Publishing ${kind.slice(0, -1)} "${artifact.slug}" failed: ${reason(saved)}`);
     }

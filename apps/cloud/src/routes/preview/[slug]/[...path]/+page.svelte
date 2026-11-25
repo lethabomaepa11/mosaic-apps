@@ -15,7 +15,7 @@
       {#each data.nav as item (item.href)}
         <a class={`flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition ${current.url.pathname === item.href || (item.route === '/' && current.url.pathname === data.app.base) ? 'bg-primary/10 font-medium text-primary' : 'opacity-75 hover:bg-base-200 hover:opacity-100'}`} href={item.href}><Icon name={item.icon} /> {item.label}</a>
       {/each}
-      <div class="mt-auto rounded-lg bg-base-200 px-2.5 py-2 text-[11px] leading-4 opacity-70">Live preview · signed in as the app admin. Data here is sample data.</div>
+      <div class="mt-auto rounded-lg bg-base-200 px-2.5 py-2 text-[11px] leading-4 opacity-70">{data.app.framework} project · Cloud preview uses sample data.</div>
     </aside>
     <div class="min-w-0 flex-1">
       <nav class="flex gap-1 overflow-x-auto border-b border-base-300 bg-base-100 px-3 py-2 md:hidden">
@@ -24,6 +24,8 @@
       <main class="mx-auto max-w-6xl p-4 md:p-8">
         {#if data.status === 'ready' && data.page}
           {#key data.page.id}<PageRenderer page={data.page} {client} scope={{ params: {}, query: Object.fromEntries(current.url.searchParams) }} />{/key}
+        {:else if data.status === 'unavailable'}
+          <div class="grid min-h-[60vh] place-items-center text-center"><div><p class="font-medium">The preview could not start.</p><a class="btn btn-outline btn-sm" href={current.url.pathname} data-sveltekit-reload>Reload preview</a></div></div>
         {:else if data.status === 'building'}
           <div class="grid min-h-[60vh] place-items-center text-center"><div><span class="loading loading-spinner loading-md text-primary"></span><p class="mt-3 font-medium">Mosaic is building this app…</p><p class="text-sm opacity-60">The preview appears as soon as the first verified version is ready.</p></div></div>
         {:else}

@@ -3,7 +3,8 @@ import type { Actions, PageServerLoad } from './$types';
 import { getCloudDb, id } from '#lib/server/db';
 import { canManageConnections, organizationFor, saveConnection } from '#lib/server/connections';
 import { oauthConfig } from '#lib/server/oauth';
-import { isProvider, validateProviderCredential } from '#lib/server/providers';
+import { isProvider, validateProviderCredential, verifyVercelConnection } from '#lib/server/providers';
+import { kickJobs } from '#lib/server/jobs';
 
 export const load: PageServerLoad = async ({ locals, url }) => {
   if (!locals.user) throw redirect(303, '/login');
@@ -35,11 +36,21 @@ export const actions: Actions = {
     let identity;
     try {
       identity = await validateProviderCredential(providerValue, token);
+      if (providerValue === 'vercel') {
+        const db = await getCloudDb();
+        const { rows: [previous] } = await db.query<{ team_id: string | null }>(
+          "SELECT metadata->>'teamId' AS team_id FROM cloud_provider_connections WHERE organization_id = $1 AND provider = 'vercel' ORDER BY updated_at DESC LIMIT 1",
+          [organization.id],
+        );
+        await verifyVercelConnection(token, previous?.team_id);
+        identity.metadata.teamId = previous?.team_id ?? null;
+      }
     } catch (cause) {
       console.error(`Provider validation failed for ${providerValue}`, cause);
       return fail(400, { provider: providerValue, message: `Could not connect ${providerValue}. Check the credential and its permissions.` });
     }
-    await saveConnection({ organizationId: organization.id, userId: locals.user.id, provider: providerValue, token, label: identity.label, metadata: identity.metadata, method: 'token' });
+    const resumed = await saveConnection({ organizationId: organization.id, userId: locals.user.id, provider: providerValue, token, label: identity.label, metadata: identity.metadata, method: 'token' });
+    if (resumed) kickJobs();
     return { success: true, provider: providerValue, message: `${identity.label} is connected.` };
   },
   disconnect: async ({ request, locals }) => {

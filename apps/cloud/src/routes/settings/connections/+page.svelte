@@ -14,35 +14,40 @@
 <svelte:head><title>Connections · Mosaic Cloud</title><meta name="description" content="Connect your GitHub, Vercel and Neon accounts to Mosaic Cloud." /></svelte:head>
 
 <section class="mx-auto max-w-3xl space-y-6">
-  <header><nav class="mb-5 flex gap-1" aria-label="Settings"><a class="tab-link" href="/settings/connections" aria-current="page">Connections</a><a class="tab-link" href="/settings/ai">AI</a></nav><p class="section-label">{data.organization.name}</p><h1 class="mb-2 text-2xl font-semibold tracking-tight">Connections</h1><p class="mb-0 max-w-2xl leading-7 muted">Connect your own accounts and Mosaic creates each project's repository, deployment and database there. You own everything. Credentials are encrypted and never sent back to the browser.</p></header>
+  <header><nav class="mb-5 flex gap-2" aria-label="Settings sections"><a class="btn btn-primary btn-sm" href="/settings/connections" aria-current="page">Connections</a><a class="btn btn-outline btn-sm" href="/settings/ai">AI</a></nav><p class="section-label">{data.organization.name}</p><h1 class="mb-2 text-2xl font-semibold tracking-tight">Connections</h1><p class="mb-0 max-w-2xl leading-7 muted">Connect your own accounts and Mosaic creates each project's repository, deployment and database there. You own everything. Provider tokens stay on the server and are stored encrypted.</p></header>
   {#if notice}<div class={`alert text-sm ${notice.success ? 'alert-success' : 'alert-error'}`} role="status">{notice.message}</div>{/if}
   <div class="space-y-3">
     {#each providers as provider}
       {@const connection = data.connections.find((item) => item.provider === provider.id)}
       {@const ProviderIcon = icons[provider.id]}
       {@const oauth = data.oauth[provider.id]}
+      {@const reconnect = connection?.status === 'reconnect_required'}
+      {@const canManage = ['owner', 'admin'].includes(data.organization.role)}
       <article class="surface p-5">
         <div class="flex items-start gap-4">
           <span class="grid size-10 shrink-0 place-items-center rounded-xl bg-base-200"><ProviderIcon size={18} /></span>
           <div class="min-w-0 flex-1">
-            <div class="flex flex-wrap items-center gap-2"><h2 class="text-base font-semibold">{provider.name}</h2>{#if connection}<span class="badge badge-sm badge-success badge-soft gap-1"><Check size={11} /> Connected</span>{/if}</div>
-            <p class="mb-0 mt-1 text-sm leading-6 muted">{connection ? `Signed in as ${connection.label}` : provider.description}</p>
+            <div class="flex flex-wrap items-center gap-2"><h2 class="text-base font-semibold">{provider.name}</h2>{#if reconnect}<span class="badge badge-sm badge-warning">Reconnect required</span>{:else if connection}<span class="badge badge-sm badge-success badge-soft gap-1"><Check size={11} /> Connected</span>{/if}</div>
+            <p class="mb-0 mt-1 text-sm leading-6 muted">{reconnect ? 'Reconnect Vercel to resume delivery while staying signed in to Cloud.' : connection ? `Signed in as ${connection.label}` : provider.description}</p>
           </div>
-          {#if connection}
+          {#if canManage && connection && provider.id === 'vercel' && oauth}
+            <a class="btn btn-outline btn-sm" href="/settings/connections/vercel/authorize" data-sveltekit-reload>Reconnect Vercel</a>
+          {/if}
+          {#if canManage && connection}
             <form method="POST" action="?/disconnect" use:enhance><input type="hidden" name="provider" value={provider.id} /><button class="btn btn-ghost btn-sm" type="submit">Disconnect</button></form>
-          {:else if oauth}
+          {:else if canManage && oauth}
             <!-- OAuth leaves the app by design: the provider's consent screen is on its own site. -->
             <a class="btn btn-primary btn-sm" href={`/settings/connections/${provider.id}/authorize`} data-sveltekit-reload>Connect {provider.name}</a>
           {/if}
         </div>
-        {#if !connection}
+        {#if canManage && (!connection || provider.id === 'vercel')}
           <details class="group mt-4 border-t border-base-300 pt-3" open={!oauth}>
-            <summary class={`flex cursor-pointer list-none items-center gap-1.5 text-xs muted ${oauth ? '' : 'hidden'}`}><KeyRound size={12} /> Use a token instead</summary>
+            <summary class={`flex cursor-pointer list-none items-center gap-1.5 text-xs muted ${oauth || connection && !reconnect ? '' : 'hidden'}`}><KeyRound size={12} /> {connection ? 'Replace access token' : 'Use a token instead'}</summary>
             <form method="POST" action="?/connect" use:enhance class="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]">
               <input type="hidden" name="provider" value={provider.id} />
               <label class="sr-only" for={`token-${provider.id}`}>{provider.name} {provider.credential}</label>
               <input class="input input-sm input-bordered w-full" id={`token-${provider.id}`} name="token" type="password" autocomplete="off" required minlength="10" placeholder={`Paste your ${provider.name} ${provider.credential.toLowerCase()}`} />
-              <button class={`btn btn-sm ${oauth ? 'btn-outline' : 'btn-primary'}`} type="submit">Connect</button>
+              <button class={`btn btn-sm ${oauth ? 'btn-outline' : 'btn-primary'}`} type="submit">{connection ? 'Save token' : 'Connect'}</button>
               <p class="mb-0 text-xs muted sm:col-span-2">Create one in <a class="link" href={provider.href} target="_blank" rel="noreferrer">{provider.name} settings</a> ({provider.hint}). Mosaic checks it before saving.</p>
             </form>
           </details>

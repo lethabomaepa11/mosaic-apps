@@ -8,6 +8,9 @@ Mosaic helps you create internal applications around your business data: custome
 directories, service requests, inventory, and operational dashboards. Define
 entities, design forms and pages in Studio, and run them in your own web application.
 
+Use [Mosaic Cloud](./cloud-studio.md) to build from a brief and deploy with your own
+GitHub, Neon and Vercel accounts. [Open Cloud](https://cloud.mosaictalent.co.za).
+
 ![A customer form in Mosaic Studio](/img/screenshots/form-studio.png)
 
 ## What you can do

@@ -3,10 +3,59 @@ import type { Db } from '@mosaic-apps/server';
 import { id } from './db';
 import type { AppSpec, CompiledApp } from './spec';
 import { renderTemplate } from './template';
+import type { AppFramework } from '../framework';
 
 export interface GeneratedFile { path: string; content: string; mode?: string }
 
 const SERVER = 'apps/web/src/lib/server';
+const NEXT_IMPORTER = `import generated from './mosaic-app.json';
+
+export async function importGeneratedApp(server, email, password) {
+  if (process.env.MOSAIC_IMPORT_GENERATED === 'false') return server;
+  let token = '';
+  async function call(method, path, body, permitted = []) {
+    const response = await server.app.request(path, {
+      method, headers: { authorization: 'Bearer ' + token, 'content-type': 'application/json' },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    if (!response.ok && !permitted.includes(response.status)) throw new Error('Mosaic import failed at ' + path + ' (' + response.status + ')');
+    return response.ok ? (await response.json()).data : undefined;
+  }
+  try {
+    token = (await call('POST', '/api/auth/login', { email, password })).token;
+    for (const entity of generated.entities) {
+      const path = '/api/entities/' + entity.name;
+      if (!await call('GET', path + '/meta', undefined, [404])) {
+        await call('PUT', path, { entity, origin: 'import' });
+      }
+    }
+    await call('POST', '/api/migrations/apply', { allowDestructive: false });
+    for (const [kind, items] of [['forms', generated.forms], ['pages', generated.pages]]) {
+      const base = '/api/' + kind;
+      for (const item of items) {
+        const existing = await call('GET', base + '/' + item.slug, undefined, [404]);
+        const payload = { name: item.name, slug: item.slug, description: item.description, schema: item.root, settings: item.settings,
+          ...(kind === 'forms' ? { entity: item.entity, dataSource: item.dataSource } : { route: item.route }) };
+        if (kind === 'pages' && item.route === '/') {
+          const home = existing ?? (await call('GET', base + '?published=true')).find((page) => page.route === '/');
+          if (home?.id === 'pg_home' && home.version === 1 && home.root?.id === 'pg_home_root') {
+            await call('PUT', base + '/' + home.id + '/save-and-publish', { ...payload, expectedVersion: home.version, origin: 'import' }, [409]);
+            continue;
+          }
+          if (home) continue;
+        }
+        const saved = existing ?? await call('POST', base, payload, [409]).then((created) =>
+          created ?? call('GET', base + '/' + item.slug));
+        if (!saved.published && (!existing || saved.root?.id === item.root.id && saved.version < 2)) await call('POST', base + '/' + saved.id + '/publish');
+      }
+    }
+    return server;
+  } catch (cause) {
+    await server.close();
+    throw cause;
+  }
+}
+`;
 
 /**
  * Runs once when the generated app's Mosaic server starts: registers the generated entities,
@@ -59,25 +108,52 @@ function withImporter(mosaicTs: string): string {
 }
 
 /** The full `mosaic create` project for this app: one SvelteKit app, API at /api, Studio at /studio. */
-export function generateProjectFiles(input: { name: string; slug: string; spec: AppSpec; app: CompiledApp }): GeneratedFile[] {
+export function generateProjectFiles(input: { name: string; slug: string; spec: AppSpec; app: CompiledApp; framework?: AppFramework; theme?: string }): GeneratedFile[] {
+  const framework = input.framework ?? 'sveltekit';
+  const server = framework === 'nextjs' ? 'lib' : SERVER;
   const files = renderTemplate({
     __PROJECT_NAME__: input.name, __PROJECT_SLUG__: input.slug, __DB_URL__: 'pglite://./data',
     __AUTH__: 'true', __PWA__: 'false', __DEMO__: 'false', __WEB_PORT__: '3000', __API_PORT__: '3001', __DB_PORT__: '5432',
-  }).filter((file) => !file.path.startsWith(`${SERVER}/entities/`)); // the template's demo entities
+  }, framework).filter((file) => !file.path.startsWith(`${server}/entities/`));
   const json = (value: unknown) => JSON.stringify(value, null, 2) + '\n';
   const out = new Map(files.map((file) => [file.path, file as GeneratedFile]));
-  const mosaicTs = out.get(`${SERVER}/mosaic.ts`);
-  if (!mosaicTs) throw new Error('The project template has no apps/web/src/lib/server/mosaic.ts.');
-  out.set(mosaicTs.path, { path: mosaicTs.path, content: withImporter(mosaicTs.content) });
-  out.set(`${SERVER}/import-generated.ts`, { path: `${SERVER}/import-generated.ts`, content: IMPORTER });
-  out.set(`${SERVER}/mosaic-app.json`, { path: `${SERVER}/mosaic-app.json`, content: json({ entities: input.app.entities, forms: input.app.forms, pages: input.app.pages }) });
+  const put = (path: string, content: string) => out.set(path, { path, content });
+  if (framework === 'nextjs') {
+    const mosaic = out.get('lib/mosaic.js')?.content;
+    const marker = '  return createMosaicServer({';
+    if (!mosaic?.includes(marker)) throw new Error('The Next.js scaffold cannot attach the generated-app importer.');
+    put('lib/mosaic.js', `import { importGeneratedApp } from './import-generated.js';\n` + mosaic.replace(marker,
+      `  const bootstrap = process.env.MOSAIC_IMPORT_GENERATED !== 'false';\n  if (bootstrap && NODE_ENV === 'production' && (!ADMIN_EMAIL || !ADMIN_PASSWORD)) throw new Error('Set ADMIN_EMAIL and ADMIN_PASSWORD to initialize the generated app.');\n  const email = ADMIN_EMAIL ?? 'admin@mosaic.local';\n  const password = ADMIN_PASSWORD ?? 'admin1234';\n  const server = await createMosaicServer({`)
+      .replace("databaseUrl: DATABASE_URL ?? 'pglite://./.mosaic-data',", "databaseUrl: DATABASE_URL ?? 'pglite://./data',\n    database: { poolMax: Number(process.env.MOSAIC_DB_POOL_MAX) || 2 },")
+      .replace("seed: ADMIN_EMAIL && ADMIN_PASSWORD ? { admin: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD }, demo: SEED_DEMO === 'true' } : false,", 'seed: bootstrap || (ADMIN_EMAIL && ADMIN_PASSWORD) ? { admin: { email, password }, demo: false } : false,')
+      .replace(/\n  \}\);\n\}\s*$/, '\n  });\n  return importGeneratedApp(server, email, password);\n}\n'));
+    if (!out.get('lib/mosaic.js')!.content.includes('return importGeneratedApp(server')) throw new Error('The Next.js server template changed.');
+    put('lib/import-generated.js', NEXT_IMPORTER);
+    put('lib/site.js', `export const site = ${json({ name: input.name, theme: input.theme ?? 'corporate' }).trimEnd()};\n`);
+    const manifest = JSON.parse(out.get('package.json')!.content);
+    delete manifest.scripts.test;
+    manifest.name = input.slug;
+    const lock = JSON.parse(out.get('package-lock.json')!.content);
+    lock.name = lock.packages[''].name = input.slug;
+    put('package.json', json(manifest));
+    put('package-lock.json', json(lock));
+    put('mosaic.config.json', json({ name: input.name, slug: input.slug, framework, auth: true, demo: false, pwa: false, web: { port: 3000 }, api: { port: 3000 } }));
+    put('.env.example', 'DATABASE_URL=pglite://./data\n# Set a stable random MOSAIC_JWT_SECRET of at least 32 characters before production.\nMOSAIC_JWT_SECRET=\nADMIN_EMAIL=\nADMIN_PASSWORD=\n');
+    put('README.md', `# ${input.name}\n\nA Mosaic Cloud app on Next.js. Run \`npm ci\` and \`npm run dev\` from this directory. First startup imports the generated app into embedded PostgreSQL under \`data/\`. The local sign-in is \`admin@mosaic.local\` / \`admin1234\` unless you set credentials in \`.env\`.\n\nFor production, use the Next.js preset at the repository root and set \`DATABASE_URL\` to durable PostgreSQL. Set a stable \`MOSAIC_JWT_SECRET\` of at least 32 characters and unique \`ADMIN_EMAIL\` and \`ADMIN_PASSWORD\` values. Check \`/api/health\` after startup.\n\nPublished pages use their configured routes. Published entity forms use \`/f/<slug>\`. Manage the app through the same-origin Mosaic API at \`/api\`.\n`);
+  } else {
+    const mosaicTs = out.get(`${SERVER}/mosaic.ts`);
+    if (!mosaicTs) throw new Error('The project template has no apps/web/src/lib/server/mosaic.ts.');
+    put(mosaicTs.path, withImporter(mosaicTs.content));
+    put(`${SERVER}/import-generated.ts`, IMPORTER);
+  }
+  put(`${server}/mosaic-app.json`, json({ entities: input.app.entities, forms: input.app.forms, pages: input.app.pages }));
   // Code-owned entity files: synced at boot in local development and reviewable in Git.
-  for (const entity of input.app.entities) out.set(`${SERVER}/entities/${entity.name}.entity.json`, { path: `${SERVER}/entities/${entity.name}.entity.json`, content: json(entity) });
+  for (const entity of input.app.entities) put(`${framework === 'nextjs' ? 'entities' : `${SERVER}/entities`}/${entity.name}.entity.json`, json(entity));
   out.set('mosaic/spec.json', { path: 'mosaic/spec.json', content: json(input.spec) });
   return [...out.values()].sort((a, b) => a.path.localeCompare(b.path));
 }
 
-export async function persistGeneratedRelease(db: Db, input: { projectId: string; name: string; slug: string; spec: AppSpec; app: CompiledApp }) {
+export async function persistGeneratedRelease(db: Db, input: Parameters<typeof generateProjectFiles>[0] & { projectId: string }) {
   const files = generateProjectFiles(input);
   const checksum = createHash('sha256').update(files.map((file) => `${file.path}\0${file.content}`).join('\0')).digest('hex');
   const releaseId = id();

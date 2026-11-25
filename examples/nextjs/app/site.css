@@ -1,0 +1,23 @@
+:root { --background:#f5f7fb; --surface:#fff; --text:#182238; --accent:#2454bd; --border:#cfd7e7; color-scheme:light; font:16px/1.5 system-ui,sans-serif; }
+[data-theme="business"], [data-theme="dark"] { --background:#151a26; --surface:#222a3a; --text:#f0f3fa; --accent:#9bb8ff; --border:#45526a; color-scheme:dark; }
+[data-theme="nord"] { --background:#e5e9f0; --surface:#eceff4; --text:#2e3440; --accent:#345782; --border:#aebcce; }
+[data-theme="winter"] { --background:#edf7fc; --surface:#fff; --text:#183047; --accent:#195fa7; --border:#b3d2e7; }
+[data-theme="silk"] { --background:#f7f0eb; --surface:#fffaf6; --text:#302b30; --accent:#8d365b; --border:#dfcbd0; }
+[data-theme="lofi"], [data-theme="light"] { --background:#f8f8f8; --surface:#fff; --text:#202020; --accent:#383838; --border:#cbcbcb; }
+body { margin:0; background:var(--background); color:var(--text); }
+a { color:var(--accent); }
+.site-nav { display:flex; align-items:center; flex-wrap:wrap; gap:1rem; padding:1rem max(1rem,calc((100vw - 72rem)/2)); background:var(--surface); border-bottom:1px solid var(--border); }
+.site-nav nav { display:flex; gap:1rem; flex-wrap:wrap; flex:1; }
+.site-name { font-weight:700; color:var(--text); text-decoration:none; }
+main { max-width:72rem; margin:2rem auto; padding:0 1rem; }
+main section + section { margin-top:1rem; }
+form { display:grid; width:min(100%,36rem); gap:.8rem; }
+label { display:grid; gap:.3rem; }
+input, select, textarea, button { font:inherit; color:inherit; }
+input:not([type="checkbox"]), select, textarea, button { padding:.5rem .7rem; background:var(--surface); border:1px solid var(--border); border-radius:.4rem; }
+button { cursor:pointer; justify-self:start; }
+button:disabled { cursor:wait; }
+.table-scroll { max-width:100%; overflow:auto; margin-top:.7rem; }
+table { width:100%; border-collapse:collapse; background:var(--surface); }
+th, td { padding:.65rem .9rem; text-align:left; border-bottom:1px solid var(--border); }
+.form-actions { display:flex; gap:.6rem; align-items:center; flex-wrap:wrap; }

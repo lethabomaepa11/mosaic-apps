@@ -6,6 +6,7 @@
 
   let prompt = $state('');
   let submitting = $state(false);
+  let appFramework = $state('sveltekit');
   const ideas = [
     { label: 'Solar installer CRM', text: 'A CRM for a solar installer with leads, site surveys, quotes, installation milestones, invoices, and a client login to track progress.' },
     { label: 'Clinic bookings', text: 'An appointment system for a small clinic: practitioners, patients, bookable slots, reminders, and a daily schedule view for reception.' },
@@ -29,7 +30,7 @@
   <div class="mx-auto max-w-3xl text-center">
     <span class="chip mb-5"><Sparkles size={14} class="text-primary" /> {data.organization?.name ?? 'AI app builder on Mosaic'}</span>
     <h1 class="page-title mb-4">What do you want to build?</h1>
-    <p class="mx-auto mb-8 max-w-xl text-base leading-7 muted">Describe it in plain words. Mosaic plans the pages and data, writes a real SvelteKit app, and shows it live while it builds.</p>
+    <p class="mx-auto mb-8 max-w-xl text-base leading-7 muted">Describe it in plain words. Mosaic plans the pages and data, then builds and previews your SvelteKit or Next.js app.</p>
   </div>
 
   <form method="POST" action="?/create" class="surface-raised mx-auto max-w-3xl p-2 text-left"
@@ -46,8 +47,10 @@
       <details class="dropdown">
         <summary class="btn btn-ghost btn-sm gap-1.5 font-normal muted"><Settings2 size={15} /> Options</summary>
         <div class="dropdown-content z-20 mt-2 w-80 space-y-3 rounded-box border border-base-300 bg-base-100 p-4 shadow-lg">
-          <label class="block text-xs font-medium">Framework<select class="select select-sm select-bordered mt-1 w-full" name="appFramework"><option value="sveltekit">SvelteKit</option><option disabled>Next.js (planned)</option><option disabled>Astro (planned)</option></select></label>
+          <label class="block text-xs font-medium">Framework<select class="select select-sm select-bordered mt-1 w-full" name="appFramework" bind:value={appFramework}><option value="sveltekit">SvelteKit</option><option value="nextjs">Next.js</option></select></label>
+          {#if appFramework === 'sveltekit'}
           <label class="block text-xs font-medium">Components<select class="select select-sm select-bordered mt-1 w-full" name="uiSystem"><option value="daisyui">DaisyUI</option><option value="mosaic">Mosaic native</option></select></label>
+          {/if}
           <label class="block text-xs font-medium">Theme<select class="select select-sm select-bordered mt-1 w-full" name="uiTheme">{#each DAISY_THEME_CHOICES as theme}<option value={theme.value}>{theme.label}</option>{/each}</select></label>
           <div class="flex gap-5 pt-1 text-sm">
             <label class="flex cursor-pointer items-center gap-2"><input class="checkbox checkbox-xs checkbox-primary" name="includeHome" type="checkbox" checked /> Homepage</label>
@@ -70,7 +73,7 @@
   {#if data.organization}
   <div class="mx-auto mt-6 flex max-w-3xl flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs muted">
     {#each ['github', 'vercel', 'neon'] as provider}
-      {@const connection = data.connections.find((item) => item.provider === provider)}
+      {@const connection = data.connections.find((item) => item.provider === provider && item.status === 'connected')}
       {@const Icon = providerIcons[provider as keyof typeof providerIcons]}
       <span class="inline-flex items-center gap-1.5"><Icon size={13} /> <span>{({ github: 'GitHub', vercel: 'Vercel', neon: 'Neon' } as Record<string, string>)[provider]}</span> <span class={`status-dot ${connection ? 'is-ready' : ''}`}></span></span>
     {/each}

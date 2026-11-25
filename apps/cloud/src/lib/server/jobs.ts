@@ -11,8 +11,9 @@ import { applyApp, httpCaller, loginToken } from './mosaic-runtime';
 import { randomBytes } from 'node:crypto';
 import { blueprintFromSpec, compileSpec, type AppSpec, type CompiledApp } from './spec';
 import { persistGeneratedRelease, type GeneratedFile } from './generation';
-import { decryptProviderSecret, encryptProviderSecret, type Provider } from './providers';
-import { createGitHubRepository, createVercelProject, deployToVercel, provisionNeon, pushToGitHub, vercelDeploymentStatus } from './delivery';
+import { decryptProviderSecret, encryptProviderSecret, VercelCredentialError, type Provider } from './providers';
+import { createGitHubRepository, createVercelProject, deployToVercel, provisionNeon, pushToGitHub, releaseFramework, vercelDeploymentStatus } from './delivery';
+import { frameworkLabel, type AppFramework } from '../framework';
 
 export type JobKind = 'generate' | 'deliver' | 'vercel-status';
 export interface ClaimedJob { id: string; project_id: string; kind: JobKind; metadata: Record<string, any>; attempts: number }
@@ -125,21 +126,34 @@ export function kickJobs(): void {
 }
 
 async function providerToken(db: Db, projectId: string, provider: Provider) {
-  const result = await db.query<{ secret_ciphertext: string; secret_iv: string; secret_tag: string; metadata: Record<string, any> }>(
-    `SELECT connection.secret_ciphertext, connection.secret_iv, connection.secret_tag, connection.metadata
+  const result = await db.query<{ id: string; status: string; secret_ciphertext: string; secret_iv: string; secret_tag: string; metadata: Record<string, any> }>(
+    `SELECT connection.id, connection.status, connection.secret_ciphertext, connection.secret_iv, connection.secret_tag, connection.metadata
      FROM cloud_provider_connections connection JOIN cloud_projects project ON project.organization_id = connection.organization_id
-     WHERE project.id = $1 AND connection.provider = $2 AND connection.status = 'connected' LIMIT 1`, [projectId, provider],
+     WHERE project.id = $1 AND connection.provider = $2 AND connection.status IN ('connected', 'reconnect_required')
+     ORDER BY connection.updated_at DESC LIMIT 1`, [projectId, provider],
   );
   const row = result.rows[0];
+  if (provider === 'vercel' && row?.status === 'reconnect_required') throw new VercelCredentialError();
   // Only the workspace's own connection is ever used: projects land in the user's accounts, never the operator's.
   if (!row?.secret_ciphertext) return undefined;
-  return { token: decryptProviderSecret({ ciphertext: row.secret_ciphertext, iv: row.secret_iv, tag: row.secret_tag }), metadata: row.metadata };
+  return { token: decryptProviderSecret({ ciphertext: row.secret_ciphertext, iv: row.secret_iv, tag: row.secret_tag }), metadata: row.metadata,
+    id: row.id, ciphertext: row.secret_ciphertext };
 }
 
-interface ProjectRow { id: string; name: string; slug: string; prompt: string; include_home: boolean; include_login: boolean; ui_system: string; ui_theme: string; blueprint: ProjectBlueprint | null; github_repository: string | null; vercel_project_id: string | null; neon_project_id: string | null; app_spec: AppSpec | null; deploy_secret: { ciphertext: string; iv: string; tag: string } | null; database_secret: { ciphertext: string; iv: string; tag: string } | null }
+async function useVercel<T>(db: Db, connection: NonNullable<Awaited<ReturnType<typeof providerToken>>>, run: () => Promise<T>): Promise<T> {
+  try { return await run(); } catch (cause) {
+    if (cause instanceof VercelCredentialError) {
+      await db.query("UPDATE cloud_provider_connections SET status = 'reconnect_required', updated_at = now() WHERE id = $1 AND secret_ciphertext = $2",
+        [connection.id, connection.ciphertext]);
+    }
+    throw cause;
+  }
+}
+
+interface ProjectRow { id: string; name: string; slug: string; prompt: string; include_home: boolean; include_login: boolean; app_framework: AppFramework; ui_system: string; ui_theme: string; blueprint: ProjectBlueprint | null; github_repository: string | null; vercel_project_id: string | null; neon_project_id: string | null; app_spec: AppSpec | null; deploy_secret: { ciphertext: string; iv: string; tag: string } | null; database_secret: { ciphertext: string; iv: string; tag: string } | null }
 
 async function loadProject(db: Db, projectId: string): Promise<ProjectRow> {
-  const result = await db.query<ProjectRow>('SELECT id, name, slug, prompt, include_home, include_login, ui_system, ui_theme, blueprint, github_repository, vercel_project_id, neon_project_id, app_spec, deploy_secret, database_secret FROM cloud_projects WHERE id = $1', [projectId]);
+  const result = await db.query<ProjectRow>('SELECT id, name, slug, prompt, include_home, include_login, app_framework, ui_system, ui_theme, blueprint, github_repository, vercel_project_id, neon_project_id, app_spec, deploy_secret, database_secret FROM cloud_projects WHERE id = $1', [projectId]);
   if (!result.rows[0]) throw new Error('Project no longer exists.');
   return result.rows[0];
 }
@@ -154,7 +168,7 @@ async function addMessage(db: Db, projectId: string, content: string) {
 const generate: JobHandler = async ({ db, job, stage, think, pause, enqueue }) => {
   const project = await loadProject(db, job.project_id);
   await db.query("UPDATE cloud_projects SET status = 'generating', updated_at = now() WHERE id = $1", [project.id]);
-  const options = `homepage=${project.include_home ? 'yes' : 'no'}, sign-in=${project.include_login ? 'yes' : 'no'}, theme=${project.ui_theme}`;
+  const options = `framework=${frameworkLabel(project.app_framework)}, homepage=${project.include_home ? 'yes' : 'no'}, sign-in=${project.include_login ? 'yes' : 'no'}, theme=${project.ui_theme}`;
   const answers = (job.metadata.answers ?? []) as Answer[];
   let spec: AppSpec;
   let app: CompiledApp;
@@ -195,7 +209,7 @@ const generate: JobHandler = async ({ db, job, stage, think, pause, enqueue }) =
   await think('Verifier', 'Publishing the live preview…');
   await publishToPreview(project, spec, app);
   await stage('Packaging the release', 90);
-  const release = await persistGeneratedRelease(db, { projectId: project.id, name: project.name, slug: project.slug, spec, app });
+  const release = await persistGeneratedRelease(db, { projectId: project.id, name: project.name, slug: project.slug, spec, app, framework: project.app_framework, theme: project.ui_theme });
   const connected = await db.query<{ provider: string }>(
     `SELECT DISTINCT connection.provider FROM cloud_provider_connections connection JOIN cloud_projects project ON project.organization_id = connection.organization_id
      WHERE project.id = $1 AND connection.status = 'connected'`, [project.id],
@@ -227,7 +241,9 @@ async function deploySecrets(db: Db, project: ProjectRow): Promise<{ jwtSecret: 
 
 const deliver: JobHandler = async ({ db, job, stage, think, enqueue }) => {
   const project = await loadProject(db, job.project_id);
-  const { version, files } = await releaseFiles(db, String(job.metadata.releaseId));
+  const releaseId = String(job.metadata.releaseId);
+  const { version, files } = await releaseFiles(db, releaseId);
+  const framework = releaseFramework(files);
 
   // Neon only provisions the database; Mosaic migrates it from the app's own entity metadata.
   let databaseUrl: string | undefined;
@@ -246,7 +262,7 @@ const deliver: JobHandler = async ({ db, job, stage, think, enqueue }) => {
   }
 
   const github = await providerToken(db, project.id, 'github');
-  if (github) {
+  if (github && !job.metadata.githubCommit) {
     await stage('Committing release to GitHub', 40);
     let repository = project.github_repository;
     if (!repository) {
@@ -254,6 +270,7 @@ const deliver: JobHandler = async ({ db, job, stage, think, enqueue }) => {
       await db.query('UPDATE cloud_projects SET github_repository = $2, updated_at = now() WHERE id = $1', [project.id, repository]);
     }
     const pushed = await pushToGitHub({ token: github.token, repository, files, message: `Mosaic release v${version}` });
+    await db.query("UPDATE cloud_jobs SET metadata = metadata || jsonb_build_object('githubCommit', $2::text) WHERE id = $1", [job.id, pushed.commit]);
     await stage(`Committed ${pushed.commit.slice(0, 7)} to ${pushed.repository}`, 60);
   }
 
@@ -267,16 +284,16 @@ const deliver: JobHandler = async ({ db, job, stage, think, enqueue }) => {
     const secrets = await deploySecrets(db, project);
     let vercelProjectId = project.vercel_project_id;
     if (!vercelProjectId) {
-      vercelProjectId = await createVercelProject({ token: vercel.token, name: project.slug, teamId: vercel.metadata.teamId });
+      vercelProjectId = await useVercel(db, vercel, () => createVercelProject({ token: vercel.token, name: project.slug, teamId: vercel.metadata.teamId, framework }));
       await db.query('UPDATE cloud_projects SET vercel_project_id = $2, updated_at = now() WHERE id = $1', [project.id, vercelProjectId]);
     }
     const env = {
       DATABASE_URL: databaseUrl, MOSAIC_JWT_SECRET: secrets.jwtSecret, MOSAIC_DEPLOY_TARGET: 'vercel', AUTH: 'on',
       SEED: 'true', SEED_DEMO: 'false', ADMIN_EMAIL: secrets.adminEmail, ADMIN_PASSWORD: secrets.adminPassword, MOSAIC_DB_POOL_MAX: '2',
     };
-    const deployed = await deployToVercel({ token: vercel.token, projectId: vercelProjectId, name: project.slug, files, env, teamId: vercel.metadata.teamId });
+    const deployed = await useVercel(db, vercel, () => deployToVercel({ token: vercel.token, projectId: vercelProjectId, name: project.slug, files, env, teamId: vercel.metadata.teamId }));
     await db.query("UPDATE cloud_environments SET status = 'building', updated_at = now() WHERE project_id = $1 AND kind = 'production'", [project.id]);
-    await enqueue('vercel-status', { deploymentId: deployed.deploymentId }, 10);
+    await enqueue('vercel-status', { deploymentId: deployed.deploymentId, releaseId, framework }, 10);
     await stage('Vercel deployment started', 90);
   } else {
     await db.query("UPDATE cloud_projects SET status = 'ready', updated_at = now() WHERE id = $1", [project.id]);
@@ -286,21 +303,35 @@ const deliver: JobHandler = async ({ db, job, stage, think, enqueue }) => {
 const vercelStatus: JobHandler = async ({ db, job, stage, think, requeue }) => {
   const vercel = await providerToken(db, job.project_id, 'vercel');
   if (!vercel) throw new Error('Vercel was disconnected before the deployment finished.');
-  const status = await vercelDeploymentStatus(vercel.token, String(job.metadata.deploymentId), vercel.metadata.teamId);
+  const status = await useVercel(db, vercel, () => vercelDeploymentStatus(vercel.token, String(job.metadata.deploymentId), vercel.metadata.teamId));
   if (status.state === 'READY') {
-    await db.query("UPDATE cloud_environments SET status = 'ready', url = $2, updated_at = now() WHERE project_id = $1 AND kind = 'production'", [job.project_id, status.url]);
     // Artifact changes (entities, forms, pages) reach a live app through its API, without waiting for a rebuild.
     const project = await loadProject(db, job.project_id);
-    if (status.url && project.app_spec && project.deploy_secret) {
+    const next = job.metadata.framework === 'nextjs';
+    if (next && (!status.url || !project.deploy_secret)) throw new Error('Vercel did not return a usable Next.js deployment.');
+    if (status.url && project.deploy_secret && (job.metadata.releaseId || project.app_spec)) {
       try {
+        const files = job.metadata.releaseId ? (await releaseFiles(db, String(job.metadata.releaseId))).files : [];
+        const manifest = files.find((file) => file.path === (next ? 'lib/mosaic-app.json' : 'apps/web/src/lib/server/mosaic-app.json'));
+        const app = manifest ? JSON.parse(manifest.content) as CompiledApp : compileSpec(project.app_spec!);
+        if (next) {
+          const health = await httpCaller(status.url, '')('GET', '/api/health');
+          if (health.status !== 200 || health.body?.data?.db !== true) throw new Error('The deployed Next.js API could not connect to the database.');
+        }
         const secrets = JSON.parse(decryptProviderSecret(project.deploy_secret)) as { adminEmail: string; adminPassword: string };
         const token = await loginToken(httpCaller(status.url, ''), secrets.adminEmail, secrets.adminPassword);
-        const applied = await applyApp(httpCaller(status.url, token), compileSpec(project.app_spec), { allowDestructive: false });
+        const applied = await applyApp(httpCaller(status.url, token), app, { allowDestructive: false });
+        if (next && applied.errors.length) throw new Error(applied.errors[0]);
         await think('Verifier', applied.errors.length ? `Live app API update had problems: ${applied.errors[0]}` : 'Published the latest pages and data model to the live app.');
       } catch (cause) {
+        if (next) {
+          await db.query("UPDATE cloud_environments SET status = 'failed', updated_at = now() WHERE project_id = $1 AND kind = 'production'", [job.project_id]);
+          throw cause;
+        }
         await think('Verifier', `Could not update the live app through its API: ${cause instanceof Error ? cause.message : cause}`);
       }
     }
+    await db.query("UPDATE cloud_environments SET status = 'ready', url = $2, updated_at = now() WHERE project_id = $1 AND kind = 'production'", [job.project_id, status.url]);
     await db.query("UPDATE cloud_projects SET status = 'ready', updated_at = now() WHERE id = $1", [job.project_id]);
     await stage(`Deployed to ${status.url}`, 100);
   } else if (status.state === 'ERROR' || status.state === 'CANCELED') {

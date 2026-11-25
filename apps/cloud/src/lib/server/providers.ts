@@ -3,6 +3,25 @@ import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:
 
 export const PROVIDERS = ['github', 'vercel', 'neon'] as const;
 export type Provider = typeof PROVIDERS[number];
+export const VERCEL_RECONNECT = 'Reconnect Vercel in Settings → Connections. Your Cloud session and existing projects are kept.';
+
+export class VercelCredentialError extends Error {
+  constructor() { super(VERCEL_RECONNECT); }
+}
+
+export function vercelCredentialRejected(status: number, code: unknown, message: unknown) {
+  return status === 401 || status === 403 && (String(message ?? '').trim().toLowerCase() === 'not authorized'
+    || /(?:invalid|expired|revoked)[ _-]*(?:access[ _-]*)?token|token[ _-]*(?:is[ _-]*)?(?:invalid|expired|revoked)/i.test(`${code ?? ''} ${message ?? ''}`));
+}
+
+export async function verifyVercelConnection(token: string, teamId?: string | null) {
+  const url = new URL('https://api.vercel.com/v9/projects?limit=1');
+  if (teamId) url.searchParams.set('teamId', teamId);
+  const response = await fetch(url, { headers: { authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(15_000) });
+  const body = await response.json().catch(() => ({})) as { error?: { code?: string; message?: string } };
+  if (vercelCredentialRejected(response.status, body.error?.code, body.error?.message)) throw new VercelCredentialError();
+  if (!response.ok) throw new Error(`Vercel could not list projects for this connection (${response.status}).`);
+}
 
 function encryptionKey(): Buffer {
   const configured = process.env.CLOUD_PROVIDER_SECRET_KEY?.trim();

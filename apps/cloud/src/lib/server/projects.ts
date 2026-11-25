@@ -4,8 +4,10 @@ import { enqueueJob, kickJobs } from './jobs';
 import { isDaisyTheme } from '../themes';
 import { canManageConnections } from './connections';
 import { discardPreview } from './preview';
+import type { AppFramework } from '../framework';
+import { decryptProviderSecret } from './providers';
 
-export interface NewProject { prompt: string; name: string; uiTheme: string; uiSystem: string; includeHome: boolean; includeLogin: boolean }
+export interface NewProject { prompt: string; name: string; appFramework: AppFramework; uiTheme: string; uiSystem: string; includeHome: boolean; includeLogin: boolean }
 
 /** Reads and validates the prompt form; the name is optional and derived from the brief. */
 export function readProjectForm(data: FormData): NewProject | { error: string } {
@@ -16,8 +18,10 @@ export function readProjectForm(data: FormData): NewProject | { error: string } 
   if (name.length < 2 || prompt.length < 10) return { error: 'Describe the app in a little more detail.' };
   const theme = String(data.get('uiTheme') ?? 'corporate');
   const system = String(data.get('uiSystem') ?? 'daisyui');
+  const appFramework = String(data.get('appFramework') ?? 'sveltekit');
+  if (appFramework !== 'sveltekit' && appFramework !== 'nextjs') return { error: 'Choose SvelteKit or Next.js.' };
   return {
-    prompt, name, uiTheme: isDaisyTheme(theme) ? theme : 'corporate', uiSystem: ['daisyui', 'mosaic'].includes(system) ? system : 'daisyui',
+    prompt, name, appFramework, uiTheme: isDaisyTheme(theme) ? theme : 'corporate', uiSystem: appFramework === 'nextjs' ? 'mosaic' : ['daisyui', 'mosaic'].includes(system) ? system : 'daisyui',
     // Unchecked checkboxes are absent; a pending prompt saved from the public page keeps its choices.
     includeHome: data.get('includeHome') === 'on', includeLogin: data.get('includeLogin') === 'on',
   };
@@ -43,8 +47,8 @@ export async function createProject(userId: string, input: NewProject, origin: s
   await db.tx(async (tx) => {
     await tx.query(
       `INSERT INTO cloud_projects (id, organization_id, name, slug, prompt, status, include_home, include_login, app_framework, ui_system, ui_theme)
-       VALUES ($1, $2, $3, $4, $5, 'queued', $6, $7, 'sveltekit', $8, $9)`,
-      [projectId, organization.id, input.name, slug, input.prompt, input.includeHome, input.includeLogin, input.uiSystem, input.uiTheme],
+       VALUES ($1, $2, $3, $4, $5, 'queued', $6, $7, $8, $9, $10)`,
+      [projectId, organization.id, input.name, slug, input.prompt, input.includeHome, input.includeLogin, input.appFramework, input.uiSystem, input.uiTheme],
     );
     await tx.query(
       `INSERT INTO cloud_environments (id, project_id, name, kind, status, url) VALUES
@@ -56,7 +60,7 @@ export async function createProject(userId: string, input: NewProject, origin: s
     await tx.query(
       `INSERT INTO cloud_audit_log (id, organization_id, user_id, action, target_type, target_id, metadata)
        VALUES ($1, $2, $3, 'project.create', 'project', $4, $5::jsonb)`,
-      [id(), organization.id, userId, projectId, JSON.stringify({ name: input.name, slug })],
+      [id(), organization.id, userId, projectId, JSON.stringify({ name: input.name, slug, appFramework: input.appFramework })],
     );
     await enqueueJob(tx, { projectId, kind: 'generate', metadata: { prompt: input.prompt, userId }, stage: 'Waiting to plan' });
   });
@@ -93,6 +97,21 @@ export async function deleteProject(projectId: string, userId: string, confirmat
   });
   if (!result) discardPreview(projectId);
   return result;
+}
+
+export async function deploymentCredentials(projectId: string, userId: string) {
+  const db = await getCloudDb();
+  const { rows: [row] } = await db.query<{ deploy_secret: Parameters<typeof decryptProviderSecret>[0] }>(
+    `SELECT project.deploy_secret FROM cloud_projects project
+     JOIN cloud_memberships membership ON membership.organization_id = project.organization_id
+     JOIN cloud_environments environment ON environment.project_id = project.id
+     WHERE project.id = $1 AND membership.user_id = $2 AND membership.role IN ('owner', 'admin')
+       AND environment.kind = 'production' AND environment.status = 'ready' AND project.deploy_secret IS NOT NULL`,
+    [projectId, userId],
+  );
+  if (!row) return undefined;
+  const { adminEmail, adminPassword } = JSON.parse(decryptProviderSecret(row.deploy_secret)) as { adminEmail: string; adminPassword: string };
+  return { email: adminEmail, password: adminPassword };
 }
 
 // A signed-out visitor's prompt waits in an HttpOnly cookie until they sign in, then becomes their project.
