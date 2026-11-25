@@ -5,6 +5,8 @@ const sidebars = {
     'quickstart',
     'cloud-studio',
     'workflows',
+    'extensions',
+    'app-integrations',
     'architecture',
     'cli',
     'entities',
