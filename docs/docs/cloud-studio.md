@@ -15,6 +15,10 @@ Start with a brief, review the generated app in a private preview, and decide wh
 
 Cloud checks generated CRUD and supported submission paths against a database and uses AI to review the design. Complex approvals, balance accounting, row-level access and tenant isolation need [custom server logic](./extensions.md#server-extensions).
 
+Cloud retrieves relevant excerpts from the framework guides when it plans, generates, or repairs an app. The builder still generates through its supported app spec. The exported source can use framework extensions and custom code.
+
+Describe which values come from the signed-in user and which they choose. For a clinic booking, the server can match the user's email to an existing patient profile and set the patient and initial status. A provider picker can use a separate directory that the submitting role has permission to read. Keep private provider records separate from the directory. An account needs a matching profile before it can submit.
+
 ## Edit the preview
 
 Use **Open Studio** in the preview toolbar to edit a page or form. Use **Edit sidebar** to select and edit navigation links. In **Appearance**, set padding and margin for all sides or individual sides. Select **Page root** to edit spacing around a page.

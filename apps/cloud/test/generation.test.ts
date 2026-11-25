@@ -6,6 +6,7 @@ import { tarGzip } from '../src/lib/server/archive';
 import { decryptProviderSecret, encryptProviderSecret } from '../src/lib/server/providers';
 import { autoRepair, compileSpec, normalizeSpec, validateSpec } from '../src/lib/server/spec';
 import { verifyApp } from '../src/lib/server/mosaic-runtime';
+import { frameworkGuideContext } from '../src/lib/server/mosaic-knowledge';
 import { equipmentSpec } from './fixtures/equipment-spec';
 
 const project = () => generateProjectFiles({ name: 'Equipment Loans', slug: 'equipment-loans', spec: equipmentSpec, app: compileSpec(equipmentSpec) });
@@ -91,6 +92,59 @@ test('release archive is a valid gzip-wrapped tar', () => {
   const tar = gunzipSync(archive);
   assert.equal(tar.subarray(0, 9).toString(), 'README.md');
   assert.equal(tar.subarray(257, 262).toString(), 'ustar');
+});
+
+test('clinic submissions resolve the patient by email and accept a visible provider choice', async () => {
+  const { spec } = autoRepair(normalizeSpec({
+    name: 'Clinic appointments',
+    entities: [
+      { name: 'patient', fields: [{ name: 'name', required: true }, { name: 'email', format: 'email', required: true, unique: true }] },
+      { name: 'provider', permissions: { read: ['viewer'], create: ['admin'], update: ['admin'], delete: ['admin'] }, fields: [{ name: 'name', required: true }] },
+      { name: 'appointment', permissions: { create: ['viewer'] }, fields: [
+        { name: 'reason', required: true },
+        { name: 'patient', type: 'ref', refEntity: 'patient', required: true },
+        { name: 'provider', type: 'ref', refEntity: 'provider', required: true },
+        { name: 'status', type: 'enum', options: ['Requested', 'Confirmed'], required: true },
+      ], submission: { profile: { entity: 'patient', emailField: 'email' }, selectable: ['provider'], managed: [
+        { field: 'patient', source: 'profile', value: 'email' },
+        { field: 'status', source: 'constant', value: 'Requested' },
+      ] } },
+    ],
+    sampleData: [
+      { entity: 'patient', records: [{ name: 'Patient A', email: 'patient@example.com' }] },
+      { entity: 'provider', records: [{ name: 'Provider A' }] },
+      { entity: 'appointment', records: [{ reason: 'Checkup', patient: 'Patient A', provider: 'Provider A', status: 'Requested' }] },
+    ],
+  }));
+  assert.deepEqual(validateSpec(spec), []);
+  assert.equal(spec.entities[2]?.submission?.managed.find((field) => field.field === 'patient')?.value, 'id');
+  const app = compileSpec(spec);
+  assert.deepEqual(app.entities.find((entity) => entity.name === 'patient')?.permissions?.read, ['admin']);
+  assert.deepEqual(app.entities.find((entity) => entity.name === 'provider')?.permissions?.read, ['viewer']);
+  assert.deepEqual(app.workflows?.[0]?.input.properties, { reason: { type: 'string' }, provider: { type: 'string', format: 'uuid' } });
+  assert.deepEqual(app.forms.find((form) => form.entity === 'appointment')?.root.children?.[0]?.children?.map((node) => node.props?.binding), ['reason', 'provider']);
+  for (const framework of ['sveltekit', 'nextjs'] as const) {
+    const files = generateProjectFiles({ name: spec.name, slug: 'clinic', spec, app, framework });
+    const openApi = JSON.parse(files.find((file) => file.path === 'mosaic/openapi.json')!.content);
+    assert.deepEqual(openApi.paths['/extensions/appointment/submit'].post.requestBody.content['application/json'].schema.properties,
+      app.workflows?.[0]?.input.properties);
+  }
+  assert.deepEqual(await verifyApp(spec, app), []);
+
+  const submission = spec.entities[2]!.submission!;
+  submission.managed = submission.managed.filter((field) => field.field !== 'patient');
+  assert.deepEqual(validateSpec(autoRepair(spec).spec), []);
+  spec.entities[1]!.permissions.read = ['admin'];
+  assert.match(validateSpec(spec).join('\n'), /appointment\.provider: a selectable link needs a separate directory/);
+  spec.entities[2]!.submission!.selectable = [];
+  assert.match(validateSpec(spec).join('\n'), /appointment\.provider: choose a server-managed profile link/);
+});
+
+test('framework context retrieves bounded excerpts from the shipped guides', () => {
+  const context = frameworkGuideContext('Configure OAuth, notifications, and maps');
+  assert.match(context, /\[app-integrations\.md\]/);
+  assert.match(context, /OAuth/);
+  assert.ok(context.length < 2000);
 });
 
 test('release archive stores long paths in the ustar prefix', () => {

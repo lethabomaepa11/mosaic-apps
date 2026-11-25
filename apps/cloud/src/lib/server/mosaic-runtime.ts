@@ -190,11 +190,23 @@ export async function verifyApp(spec: AppSpec, app: CompiledApp): Promise<string
     const failures = await seedAndSmokeTest(call, spec);
     if (failures.length) return failures;
     for (const workflow of app.workflows ?? []) {
+      const role = !workflow.roles.length || workflow.roles.includes('*') ? 'viewer'
+        : workflow.roles.find((item) => item !== 'admin') ?? 'admin';
+      const email = role === 'admin' ? 'verify@mosaic.local' : `submit-${workflow.entity}@mosaic.local`;
+      let submit = call;
+      if (role !== 'admin') {
+        const created = await call('POST', '/api/users', { email, password, roles: [role] });
+        if (created.status !== 201) {
+          failures.push(`Could not create the ${role} submitter for the ${workflow.entity} workflow: ${reason(created)}.`);
+          continue;
+        }
+        submit = inProcessCaller(server, await loginToken(inProcessCaller(server, ''), email, password));
+      }
       if (workflow.profile) {
         const { entity, emailField } = workflow.profile;
         const rows = await call('GET', `/api/entities/${entity}?pageSize=1`);
         const profile = rows.body?.data?.data?.[0];
-        const patched = profile && await call('PATCH', `/api/entities/${entity}/${profile.id}`, { [emailField]: 'verify@mosaic.local' });
+        const patched = profile && await call('PATCH', `/api/entities/${entity}/${profile.id}`, { [emailField]: email });
         if (patched?.status !== 200) {
           failures.push(`Could not match a signed-in profile for the ${workflow.entity} workflow.`);
           continue;
@@ -207,10 +219,15 @@ export async function verifyApp(spec: AppSpec, app: CompiledApp): Promise<string
           field, (schema as { format?: string }).format === 'date' && typeof record[field] === 'string' ? record[field].slice(0, 10) : record[field],
         ]));
       const endpoint = `/api/extensions/${workflow.entity.replaceAll('_', '-')}/submit`;
-      const result = await call('POST', endpoint, values);
+      const result = await submit('POST', endpoint, values);
       if (result.status !== 201) failures.push(`Submitting ${workflow.label} failed: ${reason(result)}`);
+      for (const field of workflow.selectable ?? []) {
+        if ((await submit('POST', endpoint, { ...values, [field]: '00000000-0000-4000-8000-000000000000' })).status !== 422) {
+          failures.push(`Submitting ${workflow.label} accepted an unavailable selection for ${field}.`);
+        }
+      }
       const managed = workflow.managed[0];
-      if (managed && (await call('POST', endpoint, { ...values, [managed.field]: 'forged' })).status !== 422) {
+      if (managed && (await submit('POST', endpoint, { ...values, [managed.field]: 'forged' })).status !== 422) {
         failures.push(`Submitting ${workflow.label} accepted a forged server-managed field.`);
       }
     }

@@ -1,8 +1,8 @@
-import { buildEntitySchema, buildInsertSql, formatIssues, getEntity, HttpError, ident, isAdmin, writeAudit } from '@mosaic-apps/server';
+import { buildEntitySchema, buildInsertSql, canAccessEntity, formatIssues, getEntity, HttpError, ident, isAdmin, writeAudit } from '@mosaic-apps/server';
 
 /**
  * @typedef {{ field: string, source: 'constant' | 'userId' | 'userEmail' | 'profile', value: string }} ManagedValue
- * @typedef {{ entity: string, label: string, roles: string[], profile?: { entity: string, emailField: string },
+ * @typedef {{ entity: string, label: string, roles: string[], profile?: { entity: string, emailField: string }, selectable?: string[],
  *   managed: ManagedValue[], input: { type: 'object', properties: Record<string, unknown>, required: string[], additionalProperties: false } }} CreateWorkflow
  */
 
@@ -55,7 +55,19 @@ export function createWorkflowEndpoints(workflows) {
         }
         const parsed = buildEntitySchema(entity, 'create').safeParse(values);
         if (!parsed.success) throw new HttpError(422, 'Check the values required for this request', 'BAD_INPUT', formatIssues(parsed.error));
-        const insert = buildInsertSql(entity, /** @type {Record<string, unknown>} */ (parsed.data));
+        const input = /** @type {Record<string, unknown>} */ (parsed.data);
+        for (const name of workflow.selectable ?? []) {
+          const field = entity.fields.find((item) => item.name === name && item.type === 'ref');
+          const catalog = field?.refEntity && (await getEntity(tx, field.refEntity))?.definition;
+          if (!catalog || !canAccessEntity(user, catalog, 'read')) {
+            throw new HttpError(403, 'You cannot choose records for this field', 'FORBIDDEN');
+          }
+          if (input[name] == null) continue;
+          const active = catalog.softDelete ? ' AND "deletedAt" IS NULL' : '';
+          const rows = await tx.query(`SELECT id FROM ${ident(catalog.name)} WHERE id = $1${active} FOR SHARE`, [input[name]]);
+          if (!rows.rows.length) throw new HttpError(422, 'Choose an available record', 'BAD_INPUT');
+        }
+        const insert = buildInsertSql(entity, input);
         const result = await tx.query(insert.sql, insert.params);
         return String(result.rows[0]?.id);
       });

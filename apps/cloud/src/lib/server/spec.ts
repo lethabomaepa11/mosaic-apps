@@ -14,7 +14,7 @@ export interface SpecField {
 export interface SpecEntity {
   name: string; label: string; labelPlural: string; icon: string; description: string; labelField: string;
   fields: SpecField[]; permissions: { read: string[]; create: string[]; update: string[]; delete: string[] };
-  submission?: { profile?: { entity: string; emailField: string }; managed: Array<{ field: string; source: 'constant' | 'userId' | 'userEmail' | 'profile'; value: string }> };
+  submission?: { profile?: { entity: string; emailField: string }; selectable?: string[]; managed: Array<{ field: string; source: 'constant' | 'userId' | 'userEmail' | 'profile'; value: string }> };
 }
 const SECTION_KINDS = ['spotlight', 'records', 'metric', 'form'] as const;
 interface SpecSection { kind: typeof SECTION_KINDS[number]; title: string; body: string; entity: string }
@@ -36,6 +36,7 @@ export const APP_SPEC_SCHEMA = {
         permissions: { type: 'object', additionalProperties: false, required: ['read', 'create', 'update', 'delete'], properties: { read: strList, create: strList, update: strList, delete: strList } },
         submission: { type: 'object', additionalProperties: false, required: ['managed'], properties: {
           profile: { type: 'object', additionalProperties: false, required: ['entity', 'emailField'], properties: { entity: str, emailField: str } },
+          selectable: strList,
           managed: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['field', 'source', 'value'], properties: {
             field: str, source: { type: 'string', enum: ['constant', 'userId', 'userEmail', 'profile'] }, value: str,
           } } },
@@ -92,7 +93,7 @@ export function normalizeSpec(raw: any): AppSpec {
         name: text(entity?.name), label: text(entity?.label, text(entity?.name)), labelPlural: text(entity?.labelPlural, text(entity?.label, text(entity?.name))),
         icon: text(entity?.icon), description: text(entity?.description), labelField: text(entity?.labelField, fields[0]?.name ?? ''), fields,
         permissions: { read: strings(permissions.read), create: strings(permissions.create), update: strings(permissions.update), delete: strings(permissions.delete) },
-        submission: managed.length ? { managed, profile: profile ? { entity: snake(text(profile.entity)), emailField: camel(text(profile.emailField)) } : undefined } : undefined,
+        submission: entity?.submission ? { managed, selectable: strings(entity.submission.selectable).map(camel), profile: profile ? { entity: text(profile.entity), emailField: camel(text(profile.emailField)) } : undefined } : undefined,
       };
     }),
     pages: (Array.isArray(spec.pages) ? spec.pages : []).map((page: any) => ({
@@ -166,6 +167,25 @@ export function autoRepair(input: AppSpec): { spec: AppSpec; repairs: string[] }
     field.refEntity = renamedEntities.get(field.refEntity) ?? snake(field.refEntity);
     if (!names.has(field.refEntity)) { repairs.push(`${entity.name}.${field.name}: link to unknown "${field.refEntity}" became text`); field.type = 'string'; field.refEntity = ''; }
   }
+  for (const entity of spec.entities) {
+    const submission = entity.submission;
+    if (!submission) continue;
+    const profile = submission.profile;
+    if (profile) profile.entity = renamedEntities.get(profile.entity) ?? snake(profile.entity);
+    for (const value of submission.managed) {
+      if (value.source === 'profile') value.value = camel(value.value.replace(/^profile\./, ''));
+    }
+    const ownRef = profile && entity.fields.filter((field) => field.type === 'ref' && field.refEntity === profile.entity);
+    if (!profile || ownRef?.length !== 1 || submission.selectable?.includes(ownRef[0]!.name)) continue;
+    const field = ownRef[0]!;
+    const current = submission.managed.find((item) => item.field === field.name);
+    if (current?.source === 'profile' && (current.value === 'id' || spec.entities.find((item) => item.name === profile.entity)?.fields.some(
+      (from) => from.name === current.value && from.type === 'ref' && from.refEntity === field.refEntity,
+    ))) continue;
+    if (current?.source === 'constant') continue;
+    submission.managed = [...submission.managed.filter((item) => item.field !== field.name), { field: field.name, source: 'profile', value: 'id' }];
+    repairs.push(`${entity.name}.${field.name}: linked to the signed-in profile ID`);
+  }
   spec.sampleData = spec.sampleData.filter((sample) => names.has(sample.entity));
   for (const page of spec.pages) {
     if (page.entity) page.entity = renamedEntities.get(page.entity) ?? page.entity;
@@ -192,6 +212,13 @@ const ENTITY_NAME = /^[a-z][a-z0-9_]{1,40}$/;
 const FIELD_NAME = /^[a-z][a-zA-Z0-9]{0,40}$/;
 const SYSTEM_FIELDS = new Set(['id', 'createdAt', 'updatedAt', 'deletedAt']);
 const reservedPageRoute = (route: string) => /^\/(api|f|login|signup|logout|studio)(\/|$)/.test(route);
+
+function protectedSubmissionEntities(spec: AppSpec): Set<string> {
+  return new Set(spec.entities.flatMap((entity) => entity.submission ? [
+    entity.name, entity.submission.profile?.entity ?? '',
+    ...entity.fields.filter((field) => field.type === 'ref' && !entity.submission?.selectable?.includes(field.name)).map((field) => field.refEntity),
+  ] : []));
+}
 
 /** Deterministic checks the developer agent must satisfy before anything runs. */
 export function validateSpec(spec: AppSpec): string[] {
@@ -234,6 +261,7 @@ export function validateSpec(spec: AppSpec): string[] {
       if (page.access === 'public' && section.kind !== 'spotlight') issues.push(`Page "${page.slug}": live sections require sign-in.`);
     }
   }
+  const protectedEntities = protectedSubmissionEntities(spec);
   for (const entity of spec.entities) {
     const submission = entity.submission;
     if (!submission) continue;
@@ -241,17 +269,32 @@ export function validateSpec(spec: AppSpec): string[] {
     if (submission.profile && !profile?.fields.some((field) => field.name === submission.profile!.emailField && field.type === 'string' && field.unique)) {
       issues.push(`${entity.name}: the submission profile must have a unique email field.`);
     }
+    const managedNames = new Set<string>();
     for (const value of submission.managed) {
       const target = entity.fields.find((field) => field.name === value.field);
       const from = profile?.fields.find((field) => field.name === value.value);
       const profileId = value.value === 'id' && target?.type === 'ref' && target.refEntity === profile?.name;
-      if (!target || (value.source === 'profile' && !profileId && (!from || from.type !== target.type || from.refEntity !== target.refEntity))
+      if (managedNames.has(value.field) || !target || (value.source === 'profile' && !profileId && (!from || from.type !== target.type || from.refEntity !== target.refEntity))
         || (target.type === 'ref' && value.source !== 'profile') || (value.source === 'constant' && target.type === 'enum' && !target.options.includes(value.value))) {
-        issues.push(`${entity.name}: invalid server-managed value for "${value.field}".`);
+        issues.push(`${entity.name}.${value.field}: invalid server-managed value. A link to the signed-in profile itself uses source "profile" and value "id". For another managed link use a profile field that references the same entity.`);
+      }
+      managedNames.add(value.field);
+    }
+    const selectable = new Set(submission.selectable);
+    for (const field of selectable) {
+      const ref = entity.fields.find((item) => item.name === field && item.type === 'ref');
+      const catalog = ref && spec.entities.find((item) => item.name === ref.refEntity);
+      const read = catalog?.permissions.read ?? [];
+      const submit = entity.permissions.create.filter((role) => role !== 'admin');
+      if (!catalog || protectedEntities.has(catalog.name) || managedNames.has(field)
+        || !read.length || (!read.includes('*') && (!entity.permissions.create.length || submit.some((role) => !read.includes(role))))) {
+        issues.push(`${entity.name}.${field}: a selectable link needs a separate directory with explicit read access for every submitting role. Keep patient, owner and tenant links server-managed.`);
       }
     }
-    if (entity.fields.some((field) => field.type === 'ref' && !submission.managed.some((value) => value.field === field.name))) {
-      issues.push(`${entity.name}: a managed submission must derive reference fields from its signed-in profile.`);
+    for (const field of entity.fields) {
+      if (field.type === 'ref' && !managedNames.has(field.name) && !selectable.has(field.name)) {
+        issues.push(`${entity.name}.${field.name}: choose a server-managed profile link or include this field in submission.selectable if users may browse ${field.refEntity} and choose a record.`);
+      }
     }
   }
   for (const entity of spec.entities) {
@@ -314,7 +357,7 @@ export function compileSpec(spec: AppSpec): CompiledApp {
     const properties = Object.fromEntries(fields.map((field) => [field.name, {
       type: field.type === 'int' ? 'integer' : field.type === 'decimal' ? 'number' : field.type === 'boolean' ? 'boolean' : 'string',
       ...(field.type === 'enum' ? { enum: field.options.map(enumValue) } : {}),
-      ...(field.type === 'date' ? { format: 'date' } : field.type === 'datetime' ? { format: 'date-time' } : {}),
+      ...(field.type === 'date' ? { format: 'date' } : field.type === 'datetime' ? { format: 'date-time' } : field.type === 'ref' ? { format: 'uuid' } : {}),
     }]));
     return [{ ...submission, entity: entity.name, label: entity.label, roles: entity.permissions.create,
       managed: submission.managed.map((item) => ({ ...item, value: item.source === 'constant'
@@ -322,11 +365,7 @@ export function compileSpec(spec: AppSpec): CompiledApp {
       input: { type: 'object', properties, required: fields.filter((field) => field.required).map((field) => field.name), additionalProperties: false },
     }];
   });
-  const protectedEntities = new Set(workflows.flatMap((workflow) => [
-    workflow.entity, workflow.profile?.entity,
-    ...(spec.entities.find((entity) => entity.name === workflow.entity)?.fields
-      .filter((field) => field.type === 'ref').map((field) => field.refEntity) ?? []),
-  ]));
+  const protectedEntities = protectedSubmissionEntities(spec);
   const entities: EntityDef[] = spec.entities.map((entity) => ({
     name: entity.name, label: entity.label, labelPlural: entity.labelPlural, icon: entity.icon || undefined, description: entity.description,
     softDelete: true, timestamps: true, audit: true,

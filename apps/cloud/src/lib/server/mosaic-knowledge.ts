@@ -1,3 +1,35 @@
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+declare const __MOSAIC_FRAMEWORK_GUIDES__: Record<string, string> | undefined;
+
+export function readFrameworkGuides(): Record<string, string> {
+  const root = fileURLToPath(new URL('../../../../../docs/docs/', import.meta.url));
+  return Object.fromEntries(readdirSync(root, { recursive: true, encoding: 'utf8' })
+    .filter((path) => path.endsWith('.md'))
+    .map((path) => [path.replaceAll('\\', '/'), readFileSync(join(root, path), 'utf8')]));
+}
+
+let guides: Record<string, string> | undefined;
+
+export function frameworkGuideContext(task: string): string {
+  guides ??= typeof __MOSAIC_FRAMEWORK_GUIDES__ === 'undefined' ? readFrameworkGuides() : __MOSAIC_FRAMEWORK_GUIDES__;
+  const terms = new Set(task.toLowerCase().match(/[a-z]{4,}/g) ?? []);
+  const sections = Object.entries(guides).flatMap(([path, guide]) => {
+    const body = guide.replace(/^---[\s\S]*?\n---\s*/, '');
+    const title = body.match(/^# (.+)$/m)?.[1] ?? path;
+    return body.split(/(?=^#{1,3} )/m).filter((section) => section.trim()).map((section) => {
+      const heading = section.split('\n', 1)[0]!;
+      const keywords = new Set(`${path} ${title} ${heading}`.toLowerCase().match(/[a-z]{4,}/g) ?? []);
+      return { path, section: section.trim(), score: [...keywords].filter((term) => terms.has(term) || terms.has(term + 's')).length };
+    });
+  }).filter(({ score }) => score > 0).sort((a, b) => b.score - a.score);
+  if (!sections.length) return '';
+  return '\n\nFRAMEWORK REFERENCE (shipped guides; the Cloud app schema still defines what can be generated):\n'
+    + sections.slice(0, 3).map(({ path, section }) => `[${path}]\n${section.slice(0, 560)}`).join('\n\n');
+}
+
 /**
  * What every agent must know to build with Mosaic, condensed from docs/docs/{entities,
  * auto-crud,architecture,form-json}.md and the template's mosaic-app skill. Kept short:
@@ -25,7 +57,7 @@ PAGES:
 - "home" is the landing page at "/". "dashboard" with sections shows only the chosen blocks, so choose metrics and records useful for the role. Public pages can show spotlight sections. Workflows and business data require sign-in. The app already has /login.
 - "list" + entity provides an admin-style management table. Include or let Mosaic generate a list for each entity. Set inMenu false for secondary management screens when the workflow already gives users the relevant task.
 - Sidebar comes from page settings. Set menuLabel, menuGroup and menuOrder to give users short task names in a useful order. For each role-specific screen, specify roles explicitly. Use inMenu false for pages reachable only from their parent workflow. A sidebar edit changes these page settings.
-- For a request submitted by a signed-in user, set entity.submission.managed with {field, source, value}. Sources: userId/userEmail (value ""), constant (e.g. "Pending Approval"), profile (value is a profile field name or "id"). Set submission.profile {entity,emailField} for a profile lookup using the current user's email; make that field unique. Use profile.id for employee and profile.organization for the organization reference. Every reference in managed submissions must come from the profile. Only user-entered fields appear in the form. Include a dedicated workflow page with a form section. Generated endpoints create records and initialize their status. Raw profile and request tables are administrator-only.
+- For a signed-in request use submission.profile {entity,emailField} with a unique string email field. Example: {"profile":{"entity":"patient","emailField":"email"},"managed":[{"field":"patient","source":"profile","value":"id"},{"field":"status","source":"constant","value":"Requested"}],"selectable":["provider"]}. The patient field links to patient; provider links to a separate directory of bookable providers with explicit read access for every submitting role. Use source "profile" with value "organization" when the profile has that foreign key. Use userId/userEmail only for scalar identity fields, never as business record IDs. Keep ownership, tenant, and private links managed. Only use selectable for a directory whose whole records these users may read. If options require record-level or tenant filtering, report the limitation. Only user-entered fields appear in the form. Use a workflow page with a form section. Raw profile and request tables are administrator-only.
 - route: "/" or "/kebab-path"; no params. /api, /f, /login, /logout and /studio are platform routes. icon: a simple lucide name such as calendar, clipboard, or book-open.
 
 SAMPLE DATA: 2-4 realistic records per entity, each record a plain object of fieldName to string value (e.g. {"fullName":"Thandi Nkosi","email":"thandi@example.com"}). For ref fields use the target record's labelField value. Enum values must be one of the options. Dates as YYYY-MM-DD. Always seed a matching sample profile with its unique email and context fields for preview submissions.

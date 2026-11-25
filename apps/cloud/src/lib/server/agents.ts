@@ -1,5 +1,5 @@
 import { aiJson, type AiConfig } from './ai';
-import { MOSAIC_KNOWLEDGE } from './mosaic-knowledge';
+import { frameworkGuideContext, MOSAIC_KNOWLEDGE } from './mosaic-knowledge';
 import { APP_SPEC_SCHEMA, describeSpec, normalizeSpec, type AppSpec } from './spec';
 
 export interface Question { question: string; options: string[] }
@@ -31,8 +31,8 @@ export async function refineBrief(input: PlanningInput): Promise<{ spec: string;
     name: 'mosaic_refine_brief', maxTokens: 3200, config: input.config, onWait: input.onWait,
     system: `You evaluate app briefs and turn them into implementation-ready product specs. ${MOSAIC_KNOWLEDGE}
 Preserve explicit requirements, workflows, roles, permissions, edge cases and acceptance criteria. Document actors, access, data, screens, how each workflow starts and ends, business rules and how to verify it. For a well-defined brief, refine directly without asking redundant questions. Ask up to 3 specific questions with suggested answers when missing or contradictory requirements materially change the application. Use prior answers and avoid repeating resolved questions. If the user delegates, choose reasonable defaults for ambiguity.
-Cloud supports managed submission endpoints that derive ownership, organization and initial status on the server. It cannot implement arbitrary approval transitions, balance accounting, per-record browsing, tenant-wide access policies, custom invitations, email verification or password recovery. When an explicit requirement cannot be delivered, explain it in a question and request explicit approval of a safe, specific scope reduction before proceeding. General delegation does not approve removing requirements or weakening security. Where scope is explicitly reduced, record excluded requirements so the planner cannot treat them as delivered. Return an empty spec while questions remain.`,
-    user: `${briefBlock(input.brief, input.answers)}\n\nOPTIONS: ${input.options}`,
+Cloud supports managed submission endpoints that derive ownership, organization and initial status on the server. Users can choose entries from readable directories. The built-in workflow needs an existing matching profile when it derives profile fields. It cannot implement arbitrary approval transitions, balance accounting, per-record browsing, tenant-wide access policies, custom invitations, email verification or password recovery. Treat framework-only examples in the reference as developer extensions. When an explicit requirement cannot be delivered, explain it in a question and request explicit approval of a safe, specific scope reduction before proceeding. General delegation does not approve removing requirements or weakening security. Where scope is explicitly reduced, record excluded requirements so the planner cannot treat them as delivered. Return an empty spec while questions remain.`,
+    user: `${briefBlock(input.brief, input.answers)}\n\nOPTIONS: ${input.options}${frameworkGuideContext(input.brief)}`,
     schema: { type: 'object', additionalProperties: false, required: ['spec', 'questions'], properties: { spec: { type: 'string' }, questions: questionsSchema } },
   });
   if (typeof result.spec !== 'string' || !Array.isArray(result.questions) || (!result.spec.trim() && !result.questions.length)
@@ -47,7 +47,7 @@ export async function planFeatures(input: PlanningInput & { refinedSpec: string 
   const result = await aiJson<{ features: BuildFeature[] }>({
     name: 'mosaic_feature_plan', maxTokens: 3200, config: input.config, onWait: input.onWait,
     system: 'You are the feature planner. Break the approved spec into dependency-ordered vertical slices. The first slice must deliver a usable workflow in preview, including required access controls. Each later slice should add one coherent feature or workflow with observable acceptance checks. Cover the agreed scope, carry forward required details from the original brief and answers, and respect exclusions in the refined spec. Use one slice only for an app with a single coherent feature. Name each slice and return focused scope and concrete acceptance checks.',
-    user: `${briefBlock(input.brief, input.answers)}\n\nOPTIONS: ${input.options}\n\nREFINED SPEC:\n${input.refinedSpec}`,
+    user: `${briefBlock(input.brief, input.answers)}\n\nOPTIONS: ${input.options}\n\nREFINED SPEC:\n${input.refinedSpec}${frameworkGuideContext(input.refinedSpec)}`,
     schema: { type: 'object', additionalProperties: false, required: ['features'], properties: {
       features: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['name', 'scope', 'acceptance'], properties: { name: { type: 'string' }, scope: { type: 'string' }, acceptance: strings } } },
     } },
@@ -77,7 +77,7 @@ export async function developSpec(input: { brief: string; answers: Answer[]; opt
   return specCall({
     name: 'mosaic_app_spec', config: input.config, onWait: input.onWait,
     system: `You are a senior Mosaic developer. ${MOSAIC_KNOWLEDGE}\n${NOTE}`,
-    user: `${briefBlock(input.brief, input.answers)}\n\nOPTIONS: ${input.options}\n\n${task}\n${input.feature ? 'Implement only the current feature described in the brief. Preserve existing routes, access, and working workflows.' : ''}\nGive the primary user a task-focused starting screen with domain-specific sections and action labels. Choose a compact menu based on the brief.`,
+    user: `${briefBlock(input.brief, input.answers)}\n\nOPTIONS: ${input.options}\n\n${task}\n${input.feature ? 'Implement only the current feature described in the brief. Preserve existing routes, access, and working workflows.' : ''}\nGive the primary user a task-focused starting screen with domain-specific sections and action labels. Choose a compact menu based on the brief.${frameworkGuideContext(input.change ?? input.brief)}`,
     schema: specAnswer,
   });
 }
@@ -87,7 +87,7 @@ export async function fixSpec(input: { brief: string; answers: Answer[]; spec: A
   return specCall({
     name: 'mosaic_app_spec_fix', config: input.config, onWait: input.onWait,
     system: `You are a senior Mosaic developer fixing an app spec. ${MOSAIC_KNOWLEDGE}\nFix every listed problem and change nothing else that works. ${NOTE}`,
-    user: `${briefBlock(input.brief, input.answers)}\n\nCURRENT APP SPEC (JSON):\n${JSON.stringify(input.spec)}\n\nPROBLEMS TO FIX:\n${input.problems.map((problem, index) => `${index + 1}. ${problem}`).join('\n')}`,
+    user: `${briefBlock(input.brief, input.answers)}\n\nCURRENT APP SPEC (JSON):\n${JSON.stringify(input.spec)}\n\nPROBLEMS TO FIX:\n${input.problems.map((problem, index) => `${index + 1}. ${problem}`).join('\n')}${frameworkGuideContext(input.problems.join(' '))}`,
     schema: specAnswer,
   });
 }
