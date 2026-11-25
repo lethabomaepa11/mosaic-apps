@@ -1,0 +1,4 @@
+.next/
+.env*
+.mosaic-data/
+node_modules/
