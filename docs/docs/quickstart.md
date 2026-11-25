@@ -20,7 +20,7 @@ npx @mosaic-apps/cli@latest create my-crm
 cd my-crm
 ```
 
-The CLI creates one SvelteKit app with a same-origin API plus local Studio. It also creates `.env`
+The CLI creates one SvelteKit app with a same-origin API and Studio built in at `/studio`. It also creates `.env`
 with your database URL and a generated JWT secret. Keep that file private.
 It installs dependencies automatically. Use `--no-install` if you prefer to run
 `npm install` yourself. Local data persists in the project's `data/` directory.
@@ -35,24 +35,23 @@ npm run dev
 | --- | --- |
 | Application | `http://localhost:3000` |
 | API | `http://localhost:3000/api/health` |
-| Studio | `http://localhost:3002` |
+| Studio | `http://localhost:3000/studio` |
 
-The development command starts the app and Studio. You can also run
-`npx mosaic studio` to open Studio separately. With demo seeding enabled, sign in
+The development command starts one server for the app, API, and Studio. Studio
+requires an administrator or editor account. With demo seeding enabled, sign in
 using `admin@mosaic.local` and `admin1234`. Replace the demo account before deploying.
 
 ### Resolve startup conflicts
 
-The launcher checks that both ports are free before starting. If another
-application is using one, stop that application or choose different ports in `.env`:
+The launcher checks that the app port is free before starting. If another
+application is using it, stop that application or choose a different port in `.env`:
 
 ```dotenv
 MOSAIC_WEB_PORT=3100
-MOSAIC_STUDIO_PORT=3102
 ```
 
-Restart `npm run dev` after editing `.env`. Studio follows the configured app port;
-the customer UI uses same-origin `/api` and does not need CORS configuration.
+Restart `npm run dev` after editing `.env`. Studio moves with the app port;
+the app and Studio use same-origin `/api` and does not need CORS configuration.
 
 Embedded PostgreSQL does not use port 5432. If you explicitly chose external
 PostgreSQL and see `database does not exist` or `ECONNREFUSED`, create/start the

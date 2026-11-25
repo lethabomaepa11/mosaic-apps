@@ -9,7 +9,8 @@ Mosaic's generated runtime has two durable parts:
 1. one SvelteKit application serving UI and the Hono `/api` routes;
 2. one PostgreSQL database for artifacts, users, metadata, and business tables.
 
-Studio is an authoring client, not a required customer-app deployment. Visual
+Studio is built into the same application at `/studio` (sign-in required), so there is
+no separate Studio deployment. Visual
 publishes update PostgreSQL without rebuilding; Svelte, dependency, adapter, and
 schema-source changes go through Git and a normal application deployment.
 

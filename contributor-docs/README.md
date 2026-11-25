@@ -46,3 +46,4 @@ CLI or the documented environment variables when running multiple projects.
 Keep Studio source changes synchronized with the Studio template. Update the
 public usage guide and capture real interface screenshots when behavior changes.
 Use small commits with a single clear purpose and include validation evidence.
+- [Road to v1](./v1-roadmap.md): remaining work, priorities and exit criteria.

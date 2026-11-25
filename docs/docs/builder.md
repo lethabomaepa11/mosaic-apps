@@ -10,8 +10,8 @@ Start your generated application from its project root:
 npm run dev
 ```
 
-Open Studio at `http://localhost:3002` and sign in. The web app uses port 3000
-and the API uses 3001. Open **Forms** or **Pages** to create or edit a definition.
+Open Studio at `http://localhost:3000/studio` and sign in as an administrator or
+editor. Studio is part of the app, which also serves the API at `/api`. Open **Forms** or **Pages** to create or edit a definition.
 
 ![Customer form in Studio](/img/screenshots/form-studio.png)
 

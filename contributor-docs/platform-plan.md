@@ -287,6 +287,14 @@ against live GitHub/Neon/Vercel accounts, so the provider acceptance gates stay
 open. Known limits: Vercel personal scope only (no team selection), migrations
 replay the idempotent initial SQL, generated app does not yet read DATABASE_URL.
 
+Status on 2026-11-25 (end of session): the prompt-to-app pipeline is implemented with
+multi-agent generation (planner with one round of questions, developer, verifier that
+boots a real Mosaic server and runs CRUD, reviewer), a live Cloud-hosted preview
+rendering real Mosaic pages, template-based releases (one app, Studio at /studio),
+OAuth connections, GitHub sign-in, a public prompt page, and bring-your-own AI keys.
+GitHub/Neon/Vercel delivery is still verified only with faked providers; the live
+provider gates above stay open. Remaining work to v1: [v1-roadmap.md](./v1-roadmap.md).
+
 ### 0. Specification and visibility
 
 - [x] Record the product specification and visible task ledger.

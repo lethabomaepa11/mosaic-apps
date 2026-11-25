@@ -47,5 +47,8 @@ execution, SSO, tenant isolation, and state persistence still require work.
 Form data-source settings can be stored, but automatic loading for every source
 type is not yet complete. Page access settings need complete runtime enforcement.
 
+The full v1 plan, with priorities and exit criteria, is maintained in
+[contributor-docs/v1-roadmap.md](https://github.com/lethabomaepa11/mosaic-apps/blob/main/contributor-docs/v1-roadmap.md).
+
 Start with [Quickstart](./quickstart.md) and use the
 [Deployment guide](./deployment.md) for the hosting setup currently supported.

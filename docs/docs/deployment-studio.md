@@ -4,9 +4,9 @@ sidebar_position: 13
 
 # Studio and hosted building
 
-Generated repositories use Studio locally. `npm run dev` starts the unified app on
-the web port and Studio on its authoring port; Studio proxies `/api` to the app.
-Customer traffic only needs the unified app deployment.
+Generated repositories include Studio in the app itself at `/studio`. `npm run dev`
+starts one server for the app, `/api`, and Studio, and the same deployment serves
+all three. Studio requires an administrator or editor account.
 
 ## Local authoring
 
@@ -19,9 +19,9 @@ The default topology is:
 | Service | URL |
 | --- | --- |
 | Application and API | `http://localhost:3000` |
-| Local Studio | `http://localhost:3002` |
+| Studio | `http://localhost:3000/studio` |
 
-Change these with `MOSAIC_WEB_PORT` and `MOSAIC_STUDIO_PORT`. Page, form, and
+Change the port with `MOSAIC_WEB_PORT`. Page, form, and
 entity definitions are database-first. Source routes, custom components,
 dependencies, and entity classes remain repository-owned.
 

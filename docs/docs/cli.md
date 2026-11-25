@@ -20,8 +20,7 @@ npx @mosaic-apps/cli@latest create "Acme CRM"
 | `--demo` / `--no-demo` | Include or omit seeded example records, forms, and pages |
 | `--pwa` / `--no-pwa` | Include or omit PWA support |
 | `--port 3001` | Legacy separate-API port retained for older projects |
-| `--web-port 3000` | Unified app and API port |
-| `--studio-port 3002` | Studio port |
+| `--web-port 3000` | Port for the app, its API, and Studio (`/studio`) |
 | `--db-port 5433` | Docker database host port; used only when you choose external PostgreSQL |
 | `--link PATH` | Explicitly use packages from a Mosaic source checkout for contributor development |
 | `--no-install` | Create files and install dependencies yourself |
@@ -53,8 +52,8 @@ review; see [Migrations](./migrations.md).
 
 ## Start and inspect
 
-- `npx mosaic dev`: start the project's API, web app, and Studio.
-- `npx mosaic studio --port 3002`: start Studio against the project's API.
+- `npx mosaic dev`: start the project's app, API, and Studio (`/studio`) on one server.
+- `npx mosaic studio`: same as `dev`, printing the Studio URL.
 - `npx mosaic info`: inspect configuration and check API health.
 - `npx mosaic seed --demo`: seed demonstration data for local exploration.
 

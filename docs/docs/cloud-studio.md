@@ -10,46 +10,47 @@ visually, and optionally connect GitHub and Vercel. It uses the same Mosaic runt
 and database-first artifacts as local development; it is not a separate generated
 application architecture.
 
-## Intended workflow
+## How it works
 
-1. Sign in and describe a business or passion app. Groq converts the brief into a
-   structured blueprint with routes, business tables, roles, and workflows.
-2. Choose the app framework, UI system, clean starting theme, and whether the
-   initial app includes `/` and `/login`. Theme tokens remain editable after
-   generation.
-3. Continue through chat, Build, Data, Logic, Preview, and Deploy views.
-4. Mosaic runs source and dependency changes in an isolated workspace and exposes a
-   live preview. Artifact-only page and form edits can publish without rebuilding.
-5. Optionally connect GitHub to create and push a developer-owned repository.
-6. Optionally connect Vercel for preview and production deployments.
-7. Use Neon by default, or connect Supabase or another PostgreSQL service.
+1. Type a prompt on the home page; you can do this before signing in. Your prompt is
+   kept while you sign up, sign in, or continue with GitHub, then the build starts.
+2. The planner may ask one short round of questions when the answer changes the data
+   model. Answer, or choose **Decide for me**.
+3. A developer agent designs the app (entities, relationships, pages, roles, sample
+   data). A verifier runs real create, list and edit checks on a fresh Mosaic server, and
+   a reviewer checks that every workflow in your brief is possible. Each agent's thinking
+   appears in the chat while it works.
+4. The verified app runs live in the preview pane with its own preview database. Pages
+   are real Mosaic pages: tables with create, edit, delete and detail views, dashboards,
+   and navigation.
+5. Send changes in the chat. Theme and other settings changes apply to the preview at
+   once and are then rebuilt, committed, and redeployed in the background.
+6. Optionally connect your own GitHub (private repository, one commit per release),
+   Neon (PostgreSQL), and Vercel (deployments) accounts in **Settings → Connections**.
+   With Vercel, the preview switches to your live deployment once it is ready, and
+   later page and data-model changes are published through the deployed app's API.
 
-GitHub and Vercel are optional. A user can download verified source without either
-connection. A public data-backed app still needs a durable PostgreSQL database.
+Every release is a normal Mosaic project, the same as `mosaic create`: one SvelteKit app
+with the API at `/api` and Studio at `/studio`. Download it from **Source & delivery** or
+clone it from GitHub, run `npm install` and `npm run dev`, and the generated pages and
+forms are imported on first start. A public data-backed deployment needs PostgreSQL,
+so Vercel deploys run once Neon is connected.
 
-## Current implementation
+## AI models and limits
 
-The first hosted slice now implements authentication, organizations and
-memberships, projects, default page choices, conversation history, preview and
-production environment records, durable job records, provider-connection records,
-and an audit log. The Cloud shell uses a deliberately limited DaisyUI theme set so
-users can choose Corporate, Business, Light, Dark, Nord, Winter, Silk, or Lo-fi
-without introducing novelty themes into the default business-app workflow.
-Framework, UI system, and theme are separate project
-properties. SvelteKit is the supported runtime adapter today; additional adapters
-stay unavailable in the UI until generation, preview, and deployment support is
-complete. Creating a project asks Groq for a strict, typed application blueprint,
-stores it in PostgreSQL, and then queues a generation job with that blueprint.
+By default the agents run on Groq `gpt-oss-120b` using the operator's free tier: about
+8,000 tokens per minute and 1,000 requests per day, shared by everyone. A build usually
+takes 3 to 6 minutes and can wait on the rate limit; the chat says when it does. In
+**Settings → AI** you can use your own ChatGPT (OpenAI API), Claude (Anthropic API) or
+DeepSeek key; builds then use your provider's limits and billing. ChatGPT Plus and
+Claude Pro subscriptions do not include API access, so create an API key with the
+provider.
 
-Project design settings are editable later and remain in PostgreSQL. The global
-theme maps to the generated app's single `mosaic_settings.theme.config` record,
-which the runtime applies at the document root. The Cloud shell itself stays on
-the consistent Corporate theme and never changes with project output.
+## Current limits
 
-The worker that consumes that job, isolated previews, encrypted provider secret
-operations, GitHub/Vercel authorization, automatic database provisioning, usage,
-and billing remain visible tasks in the
-[platform plan](https://github.com/mosaic-apps/mosaic-apps/blob/main/contributor-docs/platform-plan.md).
+Generated apps cover data-driven business screens: entities, relationships, CRUD,
+dashboards, roles and sample data. Custom Svelte code, external integrations, workflow
+automation, and usage billing are not generated yet; see the [road to v1](./roadmap.md).
 
 ## Developer takeover
 
