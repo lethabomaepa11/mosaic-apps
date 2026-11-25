@@ -29,13 +29,15 @@ import { canAccessEntity, isAdmin, requirePermission } from '../modules/rbac.js'
 import { writeAudit } from '../modules/audit.js';
 import type { AuthEnv, AuthUser } from '../modules/auth.js';
 import { ident } from '../db/driver.js';
+import { readCrudDefinitions } from '../entities/registry.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export interface CrudDeps {
   db: Db;
   authEnabled: boolean;
-  resolveEntity: (name: string) => EntityDef | undefined;
+  /** Optional definition source for consumers mounting the CRUD router directly. */
+  resolveEntity?: (name: string) => EntityDef | undefined;
 }
 
 function checkAccess(c: { get: (k: 'user') => AuthUser | null }, entity: EntityDef, action: 'read' | 'create' | 'update' | 'delete'): AuthUser | null {
@@ -61,10 +63,12 @@ function mustBeUuid(id: string): void {
 export function crudRoutes(deps: CrudDeps): Hono<AuthEnv> {
   const app = new Hono<AuthEnv>();
 
-  const entityOr404 = (name: string): EntityDef => {
-    const def = deps.resolveEntity(name);
-    if (!def) throw new HttpError(404, `Unknown entity "${name}"`, 'UNKNOWN_ENTITY');
-    return def;
+  const entitiesFor = async (name: string, include: string[] = []) => {
+    const definitions = deps.resolveEntity ? undefined : await readCrudDefinitions(deps.db, name, include);
+    const resolveEntity = deps.resolveEntity ?? ((entityName: string) => definitions?.get(entityName));
+    const entity = resolveEntity(name);
+    if (!entity) throw new HttpError(404, `Unknown entity "${name}"`, 'UNKNOWN_ENTITY');
+    return { entity, resolveEntity };
   };
 
   // ---------- registry ----------
@@ -94,8 +98,8 @@ export function crudRoutes(deps: CrudDeps): Hono<AuthEnv> {
   });
 
   // ---------- metadata ----------
-  app.get('/:name/meta', (c) => {
-    const entity = entityOr404(c.req.param('name'));
+  app.get('/:name/meta', async (c) => {
+    const { entity } = await entitiesFor(c.req.param('name'));
     checkAccess(c, entity, 'read');
     return ok(c, {
       entity,
@@ -123,7 +127,7 @@ export function crudRoutes(deps: CrudDeps): Hono<AuthEnv> {
 
   // ---------- picker options ----------
   app.get('/:name/options', async (c) => {
-    const entity = entityOr404(c.req.param('name'));
+    const { entity } = await entitiesFor(c.req.param('name'));
     checkAccess(c, entity, 'read');
     const { sql, params } = buildOptionsSql(entity, {
       q: c.req.query('q'),
@@ -136,13 +140,14 @@ export function crudRoutes(deps: CrudDeps): Hono<AuthEnv> {
 
   // ---------- list ----------
   app.get('/:name', async (c) => {
-    const entity = entityOr404(c.req.param('name'));
+    const include = (c.req.query('include') ?? '').split(',').map((field) => field.trim()).filter(Boolean);
+    const { entity, resolveEntity } = await entitiesFor(c.req.param('name'), include);
     checkAccess(c, entity, 'read');
     const includeDeleted = withDeleted(c);
     const spec = parseQuery(c.req.query() as RawQuery, { defaultSort: entity.list?.defaultSort });
     const { sql, countSql, params } = buildListSql(entity, spec, {
       includeDeleted,
-      resolveEntity: deps.resolveEntity,
+      resolveEntity,
     });
     const [countRes, rows] = await Promise.all([
       deps.db.query<{ total: number }>(countSql, countParams(params)),
@@ -161,12 +166,12 @@ export function crudRoutes(deps: CrudDeps): Hono<AuthEnv> {
 
   // ---------- read one ----------
   app.get('/:name/:id', async (c) => {
-    const entity = entityOr404(c.req.param('name'));
+    const include = (c.req.query('include') ?? '').split(',').filter(Boolean);
+    const { entity, resolveEntity } = await entitiesFor(c.req.param('name'), include);
     checkAccess(c, entity, 'read');
     const id = c.req.param('id');
     mustBeUuid(id);
     const includeDeleted = withDeleted(c);
-    const include = (c.req.query('include') ?? '').split(',').filter(Boolean);
     const spec: QuerySpec = {
       page: 1,
       pageSize: 1,
@@ -174,7 +179,7 @@ export function crudRoutes(deps: CrudDeps): Hono<AuthEnv> {
       filters: [{ field: 'id', op: 'eq', value: id }],
       include,
     };
-    const { sql, params } = buildListSql(entity, spec, { includeDeleted, resolveEntity: deps.resolveEntity });
+    const { sql, params } = buildListSql(entity, spec, { includeDeleted, resolveEntity });
     const res = await deps.db.query(sql, params);
     const row = res.rows[0];
     if (!row) throw new HttpError(404, 'Record not found', 'NOT_FOUND');
@@ -183,7 +188,7 @@ export function crudRoutes(deps: CrudDeps): Hono<AuthEnv> {
 
   // ---------- create ----------
   app.post('/:name', async (c) => {
-    const entity = entityOr404(c.req.param('name'));
+    const { entity } = await entitiesFor(c.req.param('name'));
     const user = checkAccess(c, entity, 'create');
     const payload = await readJson<Record<string, unknown>>(c);
     const parsed = buildEntitySchema(entity, 'create').safeParse(payload);
@@ -205,7 +210,7 @@ export function crudRoutes(deps: CrudDeps): Hono<AuthEnv> {
 
   // ---------- update ----------
   const handleUpdate = async (c: Context<AuthEnv>): Promise<Response> => {
-    const entity = entityOr404(String(c.req.param('name') ?? ''));
+    const { entity } = await entitiesFor(c.req.param('name') ?? '');
     const user = checkAccess(c, entity, 'update');
     const id = String(c.req.param('id') ?? '');
     mustBeUuid(id);
@@ -245,7 +250,7 @@ export function crudRoutes(deps: CrudDeps): Hono<AuthEnv> {
 
   // ---------- delete ----------
   app.delete('/:name/:id', async (c) => {
-    const entity = entityOr404(c.req.param('name'));
+    const { entity } = await entitiesFor(c.req.param('name'));
     const user = checkAccess(c, entity, 'delete');
     const id = c.req.param('id');
     mustBeUuid(id);

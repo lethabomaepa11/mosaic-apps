@@ -3,7 +3,6 @@
 import { randomBytes } from 'node:crypto';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import type { EntityDef } from '@mosaic-apps/core';
 import { createPgDriver, type Db } from './db/driver.js';
 import { createPgliteDriver, isPgliteUrl } from './db/pglite.js';
 import { ensurePlatformTables } from './platform.js';
@@ -98,15 +97,6 @@ export async function createMosaicServer(config: MosaicServerConfig): Promise<Mo
   }
   if (config.entitiesDir) await syncEntitiesDir(db, config.entitiesDir);
 
-  // ---- entity registry cache ----
-  let registry = new Map<string, EntityDef>();
-  const reloadRegistry = async (): Promise<void> => {
-    const rows = await listEntities(db);
-    registry = new Map(rows.map((r) => [r.name, r.definition]));
-  };
-  await reloadRegistry();
-  const resolveEntity = (name: string): EntityDef | undefined => registry.get(name);
-
   const app = new Hono<AuthEnv>();
 
   if (config.cors !== false) {
@@ -150,8 +140,8 @@ export async function createMosaicServer(config: MosaicServerConfig): Promise<Mo
 
   // ---- modules ----
   app.route('/api/auth', authRoutes({ db, secret: jwtSecret, enabled: authEnabled, tokenTtl, allowRegistration }));
-  app.route('/api/entities', entityAdminRoutes(db, reloadRegistry));
-  app.route('/api/entities', crudRoutes({ db, authEnabled, resolveEntity }));
+  app.route('/api/entities', entityAdminRoutes(db));
+  app.route('/api/entities', crudRoutes({ db, authEnabled }));
   app.route('/api/forms', artifactRoutes({ db, kind: 'form', managePerm: 'forms:manage' }));
   app.route('/api/pages', artifactRoutes({ db, kind: 'page', managePerm: 'pages:manage' }));
   app.route('/api/settings', settingsRoutes(db));
@@ -180,7 +170,7 @@ export async function createMosaicServer(config: MosaicServerConfig): Promise<Mo
   });
 
   if (config.log) {
-    console.log(`[mosaic] API ready (auth: ${authEnabled ? 'on' : 'off'}, entities: ${registry.size})`);
+    console.log(`[mosaic] API ready (auth: ${authEnabled ? 'on' : 'off'}, entities: ${(await listEntities(db)).length})`);
     if (!process.env.MOSAIC_JWT_SECRET && authEnabled) {
       console.log('[mosaic] using ephemeral JWT secret - set MOSAIC_JWT_SECRET for stable sessions');
     }

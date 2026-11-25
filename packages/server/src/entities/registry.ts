@@ -55,6 +55,22 @@ export async function getEntity(db: Db, name: string): Promise<RegistryRow | und
   };
 }
 
+/** Read the requested entity and its included references in one database snapshot. */
+export async function readCrudDefinitions(db: Db, name: string, include: string[]): Promise<Map<string, EntityDef>> {
+  const rows = include.length
+    ? await db.query<{ name: string; definition: EntityDef }>(
+      `WITH requested AS (SELECT name, definition FROM mosaic_entities WHERE name = $1)
+       SELECT name, definition FROM requested
+       UNION ALL
+       SELECT name, definition FROM mosaic_entities WHERE name <> $1 AND name IN (
+         SELECT field->>'refEntity' FROM requested, jsonb_array_elements(requested.definition->'fields') AS field
+         WHERE field->>'type' = 'ref' AND field->>'name' = ANY($2::text[])
+       )`, [name, include],
+    )
+    : await db.query<{ name: string; definition: EntityDef }>('SELECT name, definition FROM mosaic_entities WHERE name = $1', [name]);
+  return new Map(rows.rows.map((row) => [row.name, row.definition]));
+}
+
 export function assertValidEntity(def: EntityDef): void {
   if (RESERVED_ENTITY_NAMES.has(def.name)) {
     throw new EntityRegistryError(`Entity name "${def.name}" is reserved by the platform`);

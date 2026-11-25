@@ -51,9 +51,12 @@ jobs:
         run: npm run build
 
       - name: Run tests
-        run: npm run test
+        run: |
+          docker exec ${{ job.services.postgres.id }} createdb -U mosaic mosaic_registry_test
+          npm run test
         env:
           TEST_POSTGRES_URL: postgres://mosaic:mosaic@127.0.0.1:5432/mosaic_test
+          TEST_ENTITY_REGISTRY_DATABASE_URL: postgres://mosaic:mosaic@127.0.0.1:5432/mosaic_registry_test
 
       - name: Check package lifecycles
         run: npm run release:check

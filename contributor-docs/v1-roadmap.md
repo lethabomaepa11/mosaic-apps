@@ -99,10 +99,12 @@ provider responses. This is the first thing to close.
   session through both the framework API and the SvelteKit loader. Anonymous routing
   receives only route paths for protected pages so it can redirect to sign-in.
   Role-based page access still needs a policy and enforcement.
-- **P0 Multi-instance correctness.** The entity registry is cached per process; on
-  serverless, other instances serve stale definitions after an entity change. Add a
-  version check or cache invalidation. Also: revoke tokens on password change (JWT
-  `iat` vs password change time) and move `scryptSync` off the event loop.
+- **Multi-instance registry consistency.** CRUD reads the current definition and
+  requested reference definitions from the database. CI checks creation, schema
+  and permission changes, and entity removal through two independent PostgreSQL
+  server instances. Track evidence in [#27](https://github.com/lethabomaepa11/mosaic-apps/issues/27).
+- **P0 Session revocation and password hashing.** Revoke tokens on password change
+  and move password hashing off the event loop.
 - **P0 Uploads to object storage** (Vercel's filesystem is ephemeral); signed URLs.
 - **P1** Data-source loading for every form/page source type, nested form validation in
   parent submits, draft conflict resolution, opt-in state persistence (from the docs
