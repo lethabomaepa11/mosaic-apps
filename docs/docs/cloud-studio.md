@@ -17,7 +17,7 @@ Cloud checks generated CRUD and supported submission paths against a database an
 
 Cloud retrieves relevant excerpts from the framework guides when it plans, generates, or repairs an app. The builder still generates through its supported app spec. The exported source can use framework extensions and custom code.
 
-Describe which values come from the signed-in user and which they choose. For a clinic booking, the server can match the user's email to an existing patient profile and set the patient and initial status. A provider picker can use a separate directory that the submitting role has permission to read. Keep private provider records separate from the directory. An account needs a matching profile before it can submit.
+Describe which values come from the signed-in user and which they choose. An invitation-only clinic can use existing patient profiles. A self-service clinic can create an account-bound profile on the first appointment request. The server assigns the patient and initial status. A provider picker can use a separate directory that the submitting role has permission to read. Keep private provider records separate from the directory.
 
 ## Edit the preview
 

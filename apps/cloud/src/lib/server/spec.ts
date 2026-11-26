@@ -12,10 +12,15 @@ export interface SpecField {
   options: string[]; refEntity: string; format: '' | 'email' | 'url' | 'phone' | 'money';
 }
 const MANAGED_SOURCES = ['constant', 'userId', 'userEmail', 'profile', 'now', 'empty'] as const;
+interface SubmissionProfile {
+  entity: string;
+  emailField: string;
+  provision?: { accountField: string; nameField?: string };
+}
 export interface SpecEntity {
   name: string; label: string; labelPlural: string; icon: string; description: string; labelField: string;
   fields: SpecField[]; permissions: { read: string[]; create: string[]; update: string[]; delete: string[] };
-  submission?: { profile?: { entity: string; emailField: string }; selectable?: string[]; managed: Array<{ field: string; source: typeof MANAGED_SOURCES[number]; value: string }> };
+  submission?: { profile?: SubmissionProfile; selectable?: string[]; managed: Array<{ field: string; source: typeof MANAGED_SOURCES[number]; value: string }> };
 }
 const SECTION_KINDS = ['spotlight', 'records', 'metric', 'form'] as const;
 interface SpecSection { kind: typeof SECTION_KINDS[number]; title: string; body: string; entity: string }
@@ -36,7 +41,10 @@ export const APP_SPEC_SCHEMA = {
         name: str, label: str, labelPlural: str, icon: str, description: str, labelField: str,
         permissions: { type: 'object', additionalProperties: false, required: ['read', 'create', 'update', 'delete'], properties: { read: strList, create: strList, update: strList, delete: strList } },
         submission: { type: 'object', additionalProperties: false, required: ['managed'], properties: {
-          profile: { type: 'object', additionalProperties: false, required: ['entity', 'emailField'], properties: { entity: str, emailField: str } },
+          profile: { type: 'object', additionalProperties: false, required: ['entity', 'emailField'], properties: {
+            entity: str, emailField: str,
+            provision: { type: 'object', additionalProperties: false, required: ['accountField'], properties: { accountField: str, nameField: str } },
+          } },
           selectable: strList,
           managed: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['field', 'source', 'value'], properties: {
             field: str, source: { type: 'string', enum: MANAGED_SOURCES }, value: str,
@@ -90,11 +98,15 @@ export function normalizeSpec(raw: any): AppSpec {
         item && MANAGED_SOURCES.includes(item.source)
           ? [{ field: camel(text(item.field)), source: item.source, value: text(item.value) }] : []) : [];
       const profile = entity?.submission?.profile;
+      const provision = profile?.provision;
       return {
         name: text(entity?.name), label: text(entity?.label, text(entity?.name)), labelPlural: text(entity?.labelPlural, text(entity?.label, text(entity?.name))),
         icon: text(entity?.icon), description: text(entity?.description), labelField: text(entity?.labelField, fields[0]?.name ?? ''), fields,
         permissions: { read: strings(permissions.read), create: strings(permissions.create), update: strings(permissions.update), delete: strings(permissions.delete) },
-        submission: entity?.submission ? { managed, selectable: strings(entity.submission.selectable).map(camel), profile: profile ? { entity: text(profile.entity), emailField: camel(text(profile.emailField)) } : undefined } : undefined,
+        submission: entity?.submission ? { managed, selectable: strings(entity.submission.selectable).map(camel), profile: profile ? {
+          entity: text(profile.entity), emailField: camel(text(profile.emailField)),
+          ...(provision ? { provision: { accountField: camel(text(provision.accountField)), nameField: provision.nameField ? camel(text(provision.nameField)) : undefined } } : {}),
+        } : undefined } : undefined,
       };
     }),
     pages: (Array.isArray(spec.pages) ? spec.pages : []).map((page: any) => ({
@@ -327,6 +339,25 @@ export function validateSpec(spec: AppSpec): string[] {
     const profile = submission.profile && spec.entities.find((item) => item.name === submission.profile!.entity);
     if (submission.profile && !profile?.fields.some((field) => field.name === submission.profile!.emailField && field.type === 'string' && field.unique)) {
       issues.push(`${entity.name}: the submission profile must have a unique email field.`);
+    }
+    const provision = submission.profile?.provision;
+    if (provision && profile) {
+      const assigned = [submission.profile!.emailField, provision.accountField, ...(provision.nameField ? [provision.nameField] : [])];
+      const account = profile.fields.find((field) => field.name === provision.accountField);
+      const name = profile.fields.find((field) => field.name === provision.nameField);
+      if (!spec.allowRegistration || profile === entity || account?.type !== 'string' || !account.unique || account.format
+        || (provision.nameField && (name?.type !== 'string' || name.format || name.unique))
+        || new Set(assigned).size !== assigned.length || profile.fields.some((field) => field.required && !assigned.includes(field.name))
+        || submission.managed.some((value) => value.source === 'profile' && value.value !== 'id' && !assigned.includes(value.value))) {
+        issues.push(`${entity.name}: self-service profiles need enabled sign-up, a unique account ID column, and only account identity fields supplied by registration. Membership and other required fields need a separate enrollment flow.`);
+      }
+      if (spec.entities.some((other) => {
+        const config = other.submission?.profile;
+        return config?.entity === profile.name && (config.provision?.accountField !== provision.accountField
+          || config.provision?.nameField !== provision.nameField || config.emailField !== submission.profile!.emailField);
+      })) {
+        issues.push(`${entity.name}: all workflows for "${profile.name}" must use the same self-service account mapping.`);
+      }
     }
     const managedNames = new Set<string>();
     for (const value of submission.managed) {

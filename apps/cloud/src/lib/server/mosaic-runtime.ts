@@ -202,7 +202,7 @@ export async function verifyApp(spec: AppSpec, app: CompiledApp): Promise<string
         }
         submit = inProcessCaller(server, await loginToken(inProcessCaller(server, ''), email, password));
       }
-      if (workflow.profile) {
+      if (workflow.profile && !workflow.profile.provision) {
         const { entity, emailField } = workflow.profile;
         const rows = await call('GET', `/api/entities/${entity}?pageSize=1`);
         const profile = rows.body?.data?.data?.[0];

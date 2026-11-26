@@ -47,7 +47,7 @@ async function start(project: PreviewProject, databaseUrl: string): Promise<Prev
         if (!workflow) return Response.json({ success: false, error: { message: 'Workflow not found' } }, { status: 404 });
         const endpoint = createWorkflowEndpoints([workflow])[0]!;
         const profile = workflow.profile;
-        const sampleEmail = profile && spec.sampleData.find((sample) => sample.entity === profile.entity)?.records
+        const sampleEmail = profile && !profile.provision && spec.sampleData.find((sample) => sample.entity === profile.entity)?.records
           .flat().find((pair) => pair.field === profile.emailField)?.value;
         const user = context.user && sampleEmail ? { ...context.user, email: sampleEmail } : context.user;
         return endpoint.handler({ ...context, user });

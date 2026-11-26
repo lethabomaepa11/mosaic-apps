@@ -2,7 +2,7 @@ import { buildEntitySchema, buildInsertSql, canAccessEntity, formatIssues, getEn
 
 /**
  * @typedef {{ field: string, source: 'constant' | 'userId' | 'userEmail' | 'profile' | 'now' | 'empty', value: string }} ManagedValue
- * @typedef {{ entity: string, label: string, roles: string[], profile?: { entity: string, emailField: string }, selectable?: string[],
+ * @typedef {{ entity: string, label: string, roles: string[], profile?: { entity: string, emailField: string, provision?: { accountField: string, nameField?: string } }, selectable?: string[],
  *   managed: ManagedValue[], input: { type: 'object', properties: Record<string, unknown>, required: string[], additionalProperties: false } }} CreateWorkflow
  */
 
@@ -39,12 +39,28 @@ export function createWorkflowEndpoints(workflows) {
         /** @type {Record<string, unknown>} */
         let profile = {};
         if (workflow.profile) {
-          const lookup = (await getEntity(tx, workflow.profile.entity))?.definition;
+          const { entity, emailField, provision } = workflow.profile;
+          const lookup = (await getEntity(tx, entity))?.definition;
           if (!lookup) throw new HttpError(409, 'The user profile is not installed', 'WORKFLOW_UNAVAILABLE');
           const active = lookup.softDelete ? ' AND "deletedAt" IS NULL' : '';
-          const result = await tx.query(`SELECT * FROM ${ident(lookup.name)} WHERE lower(${ident(workflow.profile.emailField)}) = lower($1)${active} LIMIT 2`, [user.email]);
-          if (result.rows.length !== 1) throw new HttpError(403, 'Your account needs a unique matching profile', 'PROFILE_UNAVAILABLE');
-          profile = result.rows[0];
+          const where = provision ? `${ident(provision.accountField)} = $1` : `lower(${ident(emailField)}) = lower($1)`;
+          const find = () => tx.query(`SELECT * FROM ${ident(lookup.name)} WHERE ${where}${active} LIMIT 2`, [provision ? user.id : user.email]);
+          let rows = (await find()).rows;
+          if (!rows.length && provision) {
+            const existing = await tx.query(`SELECT id FROM ${ident(lookup.name)} WHERE lower(${ident(emailField)}) = lower($1) LIMIT 1`, [user.email]);
+            if (!existing.rows.length) {
+              const identity = { [emailField]: user.email, [provision.accountField]: user.id, ...(provision.nameField ? { [provision.nameField]: user.name } : {}) };
+              const parsed = buildEntitySchema(lookup, 'create').safeParse(identity);
+              if (!parsed.success) throw new HttpError(409, 'The self-service profile needs fields that registration cannot supply', 'WORKFLOW_UNAVAILABLE');
+              const insert = buildInsertSql(lookup, /** @type {Record<string, unknown>} */ (parsed.data));
+              const created = await tx.query(insert.sql.replace(' RETURNING *', ' ON CONFLICT DO NOTHING RETURNING *'), insert.params);
+              rows = created.rows;
+            }
+            // A concurrent first submission may have created this account's profile already.
+            if (!rows.length) rows = (await find()).rows;
+          }
+          if (rows.length !== 1) throw new HttpError(403, 'Your account needs a unique matching profile', 'PROFILE_UNAVAILABLE');
+          profile = rows[0];
         }
         /** @type {Record<string, unknown>} */
         const values = { ...body };
