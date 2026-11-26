@@ -79,6 +79,15 @@ test('Next.js hosts the Mosaic API and preserves its session and page access che
     const form = await request('/f/customer-form', { headers });
     assert.equal(form.status, 200);
     assert.match(await form.text(), /name="company"/);
+    const enrollment = await post('/api/forms', {
+      name: 'Enrollment', slug: 'enrollment', entity: 'customer',
+      schema: { id: 'enrollment-root', type: 'form', children: [] },
+      settings: { createEndpoint: '/extensions/customer/submit', submitLabel: 'Join' },
+    });
+    assert.equal(enrollment.status, 201);
+    const { data: enrollmentForm } = await enrollment.json();
+    assert.equal((await post(`/api/forms/${enrollmentForm.id}/publish`, {})).status, 200);
+    assert.match(await (await request('/f/enrollment', { headers })).text(), /type="submit">Join</);
     const record = await post('/api/entities/customer', { name: 'Next test customer', status: 'active' });
     assert.equal(record.status, 201, await record.text());
   } finally {

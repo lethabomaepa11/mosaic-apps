@@ -26,9 +26,10 @@ export function RecordForm({ form, record, options }) {
   const hydrated = useSyncExternalStore(subscribe, isClient, isServer);
   const fields = fieldsOf(form.root);
   const entity = form.entity ?? form.dataSource?.entity;
-  if (!entity || !fields.length) return <p>This form has no supported record fields.</p>;
   const custom = form.settings?.createEndpoint;
-  const endpoint = !record && typeof custom === 'string' && custom.startsWith('/extensions/')
+  const managed = !record && typeof custom === 'string' && custom.startsWith('/extensions/');
+  if (!entity || (!fields.length && !managed)) return <p>This form has no supported record fields.</p>;
+  const endpoint = managed
     ? `/api${custom}` : `/api/entities/${encodeURIComponent(entity)}${record ? '/' + encodeURIComponent(record.id) : ''}`;
   async function submit(event) {
     event.preventDefault();
