@@ -73,8 +73,8 @@ test('a framework upgrade safely patches main and preserves published definition
   await db.query("UPDATE cloud_releases SET framework_version = NULL WHERE id = $1", [baseline.id]);
   await db.query("UPDATE cloud_jobs SET status = 'completed', metadata = metadata || $2::jsonb WHERE id = $1", [delivery, JSON.stringify({ releaseId: baseline.id, githubCommit: 'base-commit' })]);
 
-  let treeWrite: any;
-  let refWrite: any;
+  const treeWrites: Array<{ base_tree: string; tree: Array<{ path: string }> }> = [];
+  let refWrite: unknown;
   let conflicting = true;
   const tree = () => [...baseFiles, { path: 'custom.ts', content: 'User-owned file', mode: '100644' }].map((file) => {
     const body = Buffer.from(file.path === shell.path && conflicting ? 'Edited shell' : file.content);
@@ -86,7 +86,7 @@ test('a framework upgrade safely patches main and preserves published definition
     if (path.endsWith('/git/ref/heads/main')) return Response.json({ object: { sha: 'main-head' } });
     if (path.endsWith('/git/commits/main-head')) return Response.json({ tree: { sha: 'head-tree' } });
     if (path.endsWith('/git/trees/head-tree')) return Response.json({ tree: tree(), truncated: false });
-    if (path.endsWith('/git/trees')) { treeWrite = JSON.parse(String(options?.body)); return Response.json({ sha: 'updated-tree' }, { status: 201 }); }
+    if (path.endsWith('/git/trees')) { treeWrites.push(JSON.parse(String(options?.body))); return Response.json({ sha: 'updated-tree' }, { status: 201 }); }
     if (path.endsWith('/git/commits')) return Response.json({ sha: 'updated-commit' }, { status: 201 });
     if (path.endsWith('/git/refs/heads/main')) { refWrite = JSON.parse(String(options?.body)); return Response.json({}); }
     throw new Error(`Unexpected provider request ${path}`);
@@ -97,14 +97,16 @@ test('a framework upgrade safely patches main and preserves published definition
     await runDue();
     const failed = (await jobsOf(projectId)).find((job) => job.kind === 'upgrade');
     assert.match(failed?.error ?? '', /overlaps GitHub edits in app\/app-shell.jsx/);
-    assert.equal(treeWrite, undefined);
+    assert.equal(treeWrites.length, 0);
     assert.equal((await db.query('SELECT status FROM cloud_projects WHERE id = $1', [projectId])).rows[0]?.status, 'ready');
 
     conflicting = false;
     assert.equal(await queueFrameworkUpgrade(db, projectId), undefined);
     await runDue();
+    const [treeWrite] = treeWrites;
+    assert.ok(treeWrite);
     assert.equal(treeWrite.base_tree, 'head-tree');
-    assert.deepEqual(treeWrite.tree.map((entry: { path: string }) => entry.path).sort(), ['app/app-shell.jsx', 'studio-source/lib/studio/cloud-release.ts']);
+    assert.deepEqual(treeWrite.tree.map((entry) => entry.path).sort(), ['app/app-shell.jsx', 'studio-source/lib/studio/cloud-release.ts']);
     assert.deepEqual(refWrite, { sha: 'updated-commit', force: false });
     assert.match(await queueFrameworkUpgrade(db, projectId) ?? '', /already uses the current framework/);
     assert.match(await queueLatestDelivery(db, projectId) ?? '', /Deploy that branch/);
