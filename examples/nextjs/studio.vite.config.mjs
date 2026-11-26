@@ -18,6 +18,7 @@ writeFileSync(`${src}/routes/+layout.js`, 'export const ssr = false;\n');
 writeFileSync(`${src}/routes/+layout.svelte`, `<script>
   import '@mosaic-apps/ui/style.css';
   import '../app.css';
+  import '#mosaic-components';
   import { Toaster } from '@mosaic-apps/ui';
   let { children } = $props();
 </script>
@@ -31,7 +32,7 @@ writeFileSync(`${src}/app.html`, `<!doctype html>
 </html>`);
 
 export default defineConfig({
-  resolve: { alias: { '#lib': resolve(src, 'lib') } },
+  resolve: { alias: { '#lib': resolve(src, 'lib'), '#mosaic-components': resolve('runtime/components.js') } },
   plugins: [tailwindcss(), sveltekit({
     appDir: '_mosaic-studio',
     outDir: '.studio-build/kit',

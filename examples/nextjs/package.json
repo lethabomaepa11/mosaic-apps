@@ -3,9 +3,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "npm run build:studio && next dev",
-    "build": "npm run build:studio && next build",
+    "dev": "npm run build:assets && next dev",
+    "build": "npm run build:assets && next build",
+    "build:assets": "npm run build:studio && npm run build:runtime",
     "build:studio": "vite build --config studio.vite.config.mjs",
+    "build:runtime": "vite build --config runtime.vite.config.mjs",
     "start": "next start",
     "test": "node --test test/*.test.mjs"
   },

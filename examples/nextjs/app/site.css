@@ -35,7 +35,7 @@ main section + section { margin-top:1rem; }
 .workflow-card > :last-child { margin-bottom:0; }
 .workflow-action { display:inline-block; padding:.5rem .85rem; border:1px solid var(--accent); border-radius:.4rem; font-weight:600; text-decoration:none; }
 .workflow-action:hover, .workflow-action:focus-visible { text-decoration:underline; }
-form { display:grid; width:min(100%,36rem); gap:.8rem; }
+form:not(.m-form-renderer) { display:grid; width:min(100%,36rem); gap:.8rem; }
 label { display:grid; gap:.3rem; }
 input, select, textarea, button { font:inherit; color:inherit; }
 input:not([type="checkbox"]), select, textarea, button { padding:.5rem .7rem; background:var(--surface); border:1px solid var(--border); border-radius:.4rem; }

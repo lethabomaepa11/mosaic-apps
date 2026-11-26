@@ -25,7 +25,7 @@ function Table({ rows = [], columns = [], fields = [], editHref }) {
 
 export function MosaicNode({ node }) {
   const props = node.props ?? {};
-  if (props.visibleIf === 'false') return null;
+  if (props.visibleIf != null && props.visibleIf !== '' && props.visibleIf !== 'true' && props.visibleIf !== true) return null;
   const style = {};
   for (const property of ['padding', 'margin']) {
     for (const side of ['', 'Top', 'Right', 'Bottom', 'Left']) {

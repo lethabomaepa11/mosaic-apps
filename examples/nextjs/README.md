@@ -20,12 +20,11 @@ under `data`. Set `ADMIN_EMAIL` and `ADMIN_PASSWORD` in `.env` before the first 
 request to seed an administrator. The scaffold generates a signing secret in `.env`.
 
 Open `/studio` with an administrator or editor account to author pages and forms.
-Studio uses the same `/api/pages` and `/api/forms` as the React app. React renders
-published pages at their configured routes, with `:parameter` segments and sign-in for
-protected pages. Published entity forms are available at `/f/<slug>` and can create
-records through the same permission-checked API. The renderer supports common
-headings, text, tables, navigation links, and basic record fields. Other component
-types can be added in `app/mosaic-node.jsx`.
+Studio uses the same `/api/pages` and `/api/forms` as the app. Next.js resolves
+published routes, checks permissions, and serves the React shell. The shared
+Svelte renderer handles published page and form components inside that shell.
+Published forms are available at `/f/<slug>`. Register custom Svelte components
+in `runtime/components.js` to use them in Studio and published artifacts.
 
 For deployment, configure durable PostgreSQL and a stable random `MOSAIC_JWT_SECRET`
 of at least 32 characters. In Vercel, use the Next.js preset and the scaffold root

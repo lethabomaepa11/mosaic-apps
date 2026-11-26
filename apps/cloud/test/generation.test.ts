@@ -18,8 +18,10 @@ test('Next.js releases ship the framework Studio with clean build inputs', () =>
   assert.ok(paths.has('studio-source/routes/studio/pages/[id]/+page.svelte'));
   assert.ok(paths.has('studio-source/routes/studio/forms/[id]/+page.svelte'));
   assert.ok(paths.has('studio-source/lib/studio/components/Canvas.svelte'));
+  assert.ok(paths.has('runtime/Artifact.svelte'));
+  assert.ok(paths.has('runtime.vite.config.mjs'));
   assert.ok(!paths.has('app/studio/page.jsx'));
-  assert.ok(!files.some(({ path }) => /(?:\.studio-build|_mosaic-studio)\//.test(path)));
+  assert.ok(!files.some(({ path }) => /(?:\.studio-build|_mosaic-studio|_mosaic-runtime)\//.test(path)));
 });
 
 test('a release is the full mosaic create project: one app with the API and Studio built in', () => {

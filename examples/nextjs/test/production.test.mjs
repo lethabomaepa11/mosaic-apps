@@ -75,7 +75,14 @@ test('Next.js hosts the Mosaic API and preserves its session and page access che
     assert.doesNotMatch(await anonymous.text(), /Private report content/);
     const published = await request('/private-page/report-1', { headers });
     assert.equal(published.status, 200);
-    assert.match(await published.text(), /Private report content/);
+    const publishedHtml = await published.text();
+    assert.match(publishedHtml, /Private report content/);
+    assert.match(publishedHtml, /data-mosaic-runtime="loading"/);
+    const runtime = await request('/_mosaic-runtime/artifact.js');
+    assert.equal(runtime.status, 200);
+    assert.match(runtime.headers.get('content-type'), /javascript/);
+    assert.match(await runtime.text(), /mountMosaicArtifact/);
+    assert.equal((await request('/_mosaic-runtime/artifact.css')).status, 200);
     const form = await request('/f/customer-form', { headers });
     assert.equal(form.status, 200);
     assert.match(await form.text(), /name="company"/);

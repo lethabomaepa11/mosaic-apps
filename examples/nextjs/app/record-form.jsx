@@ -13,7 +13,8 @@ const isClient = () => true;
 const isServer = () => false;
 
 function fieldsOf(node) {
-  if (!node || node.props?.visibleIf === 'false') return [];
+  const condition = node?.props?.visibleIf;
+  if (!node || (condition != null && condition !== '' && condition !== 'true' && condition !== true)) return [];
   const children = (node.children ?? []).flatMap(fieldsOf);
   return supported.has(node.type) && typeof node.props?.binding === 'string' && node.props.binding
     ? [node, ...children] : children;

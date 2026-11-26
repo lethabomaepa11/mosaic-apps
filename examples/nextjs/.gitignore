@@ -1,6 +1,7 @@
 .next/
 .studio-build/
 public/_mosaic-studio/
+public/_mosaic-runtime/
 .env*
 !.env.example
 .mosaic-data/

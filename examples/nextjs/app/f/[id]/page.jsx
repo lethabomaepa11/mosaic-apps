@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { readMosaic, recordFormProps, requirePublishedForm, signIn } from '../../../lib/artifacts.js';
 import { RecordForm } from '../../record-form.jsx';
+import { FrameworkArtifact } from '../../framework-artifact.jsx';
 
 export default async function PublishedForm({ params, searchParams }) {
   const { id } = await params;
@@ -14,5 +15,7 @@ export default async function PublishedForm({ params, searchParams }) {
     if (!result.data) notFound();
     record = result.data;
   }
-  return <main><h1>{form.name}</h1><RecordForm {...await recordFormProps(form, record)} /></main>;
+  return <main><h1>{form.name}</h1>
+    <FrameworkArtifact artifact={{ form, record }}><RecordForm {...await recordFormProps(form, record)} /></FrameworkArtifact>
+  </main>;
 }

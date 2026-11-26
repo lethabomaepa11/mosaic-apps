@@ -14,7 +14,7 @@ for (const [name, from] of [['fullstack', 'templates/fullstack'], ['nextjs', 'ex
   await rm(destination, { recursive: true, force: true, maxRetries: 8, retryDelay: 100 });
   await cp(source, destination, {
     recursive: true,
-    filter: (path) => !/(^|[\\/])(node_modules|\.svelte-kit|\.next|\.studio-build|_mosaic-studio|\.mosaic-data|\.vercel|dist|build|pgdata|\.git|\.env(?!\.example)[^\\/]*)([\\/]|$)/.test(path)
+    filter: (path) => !/(^|[\\/])(node_modules|\.svelte-kit|\.next|\.studio-build|_mosaic-studio|_mosaic-runtime|\.mosaic-data|\.vercel|dist|build|pgdata|\.git|\.env(?!\.example)[^\\/]*)([\\/]|$)/.test(path)
       && !/^(data|uploads)([\\/]|$)/.test(relative(source, path)),
   });
   if (name === 'nextjs') await copyFile(resolve(source, '.gitignore'), resolve(destination, 'gitignore'));

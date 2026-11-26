@@ -1,0 +1,5 @@
+@import '@mosaic-apps/ui/style.css';
+@plugin 'daisyui' {
+  themes: corporate --default, business --prefersdark, light, dark, nord, winter, silk, lofi;
+  logs: false;
+}

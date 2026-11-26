@@ -8,7 +8,7 @@ import type { AppFramework } from '../framework.ts';
  * with the API at /api and Studio at /studio). Bundled at build time so the hosted Cloud does
  * not depend on a repository checkout at runtime; tests (plain Node) read it from disk.
  */
-const SKIP = /(^|\/)(node_modules|\.svelte-kit|\.next|\.studio-build|_mosaic-studio|\.mosaic-data|\.vercel|\.git|dist|build|pgdata)(\/|$)|^(data|uploads|test)(\/|$)/;
+const SKIP = /(^|\/)(node_modules|\.svelte-kit|\.next|\.studio-build|_mosaic-studio|_mosaic-runtime|\.mosaic-data|\.vercel|\.git|dist|build|pgdata)(\/|$)|^(data|uploads|test)(\/|$)/;
 
 // Bundle the file contents directly so Vite does not resolve the scaffold's TypeScript configs.
 declare const __MOSAIC_TEMPLATE_FILES__: Record<AppFramework, Record<string, string>> | undefined;

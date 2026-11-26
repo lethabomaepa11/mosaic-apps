@@ -86,7 +86,8 @@ test('Next.js scaffold keeps its lockfile, same-origin API, and deployment envir
   const manifest = JSON.parse(await readFile(join(app, 'package.json'), 'utf8'));
   const lock = JSON.parse(await readFile(join(app, 'package-lock.json'), 'utf8'));
   assert.equal(manifest.name, 'my-crm');
-  assert.equal(manifest.scripts.dev, 'npm run build:studio && next dev --port 3210');
+  assert.equal(manifest.scripts.dev, 'npm run build:assets && next dev --port 3210');
+  assert.ok(existsSync(join(app, 'runtime/Artifact.svelte')));
   assert.equal(lock.packages[''].name, manifest.name);
   assert.equal((await loadProjectConfig(app)).web.port, 3210);
   assert.ok(existsSync(join(app, 'app/api/[...path]/route.js')));

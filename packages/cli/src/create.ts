@@ -99,7 +99,7 @@ export async function create(opts: CreateOptions): Promise<void> {
     const manifestPath = join(target, 'package.json');
     const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
     manifest.name = slug;
-    manifest.scripts.dev = `npm run build:studio && next dev --port ${opts.webPort}`;
+    manifest.scripts.dev = `npm run build:assets && next dev --port ${opts.webPort}`;
     manifest.scripts.start = `next start --port ${opts.webPort}`;
     await writeFile(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
     const lockPath = join(target, 'package-lock.json');

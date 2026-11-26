@@ -14,7 +14,7 @@ export default function AppShell({ name, links, signedIn, showStudio, editSideba
           <a href={href} aria-current={pathname === href ? 'page' : undefined}>{label}</a>
         </div>)}
       </nav>
-      {showStudio && <nav className="site-account" aria-label="Administration"><a href="/studio" aria-current={pathname === '/studio' ? 'page' : undefined}>Page Studio</a></nav>}
+      {showStudio && <nav className="site-account" aria-label="Administration"><a href="/studio" aria-current={pathname === '/studio' ? 'page' : undefined}>Studio</a></nav>}
       {editSidebar && <a href="/studio?sidebar">Edit sidebar</a>}
       {!signedIn && <nav className="site-account" aria-label="Account">
         <a href="/login">Sign in</a>
