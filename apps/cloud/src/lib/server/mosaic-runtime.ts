@@ -110,11 +110,12 @@ function syntheticValue(field: SpecEntity['fields'][number], index: number): unk
     case 'int': return 1 + index;
     case 'decimal': return 10 + index;
     case 'boolean': return index % 2 === 0;
-    case 'date': return '2026-01-15';
-    case 'datetime': return '2026-01-15T09:00:00Z';
-    case 'enum': return field.options[0];
+    case 'date': return new Date(Date.UTC(2026, 0, 15 + index)).toISOString().slice(0, 10);
+    case 'datetime': return new Date(Date.UTC(2026, 0, 15, 9, index)).toISOString();
+    case 'enum': return field.options[index % field.options.length];
     case 'ref': return undefined;
-    default: return field.format === 'email' ? `sample${index}@example.com` : field.format === 'url' ? 'https://example.com' : `${field.label} ${index + 1}`;
+    default: return field.format === 'email' ? `sample${index}@example.com` : field.format === 'url' ? `https://example.com/sample-${index}`
+      : field.format === 'phone' ? `+2710${String(index).padStart(7, '0')}` : `${field.label} ${index + 1}`;
   }
 }
 
@@ -150,7 +151,6 @@ export async function seedAndSmokeTest(call: MosaicCall, spec: AppSpec, options:
           const byLabel = given && targetSpec ? targets.find((row) => String(row[targetSpec.labelField] ?? '').toLowerCase() === given.value.toLowerCase()) : undefined;
           value = (byLabel ?? targets[index % Math.max(targets.length, 1)])?.id;
         }
-        if (field.unique && typeof value === 'string' && !given) value = `${value}-${index}`;
         value = enumValue(field, value);
         if (value !== undefined && value !== null && !(typeof value === 'number' && Number.isNaN(value))) record[field.name] = value;
       }
@@ -212,12 +212,30 @@ export async function verifyApp(spec: AppSpec, app: CompiledApp): Promise<string
           continue;
         }
       }
-      const rows = await call('GET', `/api/entities/${workflow.entity}?pageSize=1`);
-      const record = rows.body?.data?.data?.[0] ?? {};
-      const values = Object.fromEntries(Object.entries(workflow.input.properties)
-        .filter(([field]) => record[field] !== undefined).map(([field, schema]) => [
-          field, (schema as { format?: string }).format === 'date' && typeof record[field] === 'string' ? record[field].slice(0, 10) : record[field],
-        ]));
+      const rows = await call('GET', `/api/entities/${workflow.entity}?pageSize=100`);
+      const records: Array<Record<string, unknown>> = rows.body?.data?.data ?? [];
+      const values: Record<string, unknown> = {};
+      const fields = spec.entities.find((entity) => entity.name === workflow.entity)?.fields ?? [];
+      for (const field of fields.filter((item) => Object.hasOwn(workflow.input.properties, item.name))) {
+        const normalize = (value: unknown) => field.type === 'date' && typeof value === 'string' ? value.slice(0, 10) : value;
+        let value = normalize(records[0]?.[field.name]);
+        if (field.unique) {
+          const used = new Set(records.map((record) => String(normalize(record[field.name]))));
+          let choices: unknown[];
+          if (field.type === 'ref') {
+            const references = await call('GET', `/api/entities/${field.refEntity}?pageSize=100`);
+            choices = references.body?.data?.data?.map((record: { id: string }) => record.id) ?? [];
+          } else if (field.type === 'enum') {
+            choices = (workflow.input.properties[field.name] as { enum: string[] }).enum;
+          } else if (field.type === 'boolean') {
+            choices = [true, false];
+          } else {
+            choices = Array.from({ length: records.length + 1 }, (_, index) => syntheticValue(field, index + records.length));
+          }
+          value = choices.find((choice) => !used.has(String(choice)));
+        }
+        if (value !== undefined) values[field.name] = value;
+      }
       const endpoint = `/api/extensions/${workflow.entity.replaceAll('_', '-')}/submit`;
       const result = await submit('POST', endpoint, values);
       if (result.status !== 201) failures.push(`Submitting ${workflow.label} failed: ${reason(result)}`);
