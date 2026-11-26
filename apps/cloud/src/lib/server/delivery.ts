@@ -1,4 +1,5 @@
 import { createDb } from '@mosaic-apps/server';
+import { createHash } from 'node:crypto';
 import type { GeneratedFile } from './generation';
 import type { AppFramework } from '../framework';
 import { VercelCredentialError, vercelCredentialRejected } from './providers';
@@ -35,13 +36,46 @@ export async function createGitHubRepository(input: { token: string; owner: stri
   return String(created.body.full_name);
 }
 
-/** Commits the release as one commit that replaces the whole tree. */
-export async function pushToGitHub(input: { token: string; repository: string; files: GeneratedFile[]; message: string }) {
+type GitTreeEntry = { path: string; mode: string; type: string; sha: string };
+const sameFile = (file: GeneratedFile | undefined, entry: GitTreeEntry | undefined) => {
+  if (!file || !entry) return !file && !entry;
+  const bytes = Buffer.from(file.content);
+  const sha = createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex');
+  return entry.type === 'blob' && entry.mode === (file.mode ?? '100644') && entry.sha === sha;
+};
+
+function releaseChanges(base: GeneratedFile[], files: GeneratedFile[], current: GitTreeEntry[]) {
+  const before = new Map(base.map((file) => [file.path, file]));
+  const after = new Map(files.map((file) => [file.path, file]));
+  const head = new Map(current.map((entry) => [entry.path, entry]));
+  const changes = [];
+  const conflicts: string[] = [];
+  for (const path of new Set([...before.keys(), ...after.keys()])) {
+    const old = before.get(path);
+    const next = after.get(path);
+    if (old?.content === next?.content && (old?.mode ?? '100644') === (next?.mode ?? '100644')) continue;
+    const entry = head.get(path);
+    if (sameFile(next, entry)) continue;
+    const parts = path.split('/');
+    const blocked = parts.slice(0, -1).some((_, index) => {
+      const parent = head.get(parts.slice(0, index + 1).join('/'));
+      return parent && parent.type !== 'tree';
+    });
+    if (blocked || !sameFile(old, entry)) conflicts.push(path);
+    else changes.push(next ? { path, mode: next.mode ?? '100644', type: 'blob', content: next.content }
+      : { path, mode: old!.mode ?? '100644', type: 'blob', sha: null });
+  }
+  if (conflicts.length) throw new ProviderError(`The release overlaps GitHub edits in ${conflicts.slice(0, 5).join(', ')}. Merge those changes with the framework update before retrying.`);
+  return changes;
+}
+
+/** Applies the generated delta onto the current branch, preserving unrelated files. */
+export async function pushToGitHub(input: { token: string; repository: string; files: GeneratedFile[]; message: string; base?: GeneratedFile[]; branch?: string }) {
   const gh = (path: string, method = 'GET', body?: unknown) => github(input.token, path, method, body);
   const fullName = input.repository;
   const repo = await gh(`/repos/${fullName}`);
   if (repo.status === 404) throw new ProviderError(`GitHub repository ${fullName} is no longer accessible.`);
-  const branch = String(repo.body.default_branch ?? 'main');
+  const branch = input.branch ?? String(repo.body.default_branch ?? 'main');
   let ref;
   for (let attempt = 0; attempt < 5; attempt++) {
     ref = await gh(`/repos/${fullName}/git/ref/heads/${branch}`);
@@ -50,13 +84,26 @@ export async function pushToGitHub(input: { token: string; repository: string; f
   }
   if (!ref || ref.status >= 400) throw new ProviderError(`GitHub branch ${branch} is not ready in ${fullName}.`);
   const parent = String(ref.body.object.sha);
-  const tree = await gh(`/repos/${fullName}/git/trees`, 'POST', { tree: input.files.map((file) => ({ path: file.path, mode: file.mode ?? '100644', type: 'blob', content: file.content })) });
+  let baseTree: string | undefined;
+  let changes;
+  if (input.base) {
+    const currentCommit = await gh(`/repos/${fullName}/git/commits/${parent}`);
+    baseTree = currentCommit.body.tree?.sha;
+    if (currentCommit.status >= 400 || !baseTree) throw new ProviderError('GitHub could not read the current branch commit.');
+    const current = await gh(`/repos/${fullName}/git/trees/${baseTree}?recursive=1`);
+    if (current.status >= 400 || current.body.truncated || !Array.isArray(current.body.tree)) throw new ProviderError('GitHub could not return the full branch tree for a safe update.');
+    changes = releaseChanges(input.base, input.files, current.body.tree);
+  } else {
+    changes = input.files.map((file) => ({ path: file.path, mode: file.mode ?? '100644', type: 'blob', content: file.content }));
+  }
+  if (!changes.length) return { repository: fullName, branch, commit: parent, url: `https://github.com/${fullName}` };
+  const tree = await gh(`/repos/${fullName}/git/trees`, 'POST', { base_tree: baseTree, tree: changes });
   if (tree.status >= 400 || !tree.body.sha) throw new ProviderError(`GitHub rejected the release files (${tree.status}).`);
   const commit = await gh(`/repos/${fullName}/git/commits`, 'POST', { message: input.message, tree: tree.body.sha, parents: [parent] });
   if (commit.status >= 400 || !commit.body.sha) throw new ProviderError(`GitHub could not create the release commit (${commit.status}).`);
-  const updated = await gh(`/repos/${fullName}/git/refs/heads/${branch}`, 'PATCH', { sha: commit.body.sha });
+  const updated = await gh(`/repos/${fullName}/git/refs/heads/${branch}`, 'PATCH', { sha: commit.body.sha, force: false });
   if (updated.status >= 400) throw new ProviderError(`GitHub could not update the release branch (${updated.status}).`);
-  return { repository: fullName, commit: String(commit.body.sha), url: `https://github.com/${fullName}` };
+  return { repository: fullName, branch, commit: String(commit.body.sha), url: `https://github.com/${fullName}` };
 }
 
 /** Creates a Neon project once; returns the connection string to store encrypted. */

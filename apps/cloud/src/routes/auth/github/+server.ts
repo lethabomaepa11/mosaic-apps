@@ -3,10 +3,12 @@ import { error, redirect } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { hosted } from '#lib/server/db';
 import { GITHUB_LOGIN_STATE, githubLoginEnabled, githubLoginUrl } from '#lib/server/github-login';
+import { loginReturn } from '#lib/server/login-return';
 
 export const GET: RequestHandler = ({ cookies, url }) => {
   if (!githubLoginEnabled()) throw error(404, 'GitHub sign-in is not configured.');
   const state = randomBytes(24).toString('base64url');
   cookies.set(GITHUB_LOGIN_STATE, state, { path: '/auth/github', httpOnly: true, sameSite: 'lax', secure: hosted, maxAge: 600 });
+  cookies.set('mosaic_github_login_return', loginReturn(url.searchParams.get('next')), { path: '/auth/github', httpOnly: true, sameSite: 'lax', secure: hosted, maxAge: 600 });
   throw redirect(302, githubLoginUrl(url.origin, state), { external: ['https://github.com'] });
 };

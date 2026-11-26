@@ -10,7 +10,7 @@ export const GET: RequestHandler = async ({ params, locals }) => {
     `SELECT release.id, project.slug FROM cloud_releases release
      JOIN cloud_projects project ON project.id = release.project_id
      JOIN cloud_memberships membership ON membership.organization_id = project.organization_id
-     WHERE project.id = $1 AND membership.user_id = $2 ORDER BY release.version DESC LIMIT 1`, [params.id, locals.user.id],
+     WHERE project.id = $1 AND membership.user_id = $2 AND release.status = 'ready' ORDER BY release.version DESC LIMIT 1`, [params.id, locals.user.id],
   );
   const current = release.rows[0];
   if (!current) throw error(404, 'No source release is available.');

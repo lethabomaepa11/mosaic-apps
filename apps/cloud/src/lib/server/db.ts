@@ -95,6 +95,7 @@ ALTER TABLE cloud_projects ADD COLUMN IF NOT EXISTS planned_at timestamptz;
 ALTER TABLE cloud_projects ADD COLUMN IF NOT EXISTS neon_project_id text;
 ALTER TABLE cloud_projects ADD COLUMN IF NOT EXISTS app_spec jsonb;
 ALTER TABLE cloud_projects ADD COLUMN IF NOT EXISTS deploy_secret jsonb;
+ALTER TABLE cloud_releases ADD COLUMN IF NOT EXISTS framework_version text;
 ALTER TABLE cloud_users ADD COLUMN IF NOT EXISTS github_id text;
 CREATE TABLE IF NOT EXISTS cloud_user_ai_settings (
   user_id uuid PRIMARY KEY REFERENCES cloud_users(id) ON DELETE CASCADE, provider text NOT NULL, model text,

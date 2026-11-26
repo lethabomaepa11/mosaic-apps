@@ -1,5 +1,6 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
+  import { page } from '$app/state';
   import { invalidateAll } from '$app/navigation';
   import { onMount, tick } from 'svelte';
   import { ArrowLeft, ArrowUp, ExternalLink, Download, RotateCw, LoaderCircle, Sparkles, CircleAlert, Check, Globe, GitBranch, Database, Cloud, Monitor, Smartphone } from '@lucide/svelte';
@@ -8,6 +9,12 @@
 
   type Tab = 'preview' | 'blueprint' | 'source' | 'settings';
   let tab = $state<Tab>('preview');
+  $effect(() => {
+    if (page.url.searchParams.get('tab') === 'source') {
+      tab = 'source';
+      pane = 'app';
+    }
+  });
   let device = $state<'desktop' | 'mobile'>('desktop');
   // Phones show one pane at a time; desktop shows both side by side.
   let pane = $state<'chat' | 'app'>('chat');
@@ -60,7 +67,7 @@
   let copied = $state('');
   const copy = async (value: string) => { await navigator.clipboard.writeText(value).catch(() => {}); copied = value; setTimeout(() => (copied = ''), 1500); };
   const tone = (status: string) => ['ready', 'completed', 'connected'].includes(status) ? 'is-ready' : ['failed', 'delete_failed'].includes(status) ? 'is-failed' : ['queued', 'running', 'generating', 'delivering', 'building', 'deleting'].includes(status) ? 'is-busy' : '';
-  const jobTitle: Record<string, string> = { generate: 'Building your app', deliver: 'Delivering to your providers', 'vercel-status': 'Deploying on Vercel', delete: 'Deleting selected resources' };
+  const jobTitle: Record<string, string> = { generate: 'Building your app', deliver: 'Delivering to your providers', 'vercel-status': 'Deploying on Vercel', delete: 'Deleting selected resources', upgrade: 'Upgrading the framework' };
   const deleteOptions = $derived([
     { provider: 'github', label: 'GitHub repository', target: data.project.github_repository },
     { provider: 'vercel', label: 'Vercel project and deployments', target: data.project.vercel_project_id },
@@ -258,6 +265,17 @@
         </div>
 
       {:else if tab === 'source'}
+        {#if data.upgradeAvailable || (form?.upgradeQueued && busy) || form?.upgradeMessage}
+          <div class="surface mb-3 space-y-2 p-4">
+            {#if data.upgradeAvailable}
+              <h3 class="text-sm font-semibold">Framework update available</h3>
+              <p class="text-sm muted">Push the latest framework files to GitHub main. Your app data and published Studio changes stay in place.</p>
+              <form method="POST" action="?/upgrade" use:enhance><button class="btn btn-primary btn-sm" disabled={busy || Boolean(waitingJob)}>Upgrade framework and push to main</button></form>
+            {/if}
+            {#if form?.upgradeQueued && busy}<p class="text-sm muted" role="status">Upgrade queued. Follow the GitHub push in Activity.</p>{/if}
+            {#if form?.upgradeMessage}<p class="text-sm text-error" role="alert">{form.upgradeMessage}</p>{/if}
+          </div>
+        {/if}
         <div class="mx-auto grid max-w-4xl gap-5 p-5 md:p-8">
           <div class="surface overflow-hidden">
             <h3 class="border-b border-base-300 px-4 py-3 text-sm font-semibold">Endpoints</h3>

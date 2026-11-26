@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import test from 'node:test';
 
 process.env.CLOUD_DATABASE_URL = process.env.TEST_CLOUD_QUEUE_DATABASE_URL ?? 'pglite://memory';
@@ -8,13 +8,15 @@ process.env.GROQ_API_KEY = 'test-key';
 delete process.env.VERCEL;
 
 const { getCloudDb, readCloud } = await import('../src/lib/server/db');
-const { claimJob, enqueueJob, queueLatestDelivery, runJob, runJobs } = await import('../src/lib/server/jobs');
+const { claimJob, enqueueJob, queueFrameworkUpgrade, queueLatestDelivery, runJob, runJobs } = await import('../src/lib/server/jobs');
 const { deleteProject, deploymentCredentials, readProjectForm, savePendingProject } = await import('../src/lib/server/projects');
 const { previewNavigation, previewPages, previewRuntime } = await import('../src/lib/server/preview');
 const { saveConnection } = await import('../src/lib/server/connections');
 const { createMosaicServer } = await import('@mosaic-apps/server');
 const { encryptProviderSecret } = await import('../src/lib/server/providers');
 const { equipmentSpec } = await import('./fixtures/equipment-spec');
+const { generateProjectFiles, persistReleaseFiles } = await import('../src/lib/server/generation');
+const { compileSpec } = await import('../src/lib/server/spec');
 const db = await getCloudDb();
 
 // Fake Groq: answers as the three agents would. Tests set `agentQuestions` to make the planner ask.
@@ -57,6 +59,62 @@ async function runDue(): Promise<void> {
 
 const jobsOf = async (projectId: string) => (await db.query<{ kind: string; status: string; error: string | null }>('SELECT kind, status, error FROM cloud_jobs WHERE project_id = $1 ORDER BY created_at', [projectId])).rows;
 const deleteStatus = (result: Awaited<ReturnType<typeof deleteProject>>) => result && 'status' in result ? result.status : undefined;
+
+test('a framework upgrade safely patches main and preserves published definitions and unrelated Git files', async () => {
+  const { organizationId, projectId } = await createProject('nextjs');
+  await connect(organizationId, 'github');
+  const { rows: [project] } = await db.query<{ name: string; slug: string }>("UPDATE cloud_projects SET github_repository = 'octo/app', status = 'ready' WHERE id = $1 RETURNING name, slug", [projectId]);
+  const baseFiles = generateProjectFiles({ ...project!, framework: 'nextjs', spec: equipmentSpec, app: compileSpec(equipmentSpec) })
+    .filter((file) => !file.path.endsWith('/cloud-release.ts'));
+  const shell = baseFiles.find((file) => file.path === 'app/app-shell.jsx')!;
+  shell.content = 'Previous generated shell';
+  const delivery = await enqueueJob(db, { projectId, kind: 'deliver' });
+  const baseline = await persistReleaseFiles(db, { projectId, jobId: delivery, files: baseFiles, framework: 'nextjs' });
+  await db.query("UPDATE cloud_releases SET framework_version = NULL WHERE id = $1", [baseline.id]);
+  await db.query("UPDATE cloud_jobs SET status = 'completed', metadata = metadata || $2::jsonb WHERE id = $1", [delivery, JSON.stringify({ releaseId: baseline.id, githubCommit: 'base-commit' })]);
+
+  let treeWrite: any;
+  let refWrite: any;
+  let conflicting = true;
+  const tree = () => [...baseFiles, { path: 'custom.ts', content: 'User-owned file', mode: '100644' }].map((file) => {
+    const body = Buffer.from(file.path === shell.path && conflicting ? 'Edited shell' : file.content);
+    return { path: file.path, mode: file.mode ?? '100644', type: 'blob', sha: createHash('sha1').update(`blob ${body.length}\0`).update(body).digest('hex') };
+  });
+  providerFetch = (async (resource: string | URL, options?: RequestInit) => {
+    const path = new URL(String(resource)).pathname;
+    if (path === '/repos/octo/app') return Response.json({ default_branch: 'development' });
+    if (path.endsWith('/git/ref/heads/main')) return Response.json({ object: { sha: 'main-head' } });
+    if (path.endsWith('/git/commits/main-head')) return Response.json({ tree: { sha: 'head-tree' } });
+    if (path.endsWith('/git/trees/head-tree')) return Response.json({ tree: tree(), truncated: false });
+    if (path.endsWith('/git/trees')) { treeWrite = JSON.parse(String(options?.body)); return Response.json({ sha: 'updated-tree' }, { status: 201 }); }
+    if (path.endsWith('/git/commits')) return Response.json({ sha: 'updated-commit' }, { status: 201 });
+    if (path.endsWith('/git/refs/heads/main')) { refWrite = JSON.parse(String(options?.body)); return Response.json({}); }
+    throw new Error(`Unexpected provider request ${path}`);
+  }) as typeof fetch;
+  try {
+    assert.equal(await queueFrameworkUpgrade(db, projectId), undefined);
+    assert.match(await queueFrameworkUpgrade(db, projectId) ?? '', /current job/);
+    await runDue();
+    const failed = (await jobsOf(projectId)).find((job) => job.kind === 'upgrade');
+    assert.match(failed?.error ?? '', /overlaps GitHub edits in app\/app-shell.jsx/);
+    assert.equal(treeWrite, undefined);
+    assert.equal((await db.query('SELECT status FROM cloud_projects WHERE id = $1', [projectId])).rows[0]?.status, 'ready');
+
+    conflicting = false;
+    assert.equal(await queueFrameworkUpgrade(db, projectId), undefined);
+    await runDue();
+    assert.equal(treeWrite.base_tree, 'head-tree');
+    assert.deepEqual(treeWrite.tree.map((entry: { path: string }) => entry.path).sort(), ['app/app-shell.jsx', 'studio-source/lib/studio/cloud-release.ts']);
+    assert.deepEqual(refWrite, { sha: 'updated-commit', force: false });
+    assert.match(await queueFrameworkUpgrade(db, projectId) ?? '', /already uses the current framework/);
+    assert.match(await queueLatestDelivery(db, projectId) ?? '', /Deploy that branch/);
+    const newManifest = await db.query<{ content: string }>(`SELECT file.content FROM cloud_release_files file JOIN cloud_releases release ON release.id = file.release_id
+      WHERE release.project_id = $1 AND release.status = 'ready' AND file.path = 'lib/mosaic-app.json' ORDER BY release.version DESC LIMIT 1`, [projectId]);
+    assert.equal(newManifest.rows[0]?.content, baseFiles.find((file) => file.path === 'lib/mosaic-app.json')?.content);
+  } finally {
+    providerFetch = baseFetch;
+  }
+});
 
 test('a transient Cloud database read is retried once', async () => {
   let attempts = 0;

@@ -13,7 +13,7 @@
   <div class="surface-raised space-y-4 p-6">
     {#if data.githubLogin}
       <!-- GitHub's consent screen is on github.com, so this is a real navigation by design. -->
-      <a class="btn btn-neutral w-full gap-2" href="/auth/github" data-sveltekit-reload><GitBranch size={16} /> Continue with GitHub</a>
+      <a class="btn btn-neutral w-full gap-2" href={`/auth/github?${new URLSearchParams({ next: data.next })}`} data-sveltekit-reload><GitBranch size={16} /> Continue with GitHub</a>
       <div class="divider my-1 text-xs muted">or</div>
     {/if}
     {#if githubError}<div class="alert alert-error text-sm" role="alert">{githubError}</div>{/if}

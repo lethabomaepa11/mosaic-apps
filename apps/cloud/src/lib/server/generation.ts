@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { buildOpenApiDocument, type Db } from '@mosaic-apps/server';
 import { id } from './db';
 import type { AppSpec, CompiledApp } from './spec';
-import { renderTemplate, templateFiles } from './template';
+import { frameworkVersion, renderTemplate, templateFiles } from './template';
 import type { AppFramework } from '../framework';
 import { createWorkflowEndpoints } from '../../../../../templates/fullstack/apps/web/src/lib/server/create-workflows.js';
 
@@ -125,7 +125,7 @@ function withImporter(mosaicTs: string): string {
 }
 
 /** The full `mosaic create` project for this app: one SvelteKit app, API at /api, Studio at /studio. */
-export function generateProjectFiles(input: { name: string; slug: string; spec: AppSpec; app: CompiledApp; framework?: AppFramework; theme?: string }): GeneratedFile[] {
+export function generateProjectFiles(input: { name: string; slug: string; spec: AppSpec; app: CompiledApp; framework?: AppFramework; theme?: string; projectId?: string }): GeneratedFile[] {
   const framework = input.framework ?? 'sveltekit';
   const server = framework === 'nextjs' ? 'lib' : SERVER;
   const files = renderTemplate({
@@ -143,6 +143,12 @@ export function generateProjectFiles(input: { name: string; slug: string; spec: 
         put(`studio-source/${relative}`, content);
       }
     }
+  }
+  if (input.projectId) {
+    const path = framework === 'nextjs' ? 'studio-source/lib/studio/cloud-release.ts' : 'apps/web/src/lib/studio/cloud-release.ts';
+    const origin = new URL(process.env.CLOUD_PUBLIC_URL || 'https://cloud.mosaictalent.co.za').origin;
+    const release = { origin, projectId: input.projectId, framework, version: frameworkVersion(framework) };
+    put(path, out.get(path)!.content.replace('= null;', () => `= ${JSON.stringify(release)};`));
   }
   if (input.app.workflows?.length) {
     put('mosaic/openapi.json', json(buildOpenApiDocument(createWorkflowEndpoints(input.app.workflows))));
@@ -195,7 +201,11 @@ export function generateProjectFiles(input: { name: string; slug: string; spec: 
 }
 
 export async function persistGeneratedRelease(db: Db, input: Parameters<typeof generateProjectFiles>[0] & { projectId: string; jobId: string }) {
-  const files = generateProjectFiles(input);
+  return persistReleaseFiles(db, { ...input, files: generateProjectFiles(input) });
+}
+
+export async function persistReleaseFiles(db: Db, input: { projectId: string; jobId: string; files: GeneratedFile[]; framework?: AppFramework; pending?: boolean }) {
+  const { files } = input;
   const checksum = createHash('sha256').update(files.map((file) => `${file.path}\0${file.content}`).join('\0')).digest('hex');
   const releaseId = id();
   return db.tx(async (tx) => {
@@ -205,7 +215,8 @@ export async function persistGeneratedRelease(db: Db, input: Parameters<typeof g
     if (previous) return previous;
     const versions = await tx.query<{ version: number }>('SELECT COALESCE(MAX(version), 0) + 1 AS version FROM cloud_releases WHERE project_id = $1', [input.projectId]);
     const next = Number(versions.rows[0]?.version ?? 1);
-    await tx.query('INSERT INTO cloud_releases (id, project_id, version, status, checksum, file_count) VALUES ($1, $2, $3, $4, $5, $6)', [releaseId, input.projectId, next, 'ready', checksum, files.length]);
+    await tx.query('INSERT INTO cloud_releases (id, project_id, version, status, checksum, file_count, framework_version) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+      [releaseId, input.projectId, next, input.pending ? 'pending' : 'ready', checksum, files.length, frameworkVersion(input.framework ?? 'sveltekit')]);
     for (const file of files) await tx.query('INSERT INTO cloud_release_files (release_id, path, content, mode) VALUES ($1, $2, $3, $4)', [releaseId, file.path, file.content, file.mode ?? '100644']);
     await tx.query("UPDATE cloud_jobs SET metadata = metadata || jsonb_build_object('generatedReleaseId', $2::text) WHERE id = $1", [input.jobId, releaseId]);
     return { id: releaseId, version: next, checksum, fileCount: files.length };

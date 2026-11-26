@@ -11,13 +11,14 @@ import { drainPreviewCleanup } from './preview-schema';
 import { applyApp, httpCaller, loginToken } from './mosaic-runtime';
 import { randomBytes } from 'node:crypto';
 import { blueprintFromSpec, compileSpec, type AppSpec, type CompiledApp } from './spec';
-import { persistGeneratedRelease, type GeneratedFile } from './generation';
+import { generateProjectFiles, persistGeneratedRelease, persistReleaseFiles, type GeneratedFile } from './generation';
+import { frameworkVersion } from './template';
 import { decryptProviderSecret, encryptProviderSecret, VercelCredentialError, type Provider } from './providers';
 import { createGitHubRepository, createVercelProject, deleteProviderResource, deployToVercel, provisionNeon, pushToGitHub, releaseFramework, vercelDeploymentStatus } from './delivery';
 import { removeProjectData } from './project-data';
 import { frameworkLabel, type AppFramework } from '../framework';
 
-export type JobKind = 'generate' | 'deliver' | 'vercel-status' | 'delete';
+export type JobKind = 'generate' | 'deliver' | 'vercel-status' | 'delete' | 'upgrade';
 export interface ClaimedJob { id: string; project_id: string; kind: JobKind; metadata: Record<string, any>; attempts: number; lease_id: string }
 export interface JobContext { db: Db; job: ClaimedJob; stage(text: string, progress: number): Promise<void>; think(agent: string, message: string): Promise<void>; pause(questions: unknown[], message: string): Promise<void>; enqueue(kind: JobKind, metadata: Record<string, unknown>, delaySeconds?: number): Promise<void>; requeue(delaySeconds: number, metadata: Record<string, unknown>): Promise<void> }
 export type JobHandler = (context: JobContext) => Promise<void>;
@@ -43,15 +44,43 @@ export async function queueLatestDelivery(db: Db, projectId: string): Promise<st
     if (!project || ['deleting', 'delete_failed'].includes(project.status)) return 'This project is being removed.';
     const active = await tx.query("SELECT 1 FROM cloud_jobs WHERE project_id = $1 AND status IN ('queued', 'running') LIMIT 1", [projectId]);
     if (active.rows.length) return 'Wait for the current job to finish before delivering.';
-    const release = await tx.query<{ id: string }>("SELECT id FROM cloud_releases WHERE project_id = $1 AND status = 'ready' ORDER BY version DESC LIMIT 1", [projectId]);
-    if (!release.rows[0]) return 'Build a release before delivering.';
+    const { rows: [release] } = await tx.query<{ id: string; framework_only: boolean }>(`
+      SELECT release.id, EXISTS (SELECT 1 FROM cloud_jobs job WHERE job.project_id = release.project_id
+        AND job.kind = 'upgrade' AND job.metadata->>'generatedReleaseId' = release.id::text) AS framework_only
+      FROM cloud_releases release WHERE release.project_id = $1 AND release.status = 'ready' ORDER BY release.version DESC LIMIT 1`, [projectId]);
+    if (!release) return 'Build a release before delivering.';
+    if (release.framework_only) return 'The framework upgrade is on GitHub main. Deploy that branch to preserve repository edits and published Studio changes.';
     const connection = await tx.query(
       `SELECT 1 FROM cloud_provider_connections connection JOIN cloud_projects project ON project.organization_id = connection.organization_id
        WHERE project.id = $1 AND connection.status = 'connected' AND connection.provider IN ('github', 'vercel', 'neon') LIMIT 1`, [projectId],
     );
     if (!connection.rows.length) return 'Connect a provider in Settings before delivering.';
-    await enqueueJob(tx, { projectId, kind: 'deliver', metadata: { releaseId: release.rows[0].id }, stage: 'Waiting to deliver the latest release' });
+    await enqueueJob(tx, { projectId, kind: 'deliver', metadata: { releaseId: release.id }, stage: 'Waiting to deliver the latest release' });
     await tx.query("UPDATE cloud_projects SET status = 'queued', updated_at = now() WHERE id = $1", [projectId]);
+  });
+}
+
+export async function githubRelease(db: Db, projectId: string) {
+  const { rows: [release] } = await db.query<{ id: string; framework_version: string | null; branch: string | null }>(`
+    SELECT release.id, release.framework_version, job.metadata->>'githubBranch' AS branch FROM cloud_releases release
+    JOIN cloud_jobs job ON job.project_id = release.project_id AND job.metadata->>'releaseId' = release.id::text
+    WHERE release.project_id = $1 AND release.status = 'ready' AND job.metadata ? 'githubCommit'
+    ORDER BY release.version DESC LIMIT 1`, [projectId]);
+  return release;
+}
+
+export async function queueFrameworkUpgrade(db: Db, projectId: string): Promise<string | undefined> {
+  return db.tx(async (tx) => {
+    const { rows: [project] } = await tx.query<{ status: string; app_framework: AppFramework; github_repository: string | null }>(
+      'SELECT status, app_framework, github_repository FROM cloud_projects WHERE id = $1 FOR UPDATE', [projectId]);
+    if (!project || ['deleting', 'delete_failed'].includes(project.status)) return 'This project is being removed.';
+    const active = await tx.query("SELECT 1 FROM cloud_jobs WHERE project_id = $1 AND status IN ('queued', 'running', 'waiting_input') LIMIT 1", [projectId]);
+    if (active.rows.length) return 'Finish the current job before upgrading.';
+    if (!project.github_repository || !await providerToken(tx, projectId, 'github')) return 'Connect GitHub and deliver a release before upgrading.';
+    const release = await githubRelease(tx, projectId);
+    if (!release) return 'Deliver a release to GitHub before upgrading.';
+    if (release.framework_version === frameworkVersion(project.app_framework)) return 'The GitHub release already uses the current framework.';
+    await enqueueJob(tx, { projectId, kind: 'upgrade', metadata: { baseReleaseId: release.id }, stage: 'Waiting to upgrade the framework' });
   });
 }
 
@@ -63,16 +92,16 @@ const runnableProject = `(job.kind = 'delete' OR (
   ))`;
 
 export async function claimJob(db: Db): Promise<ClaimedJob | undefined> {
-  const expired = await db.query<{ project_id: string; status: string }>(
+  const expired = await db.query<{ project_id: string; status: string; kind: JobKind }>(
     `UPDATE cloud_jobs SET status = CASE WHEN attempts >= $1 THEN 'failed' ELSE 'queued' END,
          error = CASE WHEN attempts >= $1 THEN 'The job stopped responding.' ELSE NULL END,
          finished_at = CASE WHEN attempts >= $1 THEN now() ELSE NULL END, lease_id = NULL, lease_expires_at = NULL
        WHERE id IN (SELECT id FROM cloud_jobs WHERE status = 'running'
          AND COALESCE(lease_expires_at, started_at + interval '10 minutes') <= now() FOR UPDATE SKIP LOCKED)
-       RETURNING project_id, status`,
+       RETURNING project_id, status, kind`,
     [MAX_ATTEMPTS],
   );
-  const failed = expired.rows.filter((job) => job.status === 'failed').map((job) => job.project_id);
+  const failed = expired.rows.filter((job) => job.status === 'failed' && job.kind !== 'upgrade').map((job) => job.project_id);
   if (failed.length) await db.query(`UPDATE cloud_projects project SET status = CASE WHEN status = 'deleting' THEN 'delete_failed' ELSE 'failed' END, updated_at = now()
     WHERE project.id = ANY($1::uuid[]) AND NOT EXISTS (SELECT 1 FROM cloud_jobs job
       WHERE job.project_id = project.id AND job.status IN ('queued', 'running', 'waiting_input'))`, [failed]);
@@ -160,7 +189,7 @@ export async function runJob(store: Db, job: ClaimedJob, handlers: Record<string
     console.error(`Job ${job.id} (${job.kind}) failed`, cause);
     await db.tx(async (tx) => {
       await tx.query("UPDATE cloud_jobs SET status = 'failed', error = $2, finished_at = now(), lease_id = NULL, lease_expires_at = NULL, log = log || jsonb_build_array(jsonb_build_object('at', now(), 'message', $2::text)) WHERE id = $1", [job.id, message]);
-      await tx.query('UPDATE cloud_projects SET status = $2, updated_at = now() WHERE id = $1', [job.project_id, job.kind === 'delete' ? 'delete_failed' : 'failed']);
+      if (job.kind !== 'upgrade') await tx.query('UPDATE cloud_projects SET status = $2, updated_at = now() WHERE id = $1', [job.project_id, job.kind === 'delete' ? 'delete_failed' : 'failed']);
     }).catch((failure) => { if (!(failure instanceof JobLeaseLost)) throw failure; });
   } finally {
     clearInterval(heartbeat);
@@ -377,6 +406,45 @@ async function releaseFiles(db: Db, releaseId: string): Promise<{ version: numbe
   return { version: release.rows[0].version, files: files.rows };
 }
 
+const upgrade: JobHandler = async ({ db, job, stage }) => {
+  if (job.metadata.githubCommit) return;
+  const project = await loadProject(db, job.project_id);
+  const github = await providerToken(db, project.id, 'github');
+  if (!github || !project.github_repository) throw new Error('Connect GitHub before retrying this upgrade.');
+  const previous = await githubRelease(db, project.id);
+  if (!previous || previous.id !== job.metadata.baseReleaseId) throw new Error('The GitHub release changed. Start a new framework upgrade from Source & delivery.');
+  const { files: base } = await releaseFiles(db, previous.id);
+  const framework = releaseFramework(base);
+  const manifestPath = framework === 'nextjs' ? 'lib/mosaic-app.json' : 'apps/web/src/lib/server/mosaic-app.json';
+  const specFile = base.find((file) => file.path === 'mosaic/spec.json');
+  const manifest = base.find((file) => file.path === manifestPath);
+  if (!specFile || !manifest) throw new Error('This release predates framework upgrades. Deliver a current app release first.');
+
+  let releaseId = job.metadata.generatedReleaseId as string | undefined;
+  if (!releaseId) {
+    await stage('Preparing framework files', 20);
+    const isAppFile = (path: string) => path.startsWith('mosaic/') || path === manifestPath || path === 'lib/site.js'
+      || /^(?:apps\/web\/src\/lib\/server\/)?entities\//.test(path);
+    const generated = generateProjectFiles({
+      name: project.name, slug: project.slug, framework, theme: project.ui_theme, projectId: project.id,
+      spec: JSON.parse(specFile.content), app: JSON.parse(manifest.content),
+    });
+    const files = [...generated.filter((file) => !isAppFile(file.path)), ...base.filter((file) => isAppFile(file.path))]
+      .sort((a, b) => a.path.localeCompare(b.path));
+    const release = await persistReleaseFiles(db, { projectId: project.id, jobId: job.id, files, framework, pending: true });
+    releaseId = release.id;
+  }
+  const { files, version } = await releaseFiles(db, releaseId);
+  await stage('Pushing framework upgrade to GitHub main', 60);
+  const pushed = await pushToGitHub({ token: github.token, repository: project.github_repository, branch: 'main', base, files, message: `Upgrade Mosaic framework (v${version})` });
+  await db.tx(async (tx) => {
+    await tx.query("UPDATE cloud_releases SET status = 'ready' WHERE id = $1", [releaseId]);
+    await tx.query("UPDATE cloud_jobs SET metadata = metadata || jsonb_build_object('releaseId', $2::text, 'githubCommit', $3::text, 'githubBranch', $4::text) WHERE id = $1",
+      [job.id, releaseId, pushed.commit, pushed.branch]);
+  });
+  await stage(`Framework upgrade pushed to main (${pushed.commit.slice(0, 7)})`, 100);
+};
+
 /** Per-project secrets for the deployed app, generated once and stored encrypted. */
 async function deploySecrets(db: Db, project: ProjectRow): Promise<{ jwtSecret: string; adminEmail: string; adminPassword: string }> {
   if (project.deploy_secret) return JSON.parse(decryptProviderSecret(project.deploy_secret));
@@ -421,8 +489,10 @@ const deliver: JobHandler = async ({ db, job, stage, think, enqueue }) => {
       repository = await createGitHubRepository({ token: github.token, owner: String(github.metadata.login ?? ''), name: project.slug });
       await db.query('UPDATE cloud_projects SET github_repository = $2, updated_at = now() WHERE id = $1', [project.id, repository]);
     }
-    const pushed = await pushToGitHub({ token: github.token, repository, files, message: `Mosaic release v${version}` });
-    await db.query("UPDATE cloud_jobs SET metadata = metadata || jsonb_build_object('githubCommit', $2::text) WHERE id = $1", [job.id, pushed.commit]);
+    const previous = await githubRelease(db, project.id);
+    const base = previous ? (await releaseFiles(db, previous.id)).files : undefined;
+    const pushed = await pushToGitHub({ token: github.token, repository, files, base, branch: previous?.branch ?? undefined, message: `Mosaic release v${version}` });
+    await db.query("UPDATE cloud_jobs SET metadata = metadata || jsonb_build_object('githubCommit', $2::text, 'githubBranch', $3::text) WHERE id = $1", [job.id, pushed.commit, pushed.branch]);
     await stage(`Committed ${pushed.commit.slice(0, 7)} to ${pushed.repository}`, 60);
   }
 
@@ -534,4 +604,4 @@ const deleteProject: JobHandler = async ({ db, job, stage }) => {
   void discardPreview(project.id);
 };
 
-const HANDLERS: Record<JobKind, JobHandler> = { generate, deliver, 'vercel-status': vercelStatus, delete: deleteProject };
+const HANDLERS: Record<JobKind, JobHandler> = { generate, deliver, 'vercel-status': vercelStatus, delete: deleteProject, upgrade };

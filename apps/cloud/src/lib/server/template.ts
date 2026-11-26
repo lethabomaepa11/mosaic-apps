@@ -1,4 +1,5 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { AppFramework } from '../framework.ts';
@@ -31,6 +32,20 @@ function fromDisk(framework: AppFramework): Record<string, string> {
 const cached: Partial<Record<AppFramework, Record<string, string>>> = {};
 export function templateFiles(framework: AppFramework): Record<string, string> {
   return cached[framework] ??= typeof __MOSAIC_TEMPLATE_FILES__ === 'undefined' ? fromDisk(framework) : __MOSAIC_TEMPLATE_FILES__[framework];
+}
+
+const versions: Partial<Record<AppFramework, string>> = {};
+
+export function frameworkVersion(framework: AppFramework): string {
+  const ordered = (files: Array<[string, string]>) => files.sort(([a], [b]) => a.localeCompare(b))
+    .map(([path, content]) => [path, content.replace(/\r\n/g, '\n')]);
+  return versions[framework] ??= createHash('sha256').update(JSON.stringify([
+    // Increment when generation changes the scaffold independently of its source files.
+    1, framework,
+    ordered(Object.entries(templateFiles(framework))),
+    ...(framework === 'nextjs' ? [ordered(Object.entries(templateFiles('sveltekit'))
+      .filter(([path]) => /\/src\/(?:routes\/studio\/|lib\/studio\/|lib\/client\.ts$|app\.css$)|\/create-workflows\.js$/.test(path)))] : []),
+  ])).digest('hex').slice(0, 16);
 }
 
 /** Same token substitution and dotfile renames as the CLI's copyTemplate. */

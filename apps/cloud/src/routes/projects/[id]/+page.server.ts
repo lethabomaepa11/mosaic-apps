@@ -4,7 +4,9 @@ import { getCloudDb, id, readCloud, transientCloudDbError } from '#lib/server/db
 import { isDaisyTheme } from '#lib/themes';
 import type { ProjectBlueprint } from '#lib/server/groq';
 import type { Answer, BuildFeature } from '#lib/server/agents';
-import { enqueueJob, kickJobs, queueLatestDelivery } from '#lib/server/jobs';
+import { enqueueJob, githubRelease, kickJobs, queueFrameworkUpgrade, queueLatestDelivery } from '#lib/server/jobs';
+import { frameworkVersion } from '#lib/server/template';
+import type { AppFramework } from '#lib/framework';
 import { canManageConnections } from '#lib/server/connections';
 import { deleteProject } from '#lib/server/projects';
 import type { Provider } from '#lib/server/providers';
@@ -14,7 +16,7 @@ const removing = (status: string | undefined) => status === 'deleting' || status
 async function projectFor(projectId: string, userId: string) {
   const result = await readCloud((db) => db.query<{
     id: string; organization_id: string; role: string; name: string; slug: string; prompt: string; status: string;
-    include_home: boolean; include_login: boolean; app_framework: string; ui_system: string; ui_theme: string; allow_registration: boolean;
+    include_home: boolean; include_login: boolean; app_framework: AppFramework; ui_system: string; ui_theme: string; allow_registration: boolean;
     blueprint: ProjectBlueprint | null; planner_model: string | null; planned_at: string | null;
     github_repository: string | null; vercel_project_id: string | null; neon_project_id: string | null;
   }>(
@@ -31,11 +33,11 @@ async function projectFor(projectId: string, userId: string) {
   return result.rows[0];
 }
 
-export const load: PageServerLoad = async ({ params, locals }) => {
-  if (!locals.user) throw redirect(303, '/login');
+export const load: PageServerLoad = async ({ params, locals, url }) => {
+  if (!locals.user) throw redirect(303, `/login?${new URLSearchParams({ next: url.pathname + url.search })}`);
   const project = await projectFor(params.id, locals.user.id);
   if (!project) throw error(404, 'Project not found');
-  const [environments, jobs, messages, releases, generation] = await readCloud(async (db) => [
+  const [environments, jobs, messages, releases, generation, gitRelease] = await readCloud(async (db) => [
     await db.query<{ id: string; name: string; kind: string; status: string; url: string | null }>('SELECT id, name, kind, status, url FROM cloud_environments WHERE project_id = $1 ORDER BY kind DESC', [project.id]),
     await db.query<{ id: string; kind: string; status: string; progress: number; stage: string | null; error: string | null; created_at: string; started_at: string | null; lease_expires_at: string | null; run_after: string; log: Array<{ at: string; message: string; agent?: string }>; questions: Array<{ question: string; options: string[] }> | null }>("SELECT id, kind, status, progress, stage, error, created_at, started_at, lease_expires_at, run_after, log, metadata->'questions' AS questions FROM cloud_jobs WHERE project_id = $1 ORDER BY created_at DESC LIMIT 20", [project.id]),
     await db.query<{ id: string; role: string; content: string; created_at: string }>(
@@ -43,8 +45,9 @@ export const load: PageServerLoad = async ({ params, locals }) => {
        FROM cloud_messages message JOIN cloud_conversations conversation ON conversation.id = message.conversation_id
        WHERE conversation.project_id = $1 ORDER BY message.created_at`, [project.id],
     ),
-    await db.query<{ id: string; version: number; status: string; checksum: string; file_count: number; created_at: string }>('SELECT id, version, status, checksum, file_count, created_at FROM cloud_releases WHERE project_id = $1 ORDER BY version DESC LIMIT 10', [project.id]),
+    await db.query<{ id: string; version: number; status: string; checksum: string; file_count: number; created_at: string }>("SELECT id, version, status, checksum, file_count, created_at FROM cloud_releases WHERE project_id = $1 AND status = 'ready' ORDER BY version DESC LIMIT 10", [project.id]),
     await db.query<{ spec: string | null; features: BuildFeature[] | null; completed: number | null }>("SELECT metadata->>'refinedSpec' AS spec, metadata->'featurePlan' AS features, (metadata->>'completedFeatures')::int AS completed FROM cloud_jobs WHERE project_id = $1 AND kind = 'generate' AND metadata ? 'generationMode' ORDER BY created_at DESC LIMIT 1", [project.id]),
+    project.github_repository && canManageConnections(project.role) ? await githubRelease(db, project.id) : undefined,
   ] as const).catch((cause) => {
     if (transientCloudDbError(cause)) throw error(503, 'Cloud is reconnecting to its database. Reload the project shortly.');
     throw cause;
@@ -54,10 +57,22 @@ export const load: PageServerLoad = async ({ params, locals }) => {
   const now = Date.now();
   if (jobs.rows.some((job) => (project.status !== 'needs_input' && job.status === 'queued' && now - new Date(job.run_after).getTime() > 30_000)
     || (job.status === 'running' && now >= (job.lease_expires_at ? new Date(job.lease_expires_at).getTime() : new Date(job.started_at ?? job.created_at).getTime() + 10 * 60_000)))) kickJobs();
-  return { project, environments: environments.rows, jobs: jobs.rows, messages: messages.rows, releases: releases.rows, generation: generation.rows[0] };
+  return { project, environments: environments.rows, jobs: jobs.rows, messages: messages.rows, releases: releases.rows, generation: generation.rows[0],
+    upgradeAvailable: Boolean(gitRelease && gitRelease.framework_version !== frameworkVersion(project.app_framework)),
+  };
 };
 
 export const actions: Actions = {
+  upgrade: async ({ params, locals }) => {
+    if (!locals.user) throw redirect(303, '/login');
+    const project = await projectFor(params.id, locals.user.id);
+    if (!project) throw error(404, 'Project not found');
+    if (!canManageConnections(project.role)) return fail(403, { upgradeMessage: 'Only workspace owners and admins can upgrade the framework.' });
+    const message = await queueFrameworkUpgrade(await getCloudDb(), project.id);
+    if (message) return fail(409, { upgradeMessage: message });
+    kickJobs();
+    return { upgradeQueued: true };
+  },
   delete: async ({ params, request, locals }) => {
     if (!locals.user) throw redirect(303, '/login');
     const form = await request.formData();
@@ -166,14 +181,15 @@ export const actions: Actions = {
       const { rows: [current] } = await tx.query<{ status: string }>('SELECT status FROM cloud_projects WHERE id = $1 FOR UPDATE', [project.id]);
       const { rows: [job] } = await tx.query<{ kind: string }>("SELECT kind FROM cloud_jobs WHERE id = $1 AND project_id = $2 AND status = 'failed'", [jobId, project.id]);
       if (!job || !current) return 404;
-      if (job.kind === 'delete' && !canManageConnections(project.role)) return 403;
+      if (['delete', 'upgrade'].includes(job.kind) && !canManageConnections(project.role)) return 403;
       if (current.status === 'deleting' || (removing(current.status) && job.kind !== 'delete')) return 409;
+      if (job.kind === 'upgrade' && (await tx.query("SELECT 1 FROM cloud_jobs WHERE project_id = $1 AND status IN ('queued', 'running', 'waiting_input') LIMIT 1", [project.id])).rows.length) return 409;
       await tx.query(`UPDATE cloud_jobs SET status = 'queued', attempts = 0, error = NULL, finished_at = NULL, run_after = now(), stage = 'Queued for retry',
         metadata = CASE WHEN kind = 'delete' THEN metadata || jsonb_build_object('userId', $2::text) ELSE metadata END WHERE id = $1`, [jobId, locals.user!.id]);
-      await tx.query('UPDATE cloud_projects SET status = $2, updated_at = now() WHERE id = $1', [project.id, job.kind === 'delete' ? 'deleting' : 'queued']);
+      if (job.kind !== 'upgrade') await tx.query('UPDATE cloud_projects SET status = $2, updated_at = now() WHERE id = $1', [project.id, job.kind === 'delete' ? 'deleting' : 'queued']);
       return 200;
     });
-    if (result !== 200) return fail(result, { message: result === 403 ? 'A workspace owner or admin must retry deletion.' : result === 409 ? 'This project is already being removed.' : 'That job cannot be retried.' });
+    if (result !== 200) return fail(result, { message: result === 403 ? 'A workspace owner or admin must retry this job.' : result === 409 ? 'The current project job must finish first.' : 'That job cannot be retried.' });
     kickJobs();
     return { queued: true };
   },

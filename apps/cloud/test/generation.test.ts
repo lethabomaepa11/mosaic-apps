@@ -7,9 +7,23 @@ import { decryptProviderSecret, encryptProviderSecret } from '../src/lib/server/
 import { autoRepair, compileSpec, normalizeSpec, validateSpec } from '../src/lib/server/spec';
 import { verifyApp } from '../src/lib/server/mosaic-runtime';
 import { frameworkGuideContext } from '../src/lib/server/mosaic-knowledge';
+import { frameworkVersion } from '../src/lib/server/template';
+import { loginReturn } from '../src/lib/server/login-return';
 import { equipmentSpec } from './fixtures/equipment-spec';
 
 const project = () => generateProjectFiles({ name: 'Equipment Loans', slug: 'equipment-loans', spec: equipmentSpec, app: compileSpec(equipmentSpec) });
+
+test('both Studio scaffolds carry the Cloud project and framework that shipped them', () => {
+  const projectId = '5453e3f1-6271-46b3-9256-793f5f05e55f';
+  for (const framework of ['sveltekit', 'nextjs'] as const) {
+    const files = generateProjectFiles({ name: 'Equipment Loans', slug: 'equipment-loans', spec: equipmentSpec, app: compileSpec(equipmentSpec), framework, projectId });
+    const config = files.find(({ path }) => path.endsWith('/studio/cloud-release.ts'))!.content;
+    assert.ok(config.includes(JSON.stringify(projectId)));
+    assert.ok(config.includes(JSON.stringify(frameworkVersion(framework))));
+  }
+  assert.equal(loginReturn(`/projects/${projectId}?tab=source`), `/projects/${projectId}?tab=source`);
+  assert.equal(loginReturn(`//other.example/projects/${projectId}`), '/');
+});
 
 test('Next.js releases ship the framework Studio with clean build inputs', () => {
   const files = generateProjectFiles({ name: 'Equipment Loans', slug: 'equipment-loans', spec: equipmentSpec, app: compileSpec(equipmentSpec), framework: 'nextjs' });
