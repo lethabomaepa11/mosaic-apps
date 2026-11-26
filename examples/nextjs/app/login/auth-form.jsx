@@ -41,7 +41,15 @@ export default function AuthForm({ allowRegistration, registering, page, childre
       });
       if (!response.ok) throw new Error(response.status === 409 ? 'This email already has an account.' : `${registering ? 'Account creation' : 'Sign-in'} failed. Check your account details.`);
       const next = new URL(location.href).searchParams.get('next');
-      location.assign(next && /^\/(?![\/\\])/.test(next) && !/[\\\u0000-\u001f]/.test(next) ? next : '/');
+      if (next && /^\/(?![\/\\])/.test(next) && !/[\\\u0000-\u001f]/.test(next)) {
+        location.assign(next);
+        return;
+      }
+      const pages = await fetch('/api/pages?published=true').then((response) => response.ok ? response.json() : null).catch(() => null);
+      const firstPage = pages?.data?.filter((item) => item.root && item.settings?.requiresAuth && item.settings.menu?.show !== false
+        && /^\/(?:[a-z0-9-]+\/)*[a-z0-9-]+$/i.test(item.route))
+        .sort((a, b) => (a.settings?.menu?.order ?? 99) - (b.settings?.menu?.order ?? 99))[0];
+      location.assign(firstPage?.route ?? '/');
     } catch (cause) {
       setError(cause.message);
       setPending(false);

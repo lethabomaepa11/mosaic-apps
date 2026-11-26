@@ -31,7 +31,15 @@
       client.setToken(res.token);
       toast.success(`Signed in as ${res.user.name}`);
       const next = page.url.searchParams.get('next');
-      await goto(next && /^\/(?![/\\])/.test(next) && !/[\\\u0000-\u001f]/.test(next) ? next : '/');
+      if (next && /^\/(?![/\\])/.test(next) && !/[\\\u0000-\u001f]/.test(next)) {
+        await goto(next);
+        return;
+      }
+      const pages = await client.listPages(true).catch(() => []);
+      const firstPage = pages.filter((item) => item.root && item.settings?.requiresAuth && item.settings.menu?.show !== false
+        && /^\/(?:[a-z0-9-]+\/)*[a-z0-9-]+$/i.test(item.route))
+        .sort((a, b) => (a.settings?.menu?.order ?? 99) - (b.settings?.menu?.order ?? 99))[0];
+      await goto(firstPage?.route ?? '/');
     } catch (err) {
       error = err instanceof Error ? err.message : String(err);
     } finally {

@@ -77,6 +77,18 @@ test('generated appointment form distinguishes calendar dates from times', () =>
   assert.equal(fields?.[1]?.props?.withTime, undefined);
 });
 
+test('a spotlight can add home copy without duplicating the page title', () => {
+  const { spec } = autoRepair(normalizeSpec({
+    name: 'Clinic Manager',
+    pages: [{ kind: 'home', route: '/', title: 'Welcome to Clinic Manager', access: 'public', sections: [
+      { kind: 'spotlight', title: 'Welcome to Clinic Manager', body: 'Book an appointment with the clinic.' },
+    ] }],
+  }));
+  const nodes = compileSpec(spec).pages[0]?.root.children;
+  assert.equal(nodes?.[0]?.props?.text, 'Welcome to Clinic Manager');
+  assert.deepEqual(nodes?.[1]?.children?.map((child) => child.props?.text), ['Book an appointment with the clinic.']);
+});
+
 test('missing keys and nulls from a drifted answer are filled with safe defaults', () => {
   const spec = normalizeSpec({ name: 'X', entities: [{ name: 'item', fields: [{ name: 'title', type: 'string' }, { name: 'kind', type: 'weird' }] }], pages: [{ route: '/items', kind: 'list', entity: 'item' }] });
   assert.equal(spec.entities[0]!.fields[1]!.type, 'string');

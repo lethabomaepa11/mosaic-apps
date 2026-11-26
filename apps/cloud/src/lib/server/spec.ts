@@ -421,14 +421,16 @@ export function compileSpec(spec: AppSpec): CompiledApp {
         children.push({ id: key, type: 'entityTable', props: { entity: section.entity, title: section.title, columns, pageSize: 8, allowCreate: false, allowEdit: false, allowDelete: false, drillDown: false } });
         continue;
       }
-      const content: FormNode[] = [{ id: `${key}_title`, type: 'heading', props: { level: 2, text: section.title } }];
+      const content: FormNode[] = section.title.trim().toLowerCase() === page.title.trim().toLowerCase()
+        ? []
+        : [{ id: `${key}_title`, type: 'heading', props: { level: 2, text: section.title } }];
       if (section.body) content.push({ id: `${key}_copy`, type: 'text', props: { text: section.body } });
       if (section.kind === 'metric') content.push({ id: `${key}_value`, type: 'statCard', props: { entity: section.entity, label: byName.get(section.entity)?.labelPlural } });
       if (section.kind === 'form') {
         const form = forms.find((item) => item.entity === section.entity);
         if (form) content.push({ id: `${key}_action`, type: 'button', props: { label: section.title, variant: 'primary', events: { onclick: [{ type: 'navigate', target: 'form', to: form.slug }] } } });
       }
-      children.push({ id: key, type: 'card', children: content });
+      if (content.length) children.push({ id: key, type: 'card', children: content });
     }
     const requestedRoles = page.roles?.filter((role) => role !== '*') ?? [];
     const entityReaders = protectedEntities.has(page.entity) ? ['admin'] : byName.get(page.entity)?.permissions.read ?? [];
