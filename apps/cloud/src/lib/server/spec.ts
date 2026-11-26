@@ -207,6 +207,24 @@ export function autoRepair(input: AppSpec): { spec: AppSpec; repairs: string[] }
       repairs.push(`${entity.name}.${field.name}: linked to ${profileEntity.name}.${sources[0]} from the signed-in profile`);
     }
   }
+  const privateLinks = protectedSubmissionEntities(spec, false);
+  const profileEntities = new Set(spec.entities.map((entity) => entity.submission?.profile?.entity));
+  for (const profile of spec.entities.filter((entity) => profileEntities.has(entity.name))) {
+    for (const field of profile.fields) if (field.type === 'ref') privateLinks.add(field.refEntity);
+  }
+  for (const entity of spec.entities) {
+    const submission = entity.submission;
+    if (!submission) continue;
+    for (const field of entity.fields) {
+      if (field.type !== 'ref' || privateLinks.has(field.refEntity) || submission.selectable?.includes(field.name)
+        || submission.managed.some((item) => item.field === field.name)) continue;
+      const catalog = spec.entities.find((item) => item.name === field.refEntity);
+      if (catalog && submissionCanReadCatalog(entity, catalog)) {
+        (submission.selectable ??= []).push(field.name);
+        repairs.push(`${entity.name}.${field.name}: enabled selection from the readable ${catalog.name} directory`);
+      }
+    }
+  }
   spec.sampleData = spec.sampleData.filter((sample) => names.has(sample.entity));
   for (const page of spec.pages) {
     if (page.entity) page.entity = renamedEntities.get(page.entity) ?? page.entity;
@@ -241,10 +259,18 @@ function profileReferenceFields(profile: SpecEntity, target: SpecField): string[
   ];
 }
 
-function protectedSubmissionEntities(spec: AppSpec): Set<string> {
+function submissionCanReadCatalog(entity: SpecEntity, catalog: SpecEntity): boolean {
+  const read = catalog.permissions.read;
+  const submit = entity.permissions.create;
+  return read.includes('*') || (submit.length > 0 && submit.every((role) => role === 'admin' || read.includes(role)));
+}
+
+function protectedSubmissionEntities(spec: AppSpec, includeUnclassified = true): Set<string> {
   return new Set(spec.entities.flatMap((entity) => entity.submission ? [
     entity.name, entity.submission.profile?.entity ?? '',
-    ...entity.fields.filter((field) => field.type === 'ref' && !entity.submission?.selectable?.includes(field.name)).map((field) => field.refEntity),
+    ...entity.fields.filter((field) => field.type === 'ref' && (includeUnclassified
+      ? !entity.submission?.selectable?.includes(field.name)
+      : entity.submission?.managed.some((item) => item.field === field.name))).map((field) => field.refEntity),
   ] : []));
 }
 
@@ -314,10 +340,8 @@ export function validateSpec(spec: AppSpec): string[] {
     for (const field of selectable) {
       const ref = entity.fields.find((item) => item.name === field && item.type === 'ref');
       const catalog = ref && spec.entities.find((item) => item.name === ref.refEntity);
-      const read = catalog?.permissions.read ?? [];
-      const submit = entity.permissions.create.filter((role) => role !== 'admin');
       if (!catalog || protectedEntities.has(catalog.name) || managedNames.has(field)
-        || !read.length || (!read.includes('*') && (!entity.permissions.create.length || submit.some((role) => !read.includes(role))))) {
+        || !submissionCanReadCatalog(entity, catalog)) {
         issues.push(`${entity.name}.${field}: a selectable link needs a separate directory with explicit read access for every submitting role. Keep patient, owner and tenant links server-managed.`);
       }
     }

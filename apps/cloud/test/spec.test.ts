@@ -76,6 +76,29 @@ test('RSVP membership is repaired using the unique account email on the linked m
   assert.match(validateSpec(autoRepair(draft).spec).join('\n'), /rsvp\.member: invalid server-managed value/);
 });
 
+test('book and equipment pickers reuse catalogue access without changing private roles', () => {
+  const draft = normalizeSpec({
+    entities: [
+      { name: 'book', fields: [{ name: 'title' }], permissions: { read: ['viewer'] } },
+      { name: 'equipment', fields: [{ name: 'name' }], permissions: { read: ['viewer'] } },
+      { name: 'member', fields: [{ name: 'email', unique: true }] },
+      { name: 'meeting', permissions: { create: ['viewer'] }, fields: [
+        { name: 'book', type: 'ref', refEntity: 'book' }, { name: 'published', type: 'boolean' },
+      ], submission: { managed: [{ field: 'published', source: 'constant', value: 'false' }] } },
+      { name: 'loan', permissions: { create: ['viewer'] }, fields: [
+        { name: 'equipment', type: 'ref', refEntity: 'equipment' }, { name: 'borrower', type: 'ref', refEntity: 'member' },
+      ], submission: { profile: { entity: 'member', emailField: 'email' }, managed: [{ field: 'borrower', source: 'profile', value: 'id' }] } },
+    ],
+  });
+  const repaired = autoRepair(draft).spec;
+  assert.deepEqual(validateSpec(repaired), []);
+  assert.deepEqual(repaired.entities[3]?.submission?.selectable, ['book']);
+  assert.deepEqual(repaired.entities[4]?.submission?.selectable, ['equipment']);
+  assert.deepEqual(compileSpec(repaired).entities.find((entity) => entity.name === 'member')?.permissions?.read, ['admin']);
+  draft.entities[0]!.permissions.read = ['admin'];
+  assert.match(validateSpec(autoRepair(draft).spec).join('\n'), /meeting\.book: choose a server-managed profile link/);
+});
+
 test('sample records are understood in every shape models produce', () => {
   const shapes = [
     [{ fullName: 'Thandi Nkosi', email: 't@example.com' }],                                  // record objects (asked for)
