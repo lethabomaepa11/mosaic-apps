@@ -37,6 +37,24 @@ Connect only the providers you need under **Settings → Connections**.
 
 Cloud queues delivery after a release when providers are connected. To send an existing release, use **Source & delivery → Deliver latest** after connecting your accounts. You can also download the release from that tab. The Vercel build installs the latest **published** Mosaic packages for the target framework.
 
+### Upgrade the framework
+
+Published pages and forms can update through the app API. Framework code updates
+need a new build. In **Source & delivery**, a workspace owner or admin can select
+**Upgrade framework and push to main** after the project has delivered a release
+to GitHub. Cloud updates the generated framework files and keeps unrelated
+repository edits. If a framework update overlaps your edits, Cloud stops and
+lists the files in **Activity**.
+
+GitHub-connected hosts can deploy the new commit automatically. On a host that
+receives uploaded releases, build and deploy the updated `main` branch using
+your existing production environment. The upgrade itself does not write to the
+live database or publish page and form changes.
+
+Studio shows admins an **Upgrade in Mosaic Cloud** link when a newer framework
+is available. Apps deployed before this feature can get their first upgrade from
+**Source & delivery**. The link appears after they deploy that first upgrade.
+
 When production is ready, workspace owners and admins can choose **View admin sign-in**, then **Reveal initial app sign-in**. Use those credentials at the deployed app's `/login`. Cloud-generated local downloads can use `admin@mosaic.local` / `admin1234` when you leave local bootstrap credentials unset.
 
 If Vercel rejects a credential, reconnect it under **Settings → Connections** and check **Source & delivery → Activity** for the blocked job. For hosting outside Cloud's delivery setup, use [Manual deployment](./deployment.md).
