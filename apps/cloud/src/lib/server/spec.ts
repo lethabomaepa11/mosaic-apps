@@ -187,10 +187,15 @@ export function autoRepair(input: AppSpec): { spec: AppSpec; repairs: string[] }
     }
     const profile = submission.profile;
     if (profile) profile.entity = renamedEntities.get(profile.entity) ?? snake(profile.entity);
-    for (const value of submission.managed) {
-      if (value.source === 'profile') value.value = camel(value.value.replace(/^profile\./, ''));
-    }
     const profileEntity = spec.entities.find((item) => item.name === profile?.entity);
+    for (const value of submission.managed) {
+      if (value.source !== 'profile') continue;
+      const path = value.value.replace(/^profile\./i, '');
+      const nested = path.match(/^([\w-]+)\.id$/i)?.[1];
+      const target = entity.fields.find((field) => field.name === value.field && field.type === 'ref');
+      value.value = nested && profileEntity && target && profileReferenceFields(profileEntity, target).includes(camel(nested))
+        ? camel(nested) : camel(path);
+    }
     if (!profileEntity) continue;
     const ownRefs = entity.fields.filter((field) => field.type === 'ref' && field.refEntity === profileEntity.name);
     for (const field of entity.fields) {
@@ -327,12 +332,23 @@ export function validateSpec(spec: AppSpec): string[] {
     for (const value of submission.managed) {
       const target = entity.fields.find((field) => field.name === value.field);
       const from = profile?.fields.find((field) => field.name === value.value);
-      const profileId = value.value === 'id' && target?.type === 'ref' && target.refEntity === profile?.name;
-      if ((value.source === 'now' || value.source === 'empty') && (target?.type !== 'datetime' || (value.source === 'empty' && target.required))) {
+      const at = `${entity.name}.${value.field}`;
+      if (managedNames.has(value.field)) {
+        issues.push(`${at}: provide exactly one server-managed mapping.`);
+      } else if (target?.type === 'ref') {
+        const candidates = profile ? profileReferenceFields(profile, target) : [];
+        if (value.source !== 'profile' || !candidates.includes(value.value)) {
+          const configured = profile ? `The configured profile is "${profile.name}".` : 'No signed-in profile is configured.';
+          const next = candidates.length ? `Set source "profile" and choose ${candidates.map((name) => `"${name}"`).join(' or ')}.`
+            : `Use an existing signed-in profile with a unique email field and a reference to "${target.refEntity}", or use its ID when the profile is "${target.refEntity}".`;
+          issues.push(`${at}: invalid server-managed value for a reference to "${target.refEntity}". ${configured} ${next}`);
+        }
+      } else if ((value.source === 'now' || value.source === 'empty') && (target?.type !== 'datetime' || (value.source === 'empty' && target.required))) {
         issues.push(`${entity.name}.${value.field}: "now" requires a datetime; "empty" requires an optional datetime.`);
-      } else if (managedNames.has(value.field) || !target || (value.source === 'profile' && !profileId && (!from || from.type !== target.type || from.refEntity !== target.refEntity))
-        || (target.type === 'ref' && value.source !== 'profile') || (value.source === 'constant' && target.type === 'enum' && !target.options.includes(value.value))) {
-        issues.push(`${entity.name}.${value.field}: invalid server-managed value. A link to the signed-in profile itself uses source "profile" and value "id". For another managed link use a profile field that references the same entity.`);
+      } else if (!target || (value.source === 'profile' && from?.type !== target.type)
+        || ((value.source === 'userId' || value.source === 'userEmail') && target.type !== 'string' && target.type !== 'text')
+        || (value.source === 'constant' && target.type === 'enum' && !target.options.includes(value.value))) {
+        issues.push(`${at}: invalid server-managed value for ${target?.type ?? 'a missing field'}.`);
       }
       managedNames.add(value.field);
     }

@@ -158,6 +158,32 @@ test('a failing job records its error and fails the project', async () => {
   assert.deepEqual(await jobsOf(projectId), [{ kind: 'generate', status: 'failed', error: 'boom' }]);
 });
 
+test('an unchanged invalid workflow stops after two repair attempts', async () => {
+  const { projectId } = await createProject();
+  const jobId = await enqueueJob(db, { projectId, kind: 'generate', metadata: { skipQuestions: true } });
+  const broken = {
+    entities: [
+      { name: 'organization', fields: [{ name: 'name' }] },
+      { name: 'user', fields: [{ name: 'organization', type: 'ref', refEntity: 'organization' }], submission: {
+        managed: [{ field: 'organization', source: 'constant', value: 'acme' }],
+      } },
+    ],
+  };
+  groqCalls.length = 0;
+  stagedReply = () => ({ thinking: [], spec: broken });
+  try {
+    const job = await claimJob(db);
+    assert.equal(job?.id, jobId);
+    await runJob(db, job!);
+    const jobs = await jobsOf(projectId);
+    assert.equal(jobs[0]?.status, 'failed');
+    assert.match(jobs[0]?.error ?? '', /same design errors remained after two repairs.*user\.organization.*No signed-in profile is configured/);
+    assert.equal(groqCalls.filter((name) => name === 'mosaic_app_spec_fix').length, 2);
+  } finally {
+    stagedReply = undefined;
+  }
+});
+
 test('a stalled running job is requeued and claimed again', async () => {
   const { projectId } = await createProject();
   const jobId = await enqueueJob(db, { projectId, kind: 'generate' });

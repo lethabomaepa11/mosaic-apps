@@ -51,7 +51,11 @@ test('user organization repair follows the signed-in membership only when the so
 
   const membership = draft.entities[1]!;
   membership.fields.push({ ...membership.fields[1]!, name: 'billingCompany' });
-  assert.match(validateSpec(autoRepair(draft).spec).join('\n'), /user\.organization: invalid server-managed value/);
+  assert.match(validateSpec(autoRepair(draft).spec).join('\n'), /user\.organization: invalid server-managed value.*"company" or "billingCompany"/);
+  const mapping = draft.entities[2]!.submission!.managed[0]!;
+  mapping.value = 'profile.billingCompany.id';
+  assert.deepEqual(validateSpec(autoRepair(draft).spec), []);
+  assert.equal(autoRepair(draft).spec.entities[2]?.submission?.managed[0]?.value, 'billingCompany');
   membership.fields.splice(1);
   assert.match(validateSpec(autoRepair(draft).spec).join('\n'), /user\.organization: invalid server-managed value/);
 });

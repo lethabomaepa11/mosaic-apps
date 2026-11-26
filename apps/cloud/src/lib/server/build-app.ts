@@ -76,6 +76,8 @@ export async function buildApp(
   let reviews = 0;
   let reviewApproved = false;
   let verified: Extract<BuildResult, { status: 'built' }> | undefined;
+  let previousDesignErrors = '';
+  let repeatedDesignErrors = 0;
   const designProblems = (candidate: AppSpec) => [
     ...validateSpec(candidate),
     ...(input.feature && input.current ? preservedDesign(input.current, candidate) : []),
@@ -86,6 +88,12 @@ export async function buildApp(
     if (repaired.repairs.length) await events.think('Verifier', `Auto-fixed ${repaired.repairs.length} small issue${repaired.repairs.length === 1 ? '' : 's'} (${repaired.repairs.slice(0, 2).join('; ')})`);
     let problems = designProblems(spec);
     let app: CompiledApp | undefined;
+    const designErrors = JSON.stringify([...problems].sort());
+    repeatedDesignErrors = problems.length && designErrors === previousDesignErrors ? repeatedDesignErrors + 1 : 0;
+    previousDesignErrors = designErrors;
+    if (repeatedDesignErrors >= 2) {
+      throw new Error(`The same design errors remained after two repairs. ${problems.join(' | ')}`);
+    }
     if (problems.length) {
       await events.think('Verifier', `Found ${problems.length} design problem${problems.length === 1 ? '' : 's'}: ${problems[0]}`);
     } else {
