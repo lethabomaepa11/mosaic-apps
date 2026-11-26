@@ -1,8 +1,9 @@
 <script lang="ts">
   import { DatePicker as BitsDatePicker } from 'bits-ui';
-  import { parseDate, parseDateTime, type DateValue } from '@internationalized/date';
+  import { parseDate, type DateValue } from '@internationalized/date';
   import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-svelte';
   import ShadcnInput from '../shadcn/input/Input.svelte';
+  import { datetimeFromInput, localDatetimeValue } from '../lib/format';
   interface Props {
     label?: string;
     /** ISO date 'YYYY-MM-DD' or datetime string */
@@ -21,34 +22,36 @@
 
   const calendarValue = $derived.by(() => {
     if (!value) return undefined;
-    try { return withTime ? parseDateTime(value) : parseDate(value.slice(0, 10)); }
+    try { return parseDate(value.slice(0, 10)); }
     catch { return undefined; }
   });
   const minimum = $derived.by(() => {
     if (!min) return undefined;
-    try { return withTime ? parseDateTime(min) : parseDate(min.slice(0, 10)); }
+    try { return parseDate(min.slice(0, 10)); }
     catch { return undefined; }
   });
   const maximum = $derived.by(() => {
     if (!max) return undefined;
-    try { return withTime ? parseDateTime(max) : parseDate(max.slice(0, 10)); }
+    try { return parseDate(max.slice(0, 10)); }
     catch { return undefined; }
   });
 
   function onCalendarChange(next: DateValue | undefined) {
     if (!next) return;
-    const date = `${next.year}-${String(next.month).padStart(2, '0')}-${String(next.day).padStart(2, '0')}`;
-    if (withTime && 'hour' in next) {
-      const datetime = `${date}T${String(next.hour).padStart(2, '0')}:${String(next.minute).padStart(2, '0')}`;
-      value = datetime;
-    } else {
-      value = date;
-    }
+    value = next.toString();
     oninput?.(value);
   }
 
   function onInput(e: Event & { currentTarget: EventTarget & HTMLInputElement }) {
-    value = e.currentTarget.value;
+    const input = e.currentTarget.value;
+    if (input === localDatetimeValue(value)) {
+      e.currentTarget.setCustomValidity('');
+      return;
+    }
+    const next = input ? datetimeFromInput(input) : '';
+    e.currentTarget.setCustomValidity(next === undefined ? 'Choose a valid local date and time.' : '');
+    if (next === undefined) return;
+    value = next;
     oninput?.(value);
   }
 </script>
@@ -56,7 +59,9 @@
 <div class="m-field">
   {#if label}<span class="m-field__label">{label}{#if required}<span class="m-field__req">*</span>{/if}</span>{/if}
   {#if withTime}
-    <ShadcnInput class={`m-input${error ? ' m-input--invalid' : ''}`} type="datetime-local" ariaLabel={label ?? 'Choose date and time'} aria-invalid={!!error} {required} {min} {max} {disabled} value={value ?? ''} oninput={onInput} />
+    <ShadcnInput class={`m-input${error ? ' m-input--invalid' : ''}`} type="datetime-local" ariaLabel={label ?? 'Choose date and time'} aria-invalid={!!error} {required}
+      min={localDatetimeValue(min) || undefined} max={localDatetimeValue(max) || undefined} {disabled}
+      value={localDatetimeValue(value)} oninput={onInput} />
   {:else}
     <BitsDatePicker.Root value={calendarValue} onValueChange={onCalendarChange} minValue={minimum} maxValue={maximum} {disabled} {required} weekdayFormat="short" fixedWeeks>
       <BitsDatePicker.Input class={`m-input m-date-picker${error ? ' m-input--invalid' : ''}`} aria-label={label ?? 'Choose date'}>

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { FieldDef } from '@mosaic-apps/core';
-import { formatCell, refIncludes } from '../src/lib/format.js';
+import { datetimeFromInput, formatCell, localDatetimeValue, refIncludes } from '../src/lib/format.js';
 
 const owner: FieldDef = { name: 'owner', type: 'ref', refEntity: 'employee' };
 const status: FieldDef = { name: 'status', type: 'enum', options: [{ value: 'active', label: 'Active' }, 'churned'] };
@@ -30,4 +30,13 @@ test('date keeps the calendar day; datetime includes the time', () => {
   assert.equal(formatCell(date, { d: iso }, 'en-US'), 'Dec 1, 2026');
   assert.equal(formatCell(datetime, { d: iso }, 'en-US'), new Date(iso).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }));
   assert.equal(formatCell(date, { d: 'not a date' }), 'not a date');
+});
+
+test('datetime inputs display stored ISO values and serialize local selections as instants', () => {
+  const instant = '2026-12-01T09:30:00.000Z';
+  const input = localDatetimeValue(instant);
+  assert.match(input, /^2026-12-01T\d\d:\d\d$/);
+  assert.equal(datetimeFromInput(input), instant);
+  assert.equal(datetimeFromInput('2026-12-01'), undefined);
+  assert.equal(localDatetimeValue(undefined), '');
 });

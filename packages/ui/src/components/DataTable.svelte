@@ -18,6 +18,7 @@
 
 <script lang="ts" generics="T extends Record<string, unknown>">
   import Icon from './Icon.svelte';
+  import { formatDate } from '../lib/format';
 
   interface Column {
     key: string;
@@ -34,11 +35,10 @@
     const v = row[col.key];
     if (col.render) return col.render(row);
     if (v === null || v === undefined) return '';
-    if (typeof v === 'object') return JSON.stringify(v);
-    if (col.key === 'createdAt' || col.key === 'updatedAt') {
-      const d = new Date(String(v));
-      return Number.isNaN(d.getTime()) ? String(v) : d.toLocaleString();
+    if (v instanceof Date || ['createdAt', 'updatedAt', 'deletedAt'].includes(col.key)) {
+      return formatDate(v, 'datetime');
     }
+    if (typeof v === 'object') return JSON.stringify(v);
     return String(v);
   }
 
