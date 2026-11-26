@@ -1,4 +1,6 @@
 .next/
+.studio-build/
+public/_mosaic-studio/
 .env*
 !.env.example
 .mosaic-data/

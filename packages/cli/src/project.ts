@@ -126,7 +126,7 @@ export async function copyTemplate(
     const src = join(templateDir, relative);
     const entries = await readdir(src, { withFileTypes: true });
     for (const entry of entries) {
-      if (['node_modules', '.svelte-kit', '.next', '.mosaic-data', '.vercel', '.git', 'dist', 'build', 'pgdata'].includes(entry.name)
+      if (['node_modules', '.svelte-kit', '.next', '.studio-build', '_mosaic-studio', '.mosaic-data', '.vercel', '.git', 'dist', 'build', 'pgdata'].includes(entry.name)
         || (!relative && ['data', 'uploads'].includes(entry.name))
         || (entry.name.startsWith('.env') && entry.name !== '.env.example')) continue;
       const rel = relative ? join(relative, entry.name) : entry.name;

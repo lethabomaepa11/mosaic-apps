@@ -86,12 +86,14 @@ test('Next.js scaffold keeps its lockfile, same-origin API, and deployment envir
   const manifest = JSON.parse(await readFile(join(app, 'package.json'), 'utf8'));
   const lock = JSON.parse(await readFile(join(app, 'package-lock.json'), 'utf8'));
   assert.equal(manifest.name, 'my-crm');
-  assert.equal(manifest.scripts.dev, 'next dev --port 3210');
+  assert.equal(manifest.scripts.dev, 'npm run build:studio && next dev --port 3210');
   assert.equal(lock.packages[''].name, manifest.name);
   assert.equal((await loadProjectConfig(app)).web.port, 3210);
   assert.ok(existsSync(join(app, 'app/api/[...path]/route.js')));
   assert.ok(existsSync(join(app, 'app/[...path]/page.jsx')));
   assert.ok(!existsSync(join(app, '.next')));
+  assert.ok(existsSync(join(app, 'studio-source/routes/studio/forms/[id]/+page.svelte')));
+  assert.ok(!existsSync(join(app, '.studio-build')));
   const ignored = spawnSync('git', ['check-ignore', '.env', 'data/db', 'uploads/image.png'], { cwd: app, encoding: 'utf8' });
   assert.equal(ignored.status, 0);
 });

@@ -4,7 +4,7 @@ title: Mosaic Cloud
 
 # Mosaic Cloud
 
-Start with a brief, review the generated app in a private preview, and decide whether to download or deliver the source. Choose SvelteKit for the visual Studio in the deployed app, or Next.js for React and a page JSON editor. [Open Mosaic Cloud](https://cloud.mosaictalent.co.za)
+Start with a brief, review the generated app in a private preview, and decide whether to download or deliver the source. Choose SvelteKit or Next.js for the app runtime. Both generated scaffolds include the visual framework Studio. [Open Mosaic Cloud](https://cloud.mosaictalent.co.za)
 
 ## Build from a brief
 
@@ -45,7 +45,7 @@ If Vercel rejects a credential, reconnect it under **Settings → Connections** 
 
 For self-service registration, request it in the brief or enable **Allow public sign-up** in the project settings. After a new release, `/signup` assigns new accounts the viewer role. Keep sign-up closed for staff-only apps.
 
-Use the deployed SvelteKit **Studio** to edit forms, pages, and navigation. On Next.js, open **Page Studio** at `/studio` for page JSON or **Edit sidebar** for links. To publish generated changes from Cloud, create and deliver a new release. Preview and production each have their own published artifacts.
+Open **Studio** at `/studio` in either deployed scaffold to edit forms, pages, and navigation. The Next.js runtime renders a subset of the Studio component palette. To publish generated changes from Cloud or upgrade an older release, create and deliver a new release. Preview and production each have their own published artifacts.
 
 ## AI models and limits
 

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { page } from '$app/state';
   import { Tabs, toast } from '@mosaic-apps/ui';
   import type { AuditEntry, RefList, SettingRecord, UserRecord } from '@mosaic-apps/core';
   import { client } from '#lib/client';
@@ -17,6 +18,10 @@
   }
 
   let tab = $state('users');
+  $effect(() => {
+    const initial = page.url.searchParams.get('tab');
+    if (initial === 'navigation') tab = initial;
+  });
   let users = $state<UserRecord[]>([]);
   let roles = $state<Role[]>([]);
   let refLists = $state<RefList[]>([]);

@@ -4,7 +4,7 @@ title: Deployment overview
 
 # Deploy a Mosaic application
 
-Deploy one web service for the app and its same-origin `/api`, backed by durable PostgreSQL. SvelteKit serves the visual Studio in that service. Next.js serves the React runtime and Page Studio.
+Deploy one web service for the app, its same-origin `/api`, and visual Studio, backed by durable PostgreSQL. The Next.js build includes Studio's Svelte editor alongside the React app.
 
 | Where you are starting | Follow |
 | --- | --- |

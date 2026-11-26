@@ -4,10 +4,13 @@ sidebar_position: 13
 
 # Studio deployment and upgrade
 
-SvelteKit repositories include visual Studio in the app at `/studio`. `npm run dev`
-starts one server for the app, `/api`, and Studio, and the same deployment serves
-all three. Use an account with the relevant artifact permissions. Next.js
-provides Page Studio with page JSON editing at the same path.
+The current SvelteKit and Next.js scaffolds include visual Studio at `/studio`.
+`npm run dev` starts one server for the app, `/api`, and Studio. The Next.js
+build compiles the framework Studio as client assets and serves them behind the
+app's session. Use an administrator or editor account.
+
+Next.js visual Studio is included in new Cloud releases and scaffolds from the
+current source tree. Existing deployments need a new release to pick it up.
 
 ## Local authoring
 

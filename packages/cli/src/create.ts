@@ -2,7 +2,7 @@
 
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { readFile, writeFile } from 'node:fs/promises';
+import { copyFile, readFile, writeFile } from 'node:fs/promises';
 import { randomBytes } from 'node:crypto';
 import {
   copyTemplate,
@@ -86,10 +86,20 @@ export async function create(opts: CreateOptions): Promise<void> {
   // .env with generated secret
   await writeEnv(target, databaseUrl, opts.webPort, jwtSecret, opts.auth, opts.demo);
   if (next) {
+    const studioTemplate = findTemplateDir(import.meta.url, 'sveltekit');
+    if (!studioTemplate) throw new Error('Could not locate the framework Studio template.');
+    const studioSource = join(studioTemplate, 'apps', 'web', 'src');
+    const studioTarget = join(target, 'studio-source');
+    for (const path of ['routes/studio', 'lib/studio']) {
+      await copyTemplate(join(studioSource, path), join(studioTarget, path), {});
+    }
+    for (const path of ['lib/client.ts', 'app.css']) {
+      await copyFile(join(studioSource, path), join(studioTarget, path));
+    }
     const manifestPath = join(target, 'package.json');
     const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
     manifest.name = slug;
-    manifest.scripts.dev = `next dev --port ${opts.webPort}`;
+    manifest.scripts.dev = `npm run build:studio && next dev --port ${opts.webPort}`;
     manifest.scripts.start = `next start --port ${opts.webPort}`;
     await writeFile(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
     const lockPath = join(target, 'package-lock.json');

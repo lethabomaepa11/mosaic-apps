@@ -53,6 +53,14 @@ test('Next.js hosts the Mosaic API and preserves its session and page access che
     });
     assert.equal(created.status, 201);
     const { data: page } = await created.json();
+    const studio = await request(`/studio/pages/${page.id}`, { headers });
+    assert.equal(studio.status, 200);
+    const studioHtml = await studio.text();
+    const asset = studioHtml.match(/\/_mosaic-studio\/immutable\/entry\/start\.[\w-]+\.js/)?.[0];
+    assert.ok(asset, studioHtml);
+    assert.equal((await request(asset)).status, 200);
+    const studioRedirect = await request('/studio', { redirect: 'manual' });
+    assert.equal(studioRedirect.headers.get('location'), '/login?next=%2Fstudio');
     assert.equal((await request('/private-page/report-1', { headers })).status, 404);
     assert.equal((await post(`/api/pages/${page.id}/publish`, {})).status, 200);
     assert.equal((await request(`/api/pages/${page.id}`)).status, 401);

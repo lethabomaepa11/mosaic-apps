@@ -11,6 +11,17 @@ import { equipmentSpec } from './fixtures/equipment-spec';
 
 const project = () => generateProjectFiles({ name: 'Equipment Loans', slug: 'equipment-loans', spec: equipmentSpec, app: compileSpec(equipmentSpec) });
 
+test('Next.js releases ship the framework Studio with clean build inputs', () => {
+  const files = generateProjectFiles({ name: 'Equipment Loans', slug: 'equipment-loans', spec: equipmentSpec, app: compileSpec(equipmentSpec), framework: 'nextjs' });
+  const paths = new Set(files.map((file) => file.path));
+  assert.ok(paths.has('app/studio/[[...path]]/route.js'));
+  assert.ok(paths.has('studio-source/routes/studio/pages/[id]/+page.svelte'));
+  assert.ok(paths.has('studio-source/routes/studio/forms/[id]/+page.svelte'));
+  assert.ok(paths.has('studio-source/lib/studio/components/Canvas.svelte'));
+  assert.ok(!paths.has('app/studio/page.jsx'));
+  assert.ok(!files.some(({ path }) => /(?:\.studio-build|_mosaic-studio)\//.test(path)));
+});
+
 test('a release is the full mosaic create project: one app with the API and Studio built in', () => {
   const files = project();
   const paths = new Set(files.map((file) => file.path));

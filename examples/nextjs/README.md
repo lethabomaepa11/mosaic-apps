@@ -19,7 +19,8 @@ Open `/api/health` to verify the app and database. Local scaffolds use embedded 
 under `data`. Set `ADMIN_EMAIL` and `ADMIN_PASSWORD` in `.env` before the first API
 request to seed an administrator. The scaffold generates a signing secret in `.env`.
 
-Author and publish pages and forms through `/api/pages` and `/api/forms`. React renders
+Open `/studio` with an administrator or editor account to author pages and forms.
+Studio uses the same `/api/pages` and `/api/forms` as the React app. React renders
 published pages at their configured routes, with `:parameter` segments and sign-in for
 protected pages. Published entity forms are available at `/f/<slug>` and can create
 records through the same permission-checked API. The renderer supports common

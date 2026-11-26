@@ -3,8 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "dev": "npm run build:studio && next dev",
+    "build": "npm run build:studio && next build",
+    "build:studio": "vite build --config studio.vite.config.mjs",
     "start": "next start",
     "test": "node --test test/*.test.mjs"
   },
@@ -17,5 +18,16 @@
   },
   "engines": {
     "node": ">=22"
+  },
+  "devDependencies": {
+    "@mosaic-apps/core": "^0.4.0",
+    "@mosaic-apps/ui": "^0.4.2",
+    "@sveltejs/kit": "^3.4.1",
+    "@sveltejs/vite-plugin-svelte": "^7.3.2",
+    "@tailwindcss/vite": "^4.3.5",
+    "daisyui": "^5.8.2",
+    "svelte": "^5.59.2",
+    "tailwindcss": "^4.3.5",
+    "vite": "^8.3.8"
   }
 }

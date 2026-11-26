@@ -135,6 +135,15 @@ export function generateProjectFiles(input: { name: string; slug: string; spec: 
   const json = (value: unknown) => JSON.stringify(value, null, 2) + '\n';
   const out = new Map(files.map((file) => [file.path, file as GeneratedFile]));
   const put = (path: string, content: string) => out.set(path, { path, content });
+  if (framework === 'nextjs') {
+    const prefix = 'apps/web/src/';
+    for (const [path, content] of Object.entries(templateFiles('sveltekit'))) {
+      const relative = path.slice(prefix.length);
+      if (path.startsWith(prefix) && /^(?:routes\/studio\/|lib\/studio\/|lib\/client\.ts$|app\.css$)/.test(relative)) {
+        put(`studio-source/${relative}`, content);
+      }
+    }
+  }
   if (input.app.workflows?.length) {
     put('mosaic/openapi.json', json(buildOpenApiDocument(createWorkflowEndpoints(input.app.workflows))));
     if (framework === 'nextjs') {

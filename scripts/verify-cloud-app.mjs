@@ -127,10 +127,10 @@ try {
   if (!svelte) {
     const studio = await request(`/studio?page=${encodeURIComponent(authPage.id)}`, { headers });
     assert.equal(studio.status, 200);
-    assert.match(await studio.text(), /Page Studio[\s\S]*Page JSON/);
+    assert.match(await studio.text(), /_mosaic-studio\/immutable\/entry/);
     const sidebar = await request('/studio?sidebar', { headers });
     assert.equal(sidebar.status, 200);
-    assert.match(await sidebar.text(), /Save sidebar/);
+    assert.match(await sidebar.text(), /_mosaic-studio\/immutable\/entry/);
   }
   authPage.root.children[0].props.text = 'Join the equipment desk';
   const publish = await request(`/api/pages/${authPage.id}/save-and-publish`, {
