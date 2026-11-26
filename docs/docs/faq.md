@@ -18,7 +18,7 @@ For a Cloud deployment, reveal the initial administrator credentials in **Source
 
 ## Where do I add custom code?
 
-Register server handlers in the application's endpoint module. Add a custom Svelte component through `registerComponent` in SvelteKit, or build React components in Next.js. [Extensions](./extensions.md)
+Register server handlers in the application's endpoint module. Use `registerComponent` for custom Svelte artifacts in either scaffold. Next.js also supports React components in code-owned routes. [Extensions](./extensions.md)
 
 ## Can I rename a field without losing data?
 

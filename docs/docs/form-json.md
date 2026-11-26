@@ -5,7 +5,7 @@ sidebar_position: 8
 # Form JSON spec
 
 Forms and pages are serializable trees of component nodes. These examples use
-the Svelte renderer. The Next.js renderer supports a subset of component types.
+the Svelte renderer. Both scaffolds use the same renderer for published artifacts.
 
 ```json
 {

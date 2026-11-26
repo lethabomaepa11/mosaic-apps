@@ -24,7 +24,7 @@ A Mosaic app runs on SvelteKit or Next.js and exposes a same-origin Hono API. Po
 3. CRUD routes authorize the caller and validate input before evaluating parameterized SQL.
 4. Published form and page records describe the UI the runtime renders. The frontend uses the API for live record data.
 
-Both scaffolds include the visual framework Studio. SvelteKit renders published content with the Svelte UI package. Next.js renders a supported subset of components in React and serves Studio's Svelte editor against the same API. Cloud Preview Studio uses the shared preview renderer for both targets. [Local and hosted workflows](./workflows.md)
+Both scaffolds include visual Studio and use the framework's Svelte page and form renderers for published artifacts. Next.js owns routing, authentication, and the React app shell, and mounts the framework renderer inside the shell. Cloud Preview Studio uses the shared preview renderer for both targets. [Local and hosted workflows](./workflows.md)
 
 ## Runtime state
 

@@ -4,7 +4,7 @@ title: Visual Studio
 
 # Design pages and forms
 
-Open `/studio` in a SvelteKit or Next.js scaffold with permission to manage pages or forms. In Cloud, open **Preview → Open Studio** for the selected project. The Next.js application renderer supports a subset of the visual components shown in Studio. [Mosaic Cloud](./cloud-studio.md#edit-the-preview)
+Open `/studio` in a SvelteKit or Next.js scaffold with permission to manage pages or forms. In Cloud, open **Preview → Open Studio** for the selected project. Both published runtimes use the framework renderer and each scaffold shares its component registrations with Studio. [Mosaic Cloud](./cloud-studio.md#edit-the-preview)
 
 ![Customer form in SvelteKit Studio](/img/screenshots/form-studio.png)
 

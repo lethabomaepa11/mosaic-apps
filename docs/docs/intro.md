@@ -14,7 +14,7 @@ Mosaic is a framework for modeling business records, exposing them through an AP
 ## Choose a frontend
 
 - **SvelteKit** includes the visual Studio for pages, forms, and navigation.
-- **Next.js** uses a React renderer for supported published components and includes visual Studio for pages, forms, and navigation. Cloud Preview Studio is available for both targets.
+- **Next.js** uses a React app shell and the shared Svelte renderer for published components. It includes visual Studio for pages, forms, and navigation. Cloud Preview Studio is available for both targets.
 
 ## Where to go next
 

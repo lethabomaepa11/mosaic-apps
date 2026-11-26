@@ -5,8 +5,9 @@ sidebar_label: Server extensions
 
 # Extend an application
 
-Add server handlers in either framework. SvelteKit also supports custom visual
-components through its registry. Extend Next.js interfaces with React code.
+Both scaffolds support custom server handlers and custom Svelte artifact
+components. In Next.js you can also extend the app shell and code-owned routes
+with React.
 
 ## Register a component
 
@@ -33,8 +34,9 @@ registerComponent({
 });
 ```
 
-Add the registration to `apps/web/src/lib/mosaic-components.ts` in the unified SvelteKit scaffold.
-Install the widget package in the web workspace, build the application, and check
+Add the registration to `apps/web/src/lib/mosaic-components.ts` in SvelteKit or
+`runtime/components.js` in Next.js. Install the widget package, build the
+application, and check
 the Studio palette and published rendering. Saved artifacts store the component
 type and props, so the runtime must have the same registration.
 
