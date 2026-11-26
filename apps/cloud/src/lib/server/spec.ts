@@ -171,6 +171,20 @@ export function autoRepair(input: AppSpec): { spec: AppSpec; repairs: string[] }
   for (const entity of spec.entities) {
     const submission = entity.submission;
     if (!submission) continue;
+    if (!submission.profile) {
+      const linked = new Set(entity.fields.filter((field) => field.type === 'ref' && submission.managed.some((value) => value.field === field.name
+        && (value.source === 'userId' || value.source === 'userEmail' || (value.source === 'profile' && /^(?:profile\.)?(?:id|email)$/i.test(value.value)))))
+        .map((field) => field.refEntity));
+      if (linked.size === 1) {
+        const profile = spec.entities.find((candidate) => linked.has(candidate.name))!;
+        const emails = profile.fields.filter((field) => field.type === 'string' && field.unique
+          && (field.format === 'email' || /^(?:email|accountEmail|loginEmail|userEmail)$/.test(field.name)));
+        if (emails.length === 1) {
+          submission.profile = { entity: profile.name, emailField: emails[0]!.name };
+          repairs.push(`${entity.name}: matched the signed-in account to ${profile.name}.${emails[0]!.name}`);
+        }
+      }
+    }
     const profile = submission.profile;
     if (profile) profile.entity = renamedEntities.get(profile.entity) ?? snake(profile.entity);
     for (const value of submission.managed) {

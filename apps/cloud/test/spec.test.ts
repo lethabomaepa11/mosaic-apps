@@ -56,6 +56,26 @@ test('user organization repair follows the signed-in membership only when the so
   assert.match(validateSpec(autoRepair(draft).spec).join('\n'), /user\.organization: invalid server-managed value/);
 });
 
+test('RSVP membership is repaired using the unique account email on the linked member', () => {
+  const draft = normalizeSpec({
+    entities: [
+      { name: 'member', fields: [{ name: 'name' }, { name: 'account_email', unique: true }] },
+      { name: 'rsvp', fields: [{ name: 'member', type: 'ref', refEntity: 'member' }], submission: {
+        managed: [{ field: 'member', source: 'userId', value: '' }],
+      } },
+    ],
+  });
+  const { spec } = autoRepair(draft);
+  assert.deepEqual(validateSpec(spec), []);
+  assert.deepEqual(spec.entities[1]?.submission, {
+    profile: { entity: 'member', emailField: 'accountEmail' },
+    managed: [{ field: 'member', source: 'profile', value: 'id' }],
+    selectable: [],
+  });
+  draft.entities[0]!.fields.push({ ...draft.entities[0]!.fields[1]!, name: 'loginEmail' });
+  assert.match(validateSpec(autoRepair(draft).spec).join('\n'), /rsvp\.member: invalid server-managed value/);
+});
+
 test('sample records are understood in every shape models produce', () => {
   const shapes = [
     [{ fullName: 'Thandi Nkosi', email: 't@example.com' }],                                  // record objects (asked for)
