@@ -10,7 +10,7 @@ Start with a brief, review the generated app in a private preview, and decide wh
 
 1. Enter a brief of up to 24,000 characters and choose a framework under **Options**. Describe who uses the app, what each person can do, and which rules the server must enforce.
 2. Answer questions in chat when decisions affect the design. **Decide for me** delegates open product choices. Cloud asks before reducing scope for unsupported requirements.
-3. Open **Blueprint** to see the refined spec and build order. **Feature by feature** previews each checked feature as it is built. **One shot** attempts the agreed spec in a single build after brief refinement.
+3. Open **Blueprint** to see the refined spec and build order. **Feature by feature** publishes a preview as each feature passes its checks. **One shot** builds the agreed spec in a single pass after brief refinement. Choose **One shot with custom code** when a form needs a server-side rule beyond standard submissions.
 4. Try the result in **Preview**. Chat feedback during a staged build queues a change after that build. Inspect the plan and test workflows with the actual roles you intend to use before going live.
 
 Cloud checks generated CRUD and supported submission paths against a database and uses AI to review the design. Complex approvals, balance accounting, row-level access and tenant isolation need [custom server logic](./extensions.md#server-extensions).
@@ -18,6 +18,14 @@ Cloud checks generated CRUD and supported submission paths against a database an
 Cloud retrieves relevant excerpts from the framework guides when it plans, generates, or repairs an app. The builder still generates through its supported app spec. The exported source can use framework extensions and custom code.
 
 Describe which values come from the signed-in user and which they choose. An invitation-only clinic can use existing patient profiles. A self-service clinic can create an account-bound profile on the first appointment request. The server assigns the patient and initial status. A provider picker can use a separate directory that the submitting role has permission to read. Keep private provider records separate from the directory.
+
+### One shot with custom code
+
+Describe one form action, who is allowed to run it, what it must validate, and what it must save. For example, an equipment request can reserve an item and reject a request that would exceed an employee's allowance. Cloud can generate one authenticated JavaScript endpoint for that form in SvelteKit or Next.js.
+
+Cloud installs the scaffold in Vercel Sandbox, disables network access, then builds and starts the app against a temporary database. It checks sign-in, the published form, and successful, invalid, and anonymous calls to the endpoint. It checks the saved record after a successful call and tries one repair if a custom workflow fails verification. Open **Activity** to see which check passed or failed.
+
+Cloud Preview shows the standard app artifacts. To try the custom workflow, download the release and run it locally. Review the endpoint in the release source, then use **Source & delivery → Deliver latest** to send it to your connected providers. Self-hosted Cloud installations need Vercel Sandbox credentials or project OIDC access for this mode.
 
 ## Edit the preview
 
@@ -35,7 +43,7 @@ Connect only the providers you need under **Settings → Connections**.
 | Neon | Provisions durable PostgreSQL. |
 | Vercel | Deploys the selected frontend and its same-origin API. Cloud delivery needs a provisioned database. |
 
-Cloud queues delivery after a release when providers are connected. To send an existing release, use **Source & delivery → Deliver latest** after connecting your accounts. You can also download the release from that tab. The Vercel build installs the latest **published** Mosaic packages for the target framework.
+Cloud queues delivery after a standard release when providers are connected. Releases containing custom code wait for **Source & delivery → Deliver latest**. You can also download the release from that tab. The Vercel build installs the latest **published** Mosaic packages for the target framework.
 
 ### Upgrade the framework
 
