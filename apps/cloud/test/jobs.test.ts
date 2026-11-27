@@ -649,7 +649,7 @@ test('custom one shot drafts a workflow and blocks release if Sandbox cannot ver
     if (name === 'mosaic_refine_brief') return { spec: refined, questions: [] };
     if (name === 'mosaic_custom_workflow') return {
       entity: 'equipment', source: 'export async function handle() {}',
-      input: { serialNumber: '1234' }, invalidInput: { serialNumber: '' }, expected: { serialNumber: '1234' },
+      input: { serialNumber: '1234' }, invalidInput: { serialNumber: '' }, expected: { data: { id: 1, serialNumber: '1234' } },
     };
   };
   try {
@@ -659,6 +659,8 @@ test('custom one shot drafts a workflow and blocks release if Sandbox cannot ver
     const [job] = await jobsOf(projectId);
     assert.equal(job.status, 'failed');
     assert.match(job.error ?? '', /Sandbox could not authenticate/);
+    const { rows } = await db.query<{ expected: unknown }>("SELECT metadata->'customDraft'->'expected' AS expected FROM cloud_jobs WHERE project_id = $1", [projectId]);
+    assert.deepEqual(rows[0].expected, { serialNumber: '1234' });
     assert.equal((await db.query('SELECT id FROM cloud_releases WHERE project_id = $1', [projectId])).rows.length, 0);
     assert.equal((await db.query<{ app_spec: unknown }>('SELECT app_spec FROM cloud_projects WHERE id = $1', [projectId])).rows[0].app_spec, null);
   } finally {
