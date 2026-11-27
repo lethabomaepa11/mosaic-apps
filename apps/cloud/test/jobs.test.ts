@@ -512,11 +512,15 @@ test('long briefs retain their title, acceptance criteria and mode through sign-
   const form = new FormData();
   const prompt = '# LeaveDesk — Employee Leave Management System\n\n' + 'Approval must update the stored balance.\n'.repeat(250) + 'Never permit self-approval.';
   form.set('prompt', prompt);
+  const defaultInput = readProjectForm(form);
+  assert.ok(!('error' in defaultInput));
+  assert.equal(defaultInput.generationMode, 'staged');
+  form.set('generationMode', 'one-shot-code');
   const input = readProjectForm(form);
   assert.ok(!('error' in input));
   assert.equal(input.name, 'LeaveDesk');
   assert.equal(input.prompt, prompt);
-  assert.equal(input.generationMode, 'staged');
+  assert.equal(input.generationMode, 'one-shot-code');
   let cookie = '';
   const cookies = { set: (_name: string, value: string) => { cookie = value; } } as Parameters<typeof savePendingProject>[0];
   await savePendingProject(cookies, input);
@@ -630,6 +634,33 @@ test('one shot evaluates a complete brief and builds without planning feature sl
     await runDue();
     assert.deepEqual(groqCalls.slice(before), ['mosaic_refine_brief', 'mosaic_app_spec', 'mosaic_review']);
     assert.deepEqual(await jobsOf(projectId), [{ kind: 'generate', status: 'completed', error: null }]);
+  } finally {
+    stagedReply = undefined;
+  }
+});
+
+test('custom one shot drafts a workflow and blocks release if Sandbox cannot verify it', async (t) => {
+  const { Sandbox } = await import('@vercel/sandbox');
+  t.mock.method(Sandbox, 'create', async () => { throw new Error('Unauthorized OIDC token'); });
+  const { projectId } = await createProject();
+  const refined = 'Register equipment with a server-validated serial number.';
+  const before = groqCalls.length;
+  stagedReply = (name) => {
+    if (name === 'mosaic_refine_brief') return { spec: refined, questions: [] };
+    if (name === 'mosaic_custom_workflow') return {
+      entity: 'equipment', source: 'export async function handle() {}',
+      input: { serialNumber: '1234' }, invalidInput: { serialNumber: '' }, expected: { serialNumber: '1234' },
+    };
+  };
+  try {
+    await enqueueJob(db, { projectId, kind: 'generate', metadata: { generationMode: 'one-shot-code' } });
+    await runDue();
+    assert.deepEqual(groqCalls.slice(before), ['mosaic_refine_brief', 'mosaic_app_spec', 'mosaic_review', 'mosaic_custom_workflow']);
+    const [job] = await jobsOf(projectId);
+    assert.equal(job.status, 'failed');
+    assert.match(job.error ?? '', /Sandbox could not authenticate/);
+    assert.equal((await db.query('SELECT id FROM cloud_releases WHERE project_id = $1', [projectId])).rows.length, 0);
+    assert.equal((await db.query<{ app_spec: unknown }>('SELECT app_spec FROM cloud_projects WHERE id = $1', [projectId])).rows[0].app_spec, null);
   } finally {
     stagedReply = undefined;
   }

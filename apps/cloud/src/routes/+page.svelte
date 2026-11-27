@@ -54,6 +54,7 @@
       <select class="select select-sm select-bordered w-auto" id="generationMode" name="generationMode">
         <option value="staged">Feature by feature</option>
         <option value="one-shot">One shot</option>
+        <option value="one-shot-code">One shot with custom code</option>
       </select>
       <details class="dropdown">
         <summary class="btn btn-ghost btn-sm gap-1.5 font-normal muted"><Settings2 size={15} /> Options</summary>

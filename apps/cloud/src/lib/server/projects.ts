@@ -8,7 +8,7 @@ import type { AppFramework } from '../framework';
 import { decryptProviderSecret, type Provider } from './providers';
 import { removeProjectData } from './project-data';
 
-export interface NewProject { prompt: string; name: string; appFramework: AppFramework; uiTheme: string; uiSystem: string; includeHome: boolean; includeLogin: boolean; generationMode: 'staged' | 'one-shot' }
+export interface NewProject { prompt: string; name: string; appFramework: AppFramework; uiTheme: string; uiSystem: string; includeHome: boolean; includeLogin: boolean; generationMode: 'staged' | 'one-shot' | 'one-shot-code' }
 
 /** Reads and validates the prompt form; the name is optional and derived from the brief. */
 export function readProjectForm(data: FormData): NewProject | { error: string } {
@@ -27,7 +27,7 @@ export function readProjectForm(data: FormData): NewProject | { error: string } 
     prompt, name, appFramework, uiTheme: isDaisyTheme(theme) ? theme : 'corporate', uiSystem: appFramework === 'nextjs' ? 'mosaic' : ['daisyui', 'mosaic'].includes(system) ? system : 'daisyui',
     // Unchecked checkboxes are absent; a pending prompt saved from the public page keeps its choices.
     includeHome: data.get('includeHome') === 'on', includeLogin: data.get('includeLogin') === 'on',
-    generationMode: data.get('generationMode') === 'one-shot' ? 'one-shot' : 'staged',
+    generationMode: data.get('generationMode') === 'one-shot-code' ? 'one-shot-code' : data.get('generationMode') === 'one-shot' ? 'one-shot' : 'staged',
   };
 }
 

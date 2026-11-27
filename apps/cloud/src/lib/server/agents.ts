@@ -24,14 +24,17 @@ export async function clarify(input: { brief: string; options: string; config?: 
   });
 }
 
-type PlanningInput = { brief: string; answers: Answer[]; options: string; config: AiConfig; onWait: (seconds: number) => Promise<void> };
+type PlanningInput = { brief: string; answers: Answer[]; options: string; config: AiConfig; onWait: (seconds: number) => Promise<void>; customCode?: boolean };
 
 export async function refineBrief(input: PlanningInput): Promise<{ spec: string; questions: Question[] }> {
   const result = await aiJson<{ spec: string; questions: Question[] }>({
     name: 'mosaic_refine_brief', maxTokens: 3200, config: input.config, onWait: input.onWait,
     system: `You evaluate app briefs and turn them into implementation-ready product specs. ${MOSAIC_KNOWLEDGE}
 Preserve explicit requirements, workflows, roles, permissions, edge cases and acceptance criteria. Document actors, access, data, screens, how each workflow starts and ends, business rules and how to verify it. For a well-defined brief, refine directly without asking redundant questions. Ask up to 3 specific questions with suggested answers when missing or contradictory requirements materially change the application. Use prior answers and avoid repeating resolved questions. If the user delegates, choose reasonable defaults for ambiguity.
-Cloud supports managed submission endpoints that derive ownership, organization and initial status on the server. Users can choose entries from readable directories. Managed submissions can use existing profiles or create a simple profile tied to a public signup's account ID on first use. It cannot implement arbitrary approval transitions, balance accounting, per-record browsing, tenant-wide access policies, custom invitations, email verification or password recovery. Treat framework-only examples in the reference as developer extensions. When an explicit requirement cannot be delivered, explain it in a question and request explicit approval of a safe, specific scope reduction before proceeding. General delegation does not approve removing requirements or weakening security. Where scope is explicitly reduced, record excluded requirements so the planner cannot treat them as delivered. Return an empty spec while questions remain.`,
+Cloud supports managed submissions that derive ownership, organization and initial status on the server. Users can choose entries from readable directories. Managed submissions can use existing profiles or create a simple profile tied to a public signup's account ID on first use. ${input.customCode
+      ? 'This build can add one custom authenticated JavaScript workflow endpoint connected to an entity form. Choose it for a concrete business rule that needs server code, for example transactional limit checks or a domain calculation. Clearly specify the action, input, authorization, stored outcome, and acceptance tests.'
+      : 'Treat approvals that update related records, balance accounting and other server-only automation as developer extensions.'}
+Cloud still does not automatically implement tenant-wide access policies, custom invitations, email verification or password recovery. When an explicit requirement cannot be delivered, explain it in a question and request explicit approval of a safe, specific scope reduction before proceeding. Where scope is explicitly reduced, record excluded requirements. Return an empty spec while questions remain.`,
     user: `${briefBlock(input.brief, input.answers)}\n\nOPTIONS: ${input.options}${frameworkGuideContext(input.brief)}`,
     schema: { type: 'object', additionalProperties: false, required: ['spec', 'questions'], properties: { spec: { type: 'string' }, questions: questionsSchema } },
   });
@@ -70,14 +73,14 @@ async function specCall(input: { name: string; system: string; user: string; sch
 }
 
 /** Developer: writes the first spec, or revises the current one for a change request. */
-export async function developSpec(input: { brief: string; answers: Answer[]; options: string; current?: AppSpec; change?: string; feature?: BuildFeature; config?: AiConfig; onWait?: (seconds: number) => void }): Promise<{ thinking: string[]; spec: AppSpec }> {
+export async function developSpec(input: { brief: string; answers: Answer[]; options: string; current?: AppSpec; change?: string; feature?: BuildFeature; customCode?: boolean; config?: AiConfig; onWait?: (seconds: number) => void }): Promise<{ thinking: string[]; spec: AppSpec }> {
   const task = input.current
     ? `CURRENT APP SPEC (JSON):\n${JSON.stringify(input.current)}\n\nREQUESTED CHANGE:\n${input.change}\n\nReturn the complete updated spec. Keep existing entity and field names unless the change requires renaming (renames lose data). Preserve public registration and permissions unless the request changes who can sign up or what they can do.`
     : 'Write the complete app spec for this brief.';
   return specCall({
     name: 'mosaic_app_spec', config: input.config, onWait: input.onWait,
     system: `You are a senior Mosaic developer. ${MOSAIC_KNOWLEDGE}\n${NOTE}`,
-    user: `${briefBlock(input.brief, input.answers)}\n\nOPTIONS: ${input.options}\n\n${task}\n${input.feature ? 'Implement only the current feature described in the brief. Preserve existing routes, access, and working workflows.' : ''}\nGive the primary user a task-focused starting screen with domain-specific sections and action labels. Choose a compact menu based on the brief.${frameworkGuideContext(input.change ?? input.brief)}`,
+    user: `${briefBlock(input.brief, input.answers)}\n\nOPTIONS: ${input.options}\n\n${task}\n${input.feature ? 'Implement only the current feature described in the brief. Preserve existing routes, access, and working workflows.' : ''}${input.customCode ? ' A separate developer can write one custom authenticated form endpoint after this design passes. Provide its form, entity fields, permissions, and managed values. State the server-side rule that endpoint must implement in the workflow description.' : ''}\nGive the primary user a task-focused starting screen with domain-specific sections and action labels. Choose a compact menu based on the brief.${frameworkGuideContext(input.change ?? input.brief)}`,
     schema: specAnswer,
   });
 }
@@ -93,11 +96,11 @@ export async function fixSpec(input: { brief: string; answers: Answer[]; spec: A
 }
 
 /** Reviewer: an independent check that the app is a complete, sensible MVP for the brief. */
-export async function reviewSpec(input: { brief: string; answers: Answer[]; spec: AppSpec; config?: AiConfig; onWait?: (seconds: number) => void }): Promise<{ thinking: string[]; approved: boolean; issues: ReviewIssue[] }> {
+export async function reviewSpec(input: { brief: string; answers: Answer[]; spec: AppSpec; config?: AiConfig; onWait?: (seconds: number) => void; customCode?: boolean }): Promise<{ thinking: string[]; approved: boolean; issues: ReviewIssue[] }> {
   return aiJson({
     name: 'mosaic_review', maxTokens: 2000, config: input.config, onWait: input.onWait,
     system: `You are a strict but practical reviewer of Mosaic apps. ${MOSAIC_KNOWLEDGE}\nThe app below already passed automated CRUD tests. Check that someone can find and complete each main task from the navigation and workflow sections. Check every stated acceptance criterion within the requested scope. A workflow description or status field is not evidence that automation or access checks run. Missing task-specific screens or actions are blocking issues even if records can be entered in management tables. Check relationships, statuses, roles, permissions, and sample data. Report at most 5 blocking issues with concrete fixes. Approve when nothing blocks the agreed scope. ${NOTE}`,
-    user: `${briefBlock(input.brief, input.answers)}\n\nAPP:\n${describeSpec(input.spec)}`,
+    user: `${briefBlock(input.brief, input.answers)}\n\nAPP:\n${describeSpec(input.spec)}${input.customCode ? '\nThis review covers the schema, permissions, navigation, and forms. One server-side form workflow can be implemented and tested in the next build step. Require its data and a form entry point here.' : ''}`,
     schema: { type: 'object', additionalProperties: false, required: ['thinking', 'approved', 'issues'], properties: { thinking, approved: { type: 'boolean' }, issues: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['area', 'problem', 'fix'], properties: { area: { type: 'string' }, problem: { type: 'string' }, fix: { type: 'string' } } } } } },
   });
 }

@@ -44,7 +44,7 @@ function preservedDesign(current: AppSpec, next: AppSpec): string[] {
  * passes real CRUD tests and the reviewer approves (or review rounds run out).
  */
 export async function buildApp(
-  input: { brief: string; answers: Answer[]; options: string; current?: AppSpec; change?: string; feature?: BuildFeature; reviewBrief?: string; askQuestions: boolean; ai?: AiConfig },
+  input: { brief: string; answers: Answer[]; options: string; current?: AppSpec; change?: string; feature?: BuildFeature; reviewBrief?: string; askQuestions: boolean; ai?: AiConfig; customCode?: boolean },
   events: BuildEvents,
 ): Promise<BuildResult> {
   const config = input.ai;
@@ -112,7 +112,7 @@ export async function buildApp(
       await events.think('Reviewer', 'Reviewing the app against your brief as an MVP…');
       let review;
       try {
-        review = await reviewSpec({ brief: input.reviewBrief ?? input.brief, answers: input.answers, spec, config: modelConfig('Reviewer'), onWait: onWait('Reviewer') });
+        review = await reviewSpec({ brief: input.reviewBrief ?? input.brief, answers: input.answers, spec, config: modelConfig('Reviewer'), onWait: onWait('Reviewer'), customCode: input.customCode });
       } catch (cause) {
         if (input.feature || !shared || !(cause instanceof AiError)) throw cause;
         await events.think('Reviewer', 'AI review is unavailable. Publishing the app that passed the database checks.');

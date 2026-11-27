@@ -1,9 +1,10 @@
 import { createHash } from 'node:crypto';
-import { buildOpenApiDocument, type Db } from '@mosaic-apps/server';
+import { buildOpenApiDocument, type Db, type EndpointDef } from '@mosaic-apps/server';
 import { id } from './db';
 import type { AppSpec, CompiledApp } from './spec';
 import { frameworkVersion, renderTemplate, templateFiles } from './template';
 import type { AppFramework } from '../framework';
+import type { CustomCode } from './custom-code';
 import { createWorkflowEndpoints } from '../../../../../templates/fullstack/apps/web/src/lib/server/create-workflows.js';
 
 export interface GeneratedFile { path: string; content: string; mode?: string }
@@ -125,9 +126,18 @@ function withImporter(mosaicTs: string): string {
 }
 
 /** The full `mosaic create` project for this app: one SvelteKit app, API at /api, Studio at /studio. */
-export function generateProjectFiles(input: { name: string; slug: string; spec: AppSpec; app: CompiledApp; framework?: AppFramework; theme?: string; projectId?: string }): GeneratedFile[] {
+export function generateProjectFiles(input: { name: string; slug: string; spec: AppSpec; app: CompiledApp; framework?: AppFramework; theme?: string; projectId?: string; custom?: CustomCode | null }): GeneratedFile[] {
   const framework = input.framework ?? 'sveltekit';
   const server = framework === 'nextjs' ? 'lib' : SERVER;
+  const { custom } = input;
+  const app = custom ? {
+    ...input.app,
+    entities: input.app.entities.map((entity) => entity.name === custom.entity
+      ? { ...entity, permissions: { ...entity.permissions, create: ['admin'], update: ['admin'], delete: ['admin'] } } : entity),
+    forms: input.app.forms.map((form) => form.entity === custom.entity
+      ? { ...form, settings: { ...form.settings, createEndpoint: '/extensions/custom-submit' } } : form),
+    workflows: input.app.workflows?.filter((workflow) => workflow.entity !== custom.entity),
+  } : input.app;
   const files = renderTemplate({
     __PROJECT_NAME__: input.name, __PROJECT_SLUG__: input.slug, __DB_URL__: 'pglite://./data',
     __AUTH__: 'true', __PWA__: 'false', __DEMO__: 'false', __WEB_PORT__: '3000', __API_PORT__: '3001', __DB_PORT__: '5432',
@@ -150,8 +160,7 @@ export function generateProjectFiles(input: { name: string; slug: string; spec: 
     const release = { origin, projectId: input.projectId, framework, version: frameworkVersion(framework) };
     put(path, out.get(path)!.content.replace('= null;', () => `= ${JSON.stringify(release)};`));
   }
-  if (input.app.workflows?.length) {
-    put('mosaic/openapi.json', json(buildOpenApiDocument(createWorkflowEndpoints(input.app.workflows))));
+  if (app.workflows?.length) {
     if (framework === 'nextjs') {
       put('lib/create-workflows.js', templateFiles('sveltekit')[`${SERVER}/create-workflows.js`]!);
     } else {
@@ -170,7 +179,7 @@ export function generateProjectFiles(input: { name: string; slug: string; spec: 
       .replace("seed: ADMIN_EMAIL && ADMIN_PASSWORD ? { admin: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD }, demo: SEED_DEMO === 'true' } : false,", 'seed: bootstrap || (ADMIN_EMAIL && ADMIN_PASSWORD) ? { admin: { email, password }, demo: false } : false,')
       .replace(/\n  \}\);\n\}\s*$/, '\n  });\n  return importGeneratedApp(server, email, password);\n}\n'));
     if (!out.get('lib/mosaic.js')!.content.includes('return importGeneratedApp(server')) throw new Error('The Next.js server template changed.');
-    if (input.app.workflows?.length) {
+    if (app.workflows?.length) {
       put('lib/mosaic.js', `import { createWorkflowEndpoints } from './create-workflows.js';\nimport generated from './mosaic-app.json';\n`
         + out.get('lib/mosaic.js')!.content.replace('    endpoints,', '    endpoints: [...endpoints, ...createWorkflowEndpoints(generated.workflows)],'));
     }
@@ -193,9 +202,42 @@ export function generateProjectFiles(input: { name: string; slug: string; spec: 
       : mosaicTs.content));
     put(`${SERVER}/import-generated.ts`, IMPORTER);
   }
-  put(`${server}/mosaic-app.json`, json({ entities: input.app.entities, forms: input.app.forms, pages: input.app.pages, workflows: input.app.workflows ?? [], roles: input.app.roles ?? [] }));
+  if (custom) {
+    const path = `${server}/endpoints.${framework === 'nextjs' ? 'js' : 'ts'}`;
+    const roles = input.app.workflows?.find((item) => item.entity === custom.entity)?.roles
+      ?? input.spec.entities.find((item) => item.name === custom.entity)!.permissions.create;
+    const definition: EndpointDef = {
+      method: 'POST', path: '/custom-submit', summary: 'Custom workflow', entity: custom.entity,
+      responses: { 201: { description: 'Saved record' }, 400: { description: 'Invalid input' }, 403: { description: 'Access denied' } },
+    };
+    put('mosaic/openapi.json', json(buildOpenApiDocument([...createWorkflowEndpoints(app.workflows ?? []), { ...definition, handler: () => null }])));
+    put(`${server}/custom-workflow.js`, custom.source);
+    const ts = framework === 'sveltekit';
+    const existing = out.get(path)!.content.replace('export const endpoints', 'const generatedEndpoints');
+    put(path, `import { handle } from './custom-workflow.js';
+${existing}
+export const endpoints = [...generatedEndpoints, {
+  ...${JSON.stringify(definition)}${ts ? ' as const' : ''},
+  handler: async ({ db, user, json }) => {
+    const roles${ts ? ': string[]' : ''} = ${JSON.stringify(roles)};
+    if (!user || (roles.length && !roles.includes('*') && !user.roles.includes('admin') && !roles.some((role) => user.roles.includes(role)))) {
+      return Response.json({ success: false, error: { message: 'Access denied' } }, { status: 403 });
+    }
+    const input = await json${ts ? '<Record<string, unknown>>' : ''}().catch(() => null);
+    if (!input || typeof input !== 'object' || Array.isArray(input)) {
+      return Response.json({ success: false, error: { message: 'Expected a JSON object' } }, { status: 400 });
+    }
+    const workflowContext = { db, user, input };
+    return handle(workflowContext);
+  },
+}]${ts ? ' satisfies MosaicEndpointRegistration[];' : ';'}
+`);
+    put('mosaic/custom-workflow.json', json({ ...custom, source: undefined, allowedRoles: roles }));
+  }
+  if (!custom && app.workflows?.length) put('mosaic/openapi.json', json(buildOpenApiDocument(createWorkflowEndpoints(app.workflows))));
+  put(`${server}/mosaic-app.json`, json({ entities: app.entities, forms: app.forms, pages: app.pages, workflows: app.workflows ?? [], roles: app.roles ?? [] }));
   // Code-owned entity files: synced at boot in local development and reviewable in Git.
-  for (const entity of input.app.entities) put(`${framework === 'nextjs' ? 'entities' : `${SERVER}/entities`}/${entity.name}.entity.json`, json(entity));
+  for (const entity of app.entities) put(`${framework === 'nextjs' ? 'entities' : `${SERVER}/entities`}/${entity.name}.entity.json`, json(entity));
   out.set('mosaic/spec.json', { path: 'mosaic/spec.json', content: json(input.spec) });
   return [...out.values()].sort((a, b) => a.path.localeCompare(b.path));
 }

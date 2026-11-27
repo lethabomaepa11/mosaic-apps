@@ -12,6 +12,8 @@ import { applyApp, httpCaller, loginToken } from './mosaic-runtime';
 import { randomBytes } from 'node:crypto';
 import { blueprintFromSpec, compileSpec, type AppSpec, type CompiledApp } from './spec';
 import { generateProjectFiles, persistGeneratedRelease, persistReleaseFiles, type GeneratedFile } from './generation';
+import { writeCustomCode, type CustomCode } from './custom-code';
+import { verifyReleaseInSandbox } from './app-sandbox';
 import { frameworkVersion } from './template';
 import { decryptProviderSecret, encryptProviderSecret, VercelCredentialError, type Provider } from './providers';
 import { createGitHubRepository, createVercelProject, deleteProviderResource, deployToVercel, provisionNeon, pushToGitHub, releaseFramework, vercelDeploymentStatus } from './delivery';
@@ -272,10 +274,13 @@ const generate: JobHandler = async ({ db, job, stage, think, pause, enqueue, req
   const metadata = job.metadata;
   const answers = (metadata.answers ?? []) as Answer[];
   const refinedSpec = metadata.refinedSpec as string | undefined;
+  const codeMode = metadata.generationMode === 'one-shot-code';
+  const carriedCode = !codeMode && (metadata.reuseBlueprint || metadata.revise) ? await latestCustomCode(db, project.id) : null;
+  const sandboxBuild = codeMode || Boolean(carriedCode);
   if (metadata.generationMode && !refinedSpec) {
     await stage('Evaluating your brief', 3);
     const refined = await refineBrief({
-      brief: project.prompt, answers, options, config: await aiConfigFor(metadata.userId),
+      brief: project.prompt, answers, options, config: await aiConfigFor(metadata.userId), customCode: codeMode,
       onWait: (seconds) => think('Brief evaluator', `Retrying brief evaluation in ${seconds}s after an AI rate limit…`),
     });
     if (refined.questions.length) {
@@ -343,7 +348,7 @@ const generate: JobHandler = async ({ db, job, stage, think, pause, enqueue, req
     if (!verifiedSpec && typeof job.metadata.allowRegistration === 'boolean') {
       spec = { ...spec, allowRegistration: job.metadata.allowRegistration };
       await db.tx(async (tx) => {
-        await tx.query('UPDATE cloud_projects SET app_spec = $2::jsonb, updated_at = now() WHERE id = $1', [project.id, JSON.stringify(spec)]);
+        if (!sandboxBuild) await tx.query('UPDATE cloud_projects SET app_spec = $2::jsonb, updated_at = now() WHERE id = $1', [project.id, JSON.stringify(spec)]);
         await tx.query("UPDATE cloud_jobs SET metadata = metadata || jsonb_build_object('verifiedSpec', $2::jsonb) WHERE id = $1", [job.id, JSON.stringify(spec)]);
       });
     }
@@ -372,16 +377,52 @@ const generate: JobHandler = async ({ db, job, stage, think, pause, enqueue, req
       ai, brief, answers: refinedSpec ? [] : answers, options,
       current: revising ? project.app_spec! : undefined, change: revising ? String(job.metadata.prompt ?? '') : undefined,
       askQuestions: !refinedSpec && !revising && !askedBefore.rows.length && !notes.length && !job.metadata.answers && !job.metadata.skipQuestions,
+      customCode: sandboxBuild,
     }, { think, progress: async (percent) => { await db.query('UPDATE cloud_jobs SET progress = $2 WHERE id = $1', [job.id, percent]); } });
     if (result.status === 'needs_input') {
       await pause(result.questions, `Before I build, a few quick questions:\n${result.questions.map((question) => `• ${question.question}`).join('\n')}`);
       return;
     }
     ({ spec, app } = result);
+    if (sandboxBuild) {
+      await stage('Base app verified. Waiting for sandbox checks', 84);
+      await requeue(0, { ...metadata, verifiedSpec: spec, verifiedModel: respondingModel });
+      return;
+    }
     await db.tx(async (tx) => {
       await tx.query('UPDATE cloud_projects SET app_spec = $2::jsonb, blueprint = $3::jsonb, planner_model = $4, planned_at = now(), updated_at = now() WHERE id = $1', [project.id, JSON.stringify(spec), JSON.stringify(blueprintFromSpec(spec)), respondingModel]);
       await addMessage(tx, project.id, `${spec.summary}\n\nBuilt ${spec.entities.length} entities (${spec.entities.map((entity) => entity.labelPlural).join(', ')}) with ${spec.pages.length} pages, verified with real create/list/edit checks${result.reviewApproved ? ' and approved by the reviewer' : ''}.`);
       await tx.query("UPDATE cloud_jobs SET metadata = metadata || jsonb_build_object('verifiedSpec', $2::jsonb) WHERE id = $1", [job.id, JSON.stringify(spec)]);
+    });
+  }
+  const releaseInput = { projectId: project.id, jobId: job.id, name: project.name, slug: project.slug, spec, app, framework: project.app_framework, theme: project.ui_theme };
+  let custom = metadata.verifiedCustom as CustomCode | null | undefined;
+  if (sandboxBuild && custom === undefined) {
+    const config = await aiConfigFor(metadata.userId);
+    const brief = [refinedSpec ?? project.prompt, metadata.revise && metadata.prompt].filter(Boolean).join('\n\nRequested change: ');
+    let draft = metadata.customDraft as CustomCode | null | undefined;
+    if (draft === undefined) {
+      await stage('Designing the custom workflow', 85);
+      draft = carriedCode && metadata.reuseBlueprint
+        ? carriedCode : await writeCustomCode({ brief, spec, config, previous: carriedCode ?? undefined });
+      await requeue(0, { ...metadata, verifiedSpec: spec, customDraft: draft });
+      return;
+    }
+    if (draft && !spec.entities.some((entity) => entity.name === draft.entity)) throw new Error('The existing custom workflow still needs its entity and form.');
+    await stage('Verifying the production build in Vercel Sandbox', 87);
+    custom = await verifyReleaseInSandbox({
+      framework: project.app_framework, baseline: generateProjectFiles(releaseInput), custom: draft,
+      render: (candidate) => generateProjectFiles({ ...releaseInput, custom: candidate }),
+      repair: (previous, failure) => writeCustomCode({ brief, spec, config, previous, failure }),
+      status: (message) => think('Verifier', message),
+    });
+    await db.tx(async (tx) => {
+      await tx.query('UPDATE cloud_projects SET app_spec = $2::jsonb, blueprint = $3::jsonb, planner_model = COALESCE($4, planner_model), planned_at = now(), updated_at = now() WHERE id = $1',
+        [project.id, JSON.stringify(spec), JSON.stringify(blueprintFromSpec(spec)), metadata.verifiedModel ?? null]);
+      await tx.query("UPDATE cloud_jobs SET metadata = metadata || jsonb_build_object('verifiedCustom', $2::jsonb) WHERE id = $1", [job.id, JSON.stringify(custom)]);
+      await addMessage(tx, project.id, custom
+        ? 'The production build and custom workflow passed Vercel Sandbox checks. Cloud Preview shows the standard app artifacts. Download the release to try the custom workflow, or use Deliver latest after reviewing the source.'
+        : 'The production build, database health and sign-in passed Vercel Sandbox checks.');
     });
   }
   if (job.metadata.generationMode !== 'staged') {
@@ -389,13 +430,14 @@ const generate: JobHandler = async ({ db, job, stage, think, pause, enqueue, req
     await publishToPreview(project, spec, app, job.id);
   }
   await stage('Packaging the release', 90);
-  const release = await persistGeneratedRelease(db, { projectId: project.id, jobId: job.id, name: project.name, slug: project.slug, spec, app, framework: project.app_framework, theme: project.ui_theme });
+  const release = await persistGeneratedRelease(db, { ...releaseInput, custom });
   const connected = await db.query<{ provider: string }>(
     `SELECT DISTINCT connection.provider FROM cloud_provider_connections connection JOIN cloud_projects project ON project.organization_id = connection.organization_id
      WHERE project.id = $1 AND connection.status = 'connected'`, [project.id],
   );
-  if (connected.rows.length) await enqueue('deliver', { releaseId: release.id });
-  await db.query("UPDATE cloud_projects SET status = $2, updated_at = now() WHERE id = $1", [project.id, connected.rows.length ? 'delivering' : 'ready']);
+  const autoDeliver = connected.rows.length > 0 && !custom;
+  if (autoDeliver) await enqueue('deliver', { releaseId: release.id });
+  await db.query("UPDATE cloud_projects SET status = $2, updated_at = now() WHERE id = $1", [project.id, autoDeliver ? 'delivering' : 'ready']);
   await stage(`Release v${release.version} ready`, 100);
 };
 
@@ -404,6 +446,19 @@ async function releaseFiles(db: Db, releaseId: string): Promise<{ version: numbe
   if (!release.rows[0]) throw new Error('The release to deliver no longer exists.');
   const files = await db.query<GeneratedFile>('SELECT path, content, mode FROM cloud_release_files WHERE release_id = $1 ORDER BY path', [releaseId]);
   return { version: release.rows[0].version, files: files.rows };
+}
+
+function releaseCustomCode(files: GeneratedFile[]): CustomCode | null {
+  const contract = files.find((file) => file.path === 'mosaic/custom-workflow.json');
+  const source = files.find((file) => /^(?:lib|apps\/web\/src\/lib\/server)\/custom-workflow\.js$/.test(file.path));
+  return contract && source ? { ...JSON.parse(contract.content), source: source.content } : null;
+}
+
+async function latestCustomCode(db: Db, projectId: string) {
+  const { rows } = await db.query<GeneratedFile>(`SELECT file.path, file.content FROM cloud_release_files file
+    WHERE file.release_id = (SELECT id FROM cloud_releases WHERE project_id = $1 AND status = 'ready' ORDER BY version DESC LIMIT 1)
+    AND file.path IN ('mosaic/custom-workflow.json', 'lib/custom-workflow.js', 'apps/web/src/lib/server/custom-workflow.js')`, [projectId]);
+  return releaseCustomCode(rows);
 }
 
 const upgrade: JobHandler = async ({ db, job, stage }) => {
@@ -427,7 +482,7 @@ const upgrade: JobHandler = async ({ db, job, stage }) => {
       || /^(?:apps\/web\/src\/lib\/server\/)?entities\//.test(path);
     const generated = generateProjectFiles({
       name: project.name, slug: project.slug, framework, theme: project.ui_theme, projectId: project.id,
-      spec: JSON.parse(specFile.content), app: JSON.parse(manifest.content),
+      spec: JSON.parse(specFile.content), app: JSON.parse(manifest.content), custom: releaseCustomCode(base),
     });
     const files = [...generated.filter((file) => !isAppFile(file.path)), ...base.filter((file) => isAppFile(file.path))]
       .sort((a, b) => a.path.localeCompare(b.path));
