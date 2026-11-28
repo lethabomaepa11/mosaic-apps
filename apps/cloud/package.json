@@ -19,7 +19,7 @@
     "@sveltejs/adapter-vercel": "^7.0.0",
     "@sveltejs/kit": "^3.0.1",
     "@vercel/functions": "^3.1.0",
-    "@vercel/sandbox": "^5.0.0",
+    "@vercel/sandbox": "4.0.0",
     "svelte": "^5.57.2"
   },
   "devDependencies": {
